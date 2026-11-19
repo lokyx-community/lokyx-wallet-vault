@@ -14,7 +14,7 @@ It runs inside `watchtower/server.mjs`, so it is one server for alerts and for t
 
 ```
 cd wallet
-RELAY_FILE=/var/lib/lokyx/relay.json PORT=8787 node watchtower/server.mjs
+RELAY_FILE=/var/lib/lokyx/relay.json PORT=8787 node --experimental-strip-types watchtower/server.mjs
 ```
 
 Add `NODE_RPC=https://your-node/rpc` as well if this server should also send vault alerts. Without it only the relay runs.
@@ -40,7 +40,7 @@ After=network.target
 User=lokyx
 WorkingDirectory=/opt/lokyx/wallet
 Environment=PORT=8787 RELAY_FILE=/var/lib/lokyx/relay.json
-ExecStart=/usr/bin/node watchtower/server.mjs
+ExecStart=/usr/bin/node --experimental-strip-types watchtower/server.mjs
 Restart=always
 
 [Install]
@@ -53,7 +53,12 @@ Check it: `curl https://relay.example.com/health` answers `{"ok":true,...}`.
 
 200 messages per topic, 20,000 topics, 12 KB per message, a rate limit per address. Messages older than a week are dropped.
 
-## Not wired into the screens yet
+## In the app
 
-`src/lib/relay-seal.ts` and `src/lib/relay-client.ts` are the phone side, tested. The shared-account screens do not call them yet, so
-today payment codes still pass through the share sheet.
+- The relay used is `https://relay.naptunemist.xyz` unless `w.relayUrl` holds another https address.
+- A new Ethereum/BNB or Bitcoin shared account gets a random group key. Ethereum/BNB: it is in the setup message and the others paste it
+  under "I've been added". Bitcoin: one person shares it from the new-account screen and the others paste it there.
+- "Sign and share" and "Approve" also leave the payment on the relay. Each phone checks the relay every 8 seconds while that account's screen is open,
+  merges the copies, drops anything that is not a plain coin or token payment for that account, and opens the newest one. Signatures are still checked against the owners.
+- Accounts made before this have no key and keep using the share sheet. If the relay does not answer, the share sheet opens instead.
+- Not done: background pings (a phone only learns of a payment while it has that screen open), a screen to change the relay address, and LOKYX accounts (those are on chain and need no relay).

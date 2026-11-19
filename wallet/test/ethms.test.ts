@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { privateKeyToAccount } from 'viem/accounts';
 import { decodeFunctionData, encodeFunctionData, getAddress, type Hex } from 'viem';
-import { addSignature, assertSignable, createCall, decodePay, describePay, encodePay, execData, netOfChainId, sharedAddress, tokenPay, validSigners, type Pay } from '../src/lib/ethms-core.ts';
+import { addSignature, assertSignable, createCall, decodePay, describePay, encodePay, execData, netOfChainId, payHash, pendingPays, sharedAddress, tokenPay, validSigners, type Pay } from '../src/lib/ethms-core.ts';
 import { ABI } from '../src/lib/ethvault-core.ts';
 
 const keys: Hex[] = ['0x' + '11'.repeat(32), '0x' + '22'.repeat(32), '0x' + '33'.repeat(32)] as Hex[];
@@ -82,4 +82,25 @@ test('shared account: the network comes from the chain id', () => {
   assert.equal(netOfChainId(8453), 'base');
   assert.equal(netOfChainId(1), 'mainnet');
   assert.equal(netOfChainId(999999), null);
+});
+
+test('relay inbox: copies of one payment merge, and wrong, used-up, hidden or odd ones are dropped', async () => {
+  const safe = sharedAddress({ owners: who, threshold: 2 });
+  const base = { chainId: 11155111, safe, to: '0x000000000000000000000000000000000000dEaD' as Hex, value: '1000', nonce: '0' };
+  const a = await addSignature({ ...base, sigs: {} }, keys[0], who[0]);
+  const b = await addSignature({ ...base, sigs: {} }, keys[1], who[1]);
+  const other: Pay = { ...base, value: '2000', sigs: {} };
+  const codes = [encodePay(a), encodePay(b), encodePay(other), 'junk', encodePay({ ...base, safe: who[0], sigs: {} })];
+
+  const out = pendingPays(codes, safe, 11155111, 0n, new Set());
+  assert.equal(out.length, 2);
+  const merged = out.find((x) => x.sigs === 2)!;
+  assert.ok(merged);
+  assert.equal((await validSigners(decodePay(merged.code), who)).length, 2);
+  assert.equal(merged.hash, payHash(a));
+
+  assert.equal(pendingPays(codes, safe, 11155111, 1n, new Set()).length, 0); // the account moved on: both used up
+  assert.equal(pendingPays(codes, safe, 11155111, 0n, new Set([merged.hash])).length, 1); // dismissed
+  assert.equal(pendingPays(codes, safe, 1, 0n, new Set()).length, 0); // another network
+  assert.equal(pendingPays([encodePay({ ...base, data: '0x12345678' as Hex, sigs: {} })], safe, 11155111, 0n, new Set()).length, 0); // not a plain transfer
 });

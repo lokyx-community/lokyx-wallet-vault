@@ -16,6 +16,7 @@ import { confirmIt } from '../../../lib/auth';
 import { activeNets, ensureAddresses, useChainSettings } from '../../../lib/multichain';
 import { ETH_NETS, ethAddressOk, ethNetChoices, type EthNet } from '../../../lib/multichain-core';
 import { sharedAddress } from '../../../lib/ethms-core';
+import { groupKeyOk } from '../../../lib/relay-seal';
 import { addEthShared, safeReady } from '../../../lib/ethms';
 
 const avatar = (t: string) => (
@@ -44,6 +45,7 @@ export default function NewEthShared() {
   const [need, setNeed] = useState(2);
   const [mode, setMode] = useState<'make' | 'add'>('make');
   const [busy, setBusy] = useState(false);
+  const [relayKey, setRelayKey] = useState('');
   useEffect(() => {
     ensureAddresses().then((a) => setMe(a.eth), () => {});
   }, []);
@@ -78,6 +80,7 @@ export default function NewEthShared() {
       <Segmented value={mode} onChange={setMode} options={[['make', 'Make one'], ['add', "I've been added"]]} />
       <T v="sub" dim style={{ lineHeight: 21, fontSize: 14.5, paddingHorizontal: 6 }}>{mode === 'make' ? 'Money moves when enough people approve. You pay the network fee once.' : 'Enter the same network, people and number as whoever made it.'}</T>
       <Field value={name} onChangeText={setName} placeholder="Name, like Family fund" maxLength={30} />
+      {mode === 'add' ? <Field value={relayKey} onChangeText={setRelayKey} placeholder="Relay key from the setup message (optional)" autoCapitalize="none" autoCorrect={false} mono /> : null}
 
       <Group title="Network">
         <LeadRow lead={<NetMark net={net} size={40} />} title={ETH_NETS[net].label} sub={netSub} subColor={ready === 'no' ? C.wait : undefined} chevron onPress={() => setPick(true)} />
@@ -111,7 +114,8 @@ export default function NewEthShared() {
           if (mode === 'make' && !(await confirmIt(`Create the shared account on ${ETH_NETS[net].label} (network fee)`))) return;
           setBusy(true);
           try {
-            const s = await addEthShared(name, owners, t, mode === 'make', net);
+            if (mode === 'add' && relayKey.trim() && !groupKeyOk(relayKey)) throw new Error("That relay key isn't valid. Copy it again from the setup message.");
+            const s = await addEthShared(name, owners, t, mode === 'make', net, mode === 'add' ? relayKey : undefined);
             router.replace(`/shared/eth/${s.address}?chain=${s.chainId}`);
           } catch (e) {
             toast((e as Error).message, 'info');

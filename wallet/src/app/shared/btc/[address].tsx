@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Share, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -14,7 +14,8 @@ import { confirmIt } from '../../../lib/auth';
 import { useAsync } from '../../../lib/multichain';
 import { formatBtc, parseBtc } from '../../../lib/multichain-core';
 import { readSpend } from '../../../lib/btcms-core';
-import { myMsPub, removeBtcShared, sendFinished, sharedBalance, signWithMine, startPayment, useBtcShared } from '../../../lib/btcms';
+import { dismissPay, sendToGroup } from '../../../lib/relay';
+import { incomingSpends, myMsPub, removeBtcShared, spendId, type IncomingSpend, sendFinished, sharedBalance, signWithMine, startPayment, useBtcShared } from '../../../lib/btcms';
 
 /** A shared Bitcoin account: balance, its address to receive, and passing a payment around until it has enough signatures. */
 export default function BtcSharedScreen() {
@@ -28,6 +29,20 @@ export default function BtcSharedScreen() {
   const [amt, setAmt] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  // payments the others left on the relay: the newest opens by itself, and a copy with more signatures replaces the one on screen
+  const inbox = useAsync<IncomingSpend[]>(async () => (s?.relay ? incomingSpends(s) : []), [address], 8_000);
+  useEffect(() => {
+    const list = inbox.data ?? [];
+    if (!s || !list.length) return;
+    if (!code.trim()) return setCode(list[0].code);
+    try {
+      const cur = readSpend(s, code);
+      const m = list.find((x) => x.id === spendId(s.address, cur));
+      if (m && m.signatures > cur.signatures) setCode(m.code);
+    } catch {
+      // a code typed by hand that is not a payment: leave it alone
+    }
+  }, [inbox.data]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!s) return <Screen title="Shared Bitcoin"><T v="sub" dim>That account isn't on this phone.</T></Screen>;
 
   let reading: ReturnType<typeof readSpend> | null = null;
@@ -48,7 +63,10 @@ export default function BtcSharedScreen() {
       const d = await startPayment(s, to.trim(), parseBtc(amt));
       setCode(d.psbt);
       setSheet('code');
-      if (s.m > 1) await Share.share({ message: `Please approve this payment from "${s.name}": open LOKYX › Apps › Shared accounts › ${s.name} › I have a payment code, and paste:\n\n${d.psbt}` });
+      if (s.m > 1) {
+        if (await sendToGroup(s.relay, d.psbt)) toast('Sent to the others', 'send');
+        else await Share.share({ message: `Please approve this payment from "${s.name}": open LOKYX › Apps › Shared accounts › ${s.name} › I have a payment code, and paste:\n\n${d.psbt}` });
+      }
     } catch (e) {
       toast((e as Error).message, 'info');
     } finally {
@@ -63,7 +81,10 @@ export default function BtcSharedScreen() {
       setCode(next);
       success();
       const r = readSpend(s, next);
-      if (!r.ready) await Share.share({ message: `Signed (${r.signatures} of ${r.needed}). Next person, paste this in LOKYX:\n\n${next}` });
+      if (!r.ready) {
+        if (await sendToGroup(s.relay, next)) toast('Sent to the others', 'send');
+        else await Share.share({ message: `Signed (${r.signatures} of ${r.needed}). Next person, paste this in LOKYX:\n\n${next}` });
+      } else await sendToGroup(s.relay, next);
     } catch (e) {
       toast((e as Error).message, 'info');
     } finally {
@@ -74,7 +95,9 @@ export default function BtcSharedScreen() {
     if (!(await confirmIt('Send this payment'))) return;
     setBusy(true);
     try {
+      const done = readSpend(s, code);
       await sendFinished(s, code);
+      await dismissPay(spendId(s.address, done));
       success();
       toast('Sent to the Bitcoin network', 'send');
       setCode('');

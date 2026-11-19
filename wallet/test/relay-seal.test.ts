@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newGroupKey, openMsg, sealMsg, topicOf } from '../src/lib/relay-seal.ts';
+import { groupKeyOk, newGroupKey, openMsg, sealMsg, topicOf } from '../src/lib/relay-seal.ts';
 import { relayGet, relayNotify, relayPut, relayUrlOk } from '../src/lib/relay-client.ts';
 import { RelayStore, checkPut } from '../src/lib/relay-store.ts';
 
@@ -49,4 +49,11 @@ test('relay client: only https relays', () => {
   assert.equal(relayUrlOk('https://relay.example.com:8443/r'), true);
   assert.equal(relayUrlOk('http://relay.example.com'), false);
   assert.equal(relayUrlOk('https://localhost'), false);
+});
+
+test('relay seal: only a real group key is accepted', () => {
+  assert.equal(groupKeyOk(newGroupKey()), true);
+  assert.equal(groupKeyOk(` ${newGroupKey()}\n`), true);
+  assert.equal(groupKeyOk('short'), false);
+  assert.equal(groupKeyOk('not a key!'), false);
 });

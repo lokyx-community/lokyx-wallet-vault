@@ -44,6 +44,15 @@ const keyBytes = (k: string): Uint8Array => {
   return b;
 };
 
+/** True if this is a group key this version can use (32 bytes, in the relay's text form). */
+export const groupKeyOk = (k: string): boolean => {
+  try {
+    return fromB64(k.trim()).length === 32; // pasted keys often carry a space or a line break
+  } catch {
+    return false;
+  }
+};
+
 /** The mailbox name: a hash of the key, so the relay learns nothing about who or what it is for. */
 export const topicOf = (groupKey: string): string =>
   [...sha256(new Uint8Array([...enc.encode('lokyx-relay-topic-v1'), ...keyBytes(groupKey)]))].map((x) => x.toString(16).padStart(2, '0')).join('');

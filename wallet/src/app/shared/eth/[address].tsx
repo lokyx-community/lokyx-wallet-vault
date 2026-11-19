@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Share, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -16,8 +16,9 @@ import { C } from '../../../ui/theme';
 import { confirmIt } from '../../../lib/auth';
 import { ensureAddresses, lookupToken, tokensFor, useAsync } from '../../../lib/multichain';
 import { ETH_NETS, EVM_FAMILIES, evmOf, formatUnits, type EthToken } from '../../../lib/multichain-core';
-import { decodePay, describePay, encodePay, netOfChainId, validSigners, type Pay, type PayView } from '../../../lib/ethms-core';
-import { addSharedToken, readEthShared, readSharedTokens, removeEthShared, sendEthPay, signEthPay, startEthPay, useEthShared } from '../../../lib/ethms';
+import { decodePay, describePay, encodePay, netOfChainId, payHash, validSigners, type Pay, type PayView, type Pending } from '../../../lib/ethms-core';
+import { dismissPay, sendToGroup } from '../../../lib/relay';
+import { addSharedToken, incomingPays, readEthShared, readSharedTokens, removeEthShared, sendEthPay, signEthPay, startEthPay, useEthShared } from '../../../lib/ethms';
 
 const short = (a: string) => `${a.slice(0, 8)}…${a.slice(-6)}`;
 const radio = (on: boolean) => (
@@ -54,6 +55,20 @@ export default function EthSharedScreen() {
   const signers = useAsync(async () => (pay && s ? validSigners(pay, s.owners) : []), [code]);
   const knownTok = view?.kind === 'token' && net ? tokensFor(net).find((t) => t.contract.toLowerCase() === view!.token.toLowerCase()) : undefined;
   const lookedUp = useAsync<EthToken | null>(async () => (view?.kind === 'token' && net && !knownTok ? lookupToken(net, view.token).catch(() => null) : null), [code]);
+  // payments the others left on the relay: the newest one opens by itself, and a newer copy with more signatures replaces the one on screen
+  const inbox = useAsync<Pending[]>(async () => (s?.relay ? incomingPays(s, info.data?.nonce) : []), [address, chain, String(info.data?.nonce ?? '')], 8_000);
+  useEffect(() => {
+    const list = inbox.data ?? [];
+    if (!list.length) return;
+    if (!code.trim()) return setCode(list[0].code);
+    try {
+      const cur = decodePay(code);
+      const m = list.find((x) => x.hash === payHash(cur));
+      if (m && m.sigs > Object.keys(cur.sigs ?? {}).length) setCode(m.code);
+    } catch {
+      // a code typed by hand that is not a payment: leave it alone
+    }
+  }, [inbox.data]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!s || !net) return <Screen title="Shared account"><T v="sub" dim>That account isn't on this phone.</T></Screen>;
 
   const unit = ETH_NETS[net].unit;
@@ -93,7 +108,7 @@ export default function EthSharedScreen() {
       <ActionRow items={[
         { icon: 'send', label: 'Send', onPress: () => setSheet('pay') },
         { icon: 'receive', label: 'Receive', onPress: () => setSheet('recv') },
-        { icon: 'share', label: 'Send the setup to the others', onPress: () => Share.share({ message: `Add our shared account in LOKYX (Apps › Shared accounts › Ethereum › I've been added).\nNetwork: ${ETH_NETS[net].label}\nPeople:\n${s.owners.join('\n')}\nApprovals needed: ${s.threshold}\nAddress: ${s.address}` }) },
+        { icon: 'share', label: 'Send the setup to the others', onPress: () => Share.share({ message: `Add our shared account in LOKYX (Apps › Shared accounts › Ethereum › I've been added).\nNetwork: ${ETH_NETS[net].label}\nPeople:\n${s.owners.join('\n')}\nApprovals needed: ${s.threshold}\nAddress: ${s.address}${s.relay ? `\nRelay key: ${s.relay}` : ''}` }) },
       ]} />
       {info.data && !info.data.exists ? <ErrorText>This account has not been created on {ETH_NETS[net].label} yet. Ask whoever made it, or make it again with the same people.</ErrorText> : null}
 
@@ -172,7 +187,8 @@ export default function EthSharedScreen() {
             const c = encodePay(p);
             setCode(c);
             setSheet('code');
-            await Share.share({ message: `Please approve this payment from "${s.name}" in LOKYX (Shared accounts › ${s.name} › I have a payment code):\n\n${c}` });
+            if (await sendToGroup(s.relay, c)) toast('Sent to the others', 'send');
+            else await Share.share({ message: `Please approve this payment from "${s.name}" in LOKYX (Shared accounts › ${s.name} › I have a payment code):\n\n${c}` });
           })} />
         </View>
       </Sheet>
@@ -192,10 +208,10 @@ export default function EthSharedScreen() {
               <LeadRow lead={<View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: C.fill2, alignItems: 'center', justifyContent: 'center' }}><Icon name="people" size={19} color={C.text} width={1.9} /></View>} title={`${n} of ${s.threshold} approved`} sub={iSigned ? 'Yours is on it' : 'You have not signed'} />
             </Group>
           ) : null}
-          {pay && view && view.kind !== 'other' && ready ? <Button title="Send it (you pay the network fee)" busy={busy} onPress={() => run('Send this payment', async () => { await sendEthPay(s, pay!); success(); toast(`Sent on ${ETH_NETS[net].label}`, 'send'); setCode(''); setSheet(''); info.refresh(); toks.refresh(); })} /> : null}
-          {pay && view && view.kind !== 'other' && !ready && !iSigned ? <Button title="Approve" busy={busy} onPress={() => run(`Approve a payment of ${headline}`, async () => { const next = encodePay(await signEthPay(s, pay!)); setCode(next); success(); })} /> : null}
+          {pay && view && view.kind !== 'other' && ready ? <Button title="Send it (you pay the network fee)" busy={busy} onPress={() => run('Send this payment', async () => { await sendEthPay(s, pay!); await dismissPay(payHash(pay!)); success(); toast(`Sent on ${ETH_NETS[net].label}`, 'send'); setCode(''); setSheet(''); info.refresh(); toks.refresh(); })} /> : null}
+          {pay && view && view.kind !== 'other' && !ready && !iSigned ? <Button title="Approve" busy={busy} onPress={() => run(`Approve a payment of ${headline}`, async () => { const next = encodePay(await signEthPay(s, pay!)); setCode(next); success(); if (await sendToGroup(s.relay, next)) toast('Sent to the others', 'send'); })} /> : null}
           {pay && !ready && iSigned ? <Button title="Share it with the next person" kind="line" onPress={() => Share.share({ message: code })} /> : null}
-          {pay ? <Button title="Decline" kind="plain" onPress={() => { setCode(''); setSheet(''); }} /> : null}
+          {pay ? <Button title="Decline" kind="plain" onPress={async () => { await dismissPay(payHash(pay!)); setCode(''); setSheet(''); inbox.refresh(); }} /> : null}
         </View>
       </Sheet>
     </Screen>

@@ -9,6 +9,7 @@ import { Icon } from '../../../ui/Icon';
 import { toast } from '../../../ui/Toast';
 import { C, F } from '../../../ui/theme';
 import { Stepper } from '../../../ui/Stepper';
+import { groupKeyOk, newGroupKey } from '../../../lib/relay-seal';
 import { activeNets } from '../../../lib/multichain';
 import { KEY_PREFIX, msAddress, parseKey } from '../../../lib/btcms-core';
 import { addBtcShared, myMsPub } from '../../../lib/btcms';
@@ -25,6 +26,7 @@ export default function NewBtcShared() {
   const [others, setOthers] = useState<string[]>([]);
   const [typed, setTyped] = useState('');
   const [need, setNeed] = useState(2);
+  const [relayKey, setRelayKey] = useState(() => newGroupKey());
   useEffect(() => {
     myMsPub(net).then(setMine, (e) => setErr((e as Error).message));
   }, [net]);
@@ -66,6 +68,12 @@ export default function NewBtcShared() {
           <T style={{ fontFamily: F.semibold, fontSize: 15, color: C.inkText }}>{typed ? 'Add' : 'Paste'}</T>
         </Press>
       </View>
+      <Label>Automatic approvals</Label>
+      <Panel style={{ paddingVertical: 12, gap: 10 }}>
+        <T v="caption" dim style={{ lineHeight: 18 }}>One person shares this key, everyone else pastes it here. It lets your phones pass payments to each other without copying codes.</T>
+        <Field value={relayKey} onChangeText={setRelayKey} autoCapitalize="none" autoCorrect={false} mono />
+        <Secondary title="Share the relay key" onPress={() => Share.share({ message: `Relay key for our shared Bitcoin account: ${relayKey}` })} />
+      </Panel>
       <Label>Approvals needed</Label>
       <Stepper t={t} n={n} onChange={setNeed} />
       {preview ? (
@@ -80,7 +88,8 @@ export default function NewBtcShared() {
         disabled={!mine || n < 2}
         onPress={async () => {
           try {
-            const s = await addBtcShared({ name: name.trim() || 'Shared Bitcoin', net, m: t, keys });
+            if (!groupKeyOk(relayKey)) throw new Error("That relay key isn't valid. Copy it again.");
+            const s = await addBtcShared({ name: name.trim() || 'Shared Bitcoin', net, m: t, keys }, relayKey);
             router.replace(`/shared/btc/${s.address}`);
           } catch (e) {
             toast((e as Error).message, 'info');

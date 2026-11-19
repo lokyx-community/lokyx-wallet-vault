@@ -8,11 +8,16 @@ import { store, useStore } from './store';
 import { activeNets, ensureAddresses, ethBalance, ethCode, ethRead, lookupToken, sendEthCall, tokenBalance, tokensFor, addToken, withEthKey } from './multichain';
 import { ETH_NETS, type EthNet, type EthToken } from './multichain-core';
 import { ABI, deploymentOf } from './ethvault-core';
+import { pendingPays, type Pending } from './ethms-core';
+import { goneSet, allFromGroup } from './relay';
+import { newGroupKey } from './relay-seal';
 import { addSignature, assertSignable, createCall, execData, netOfChainId, sharedAddress, tokenPay, type EthShared, type Pay } from './ethms-core';
 
 export interface EthSharedSaved extends EthShared {
   address: Hex;
   at: number;
+  /** the group key for automatic approvals through the relay; accounts made before it have none and keep using codes */
+  relay?: string;
 }
 export const ethShared = store<EthSharedSaved[]>([]);
 export const useEthShared = () => useStore(ethShared);
@@ -41,7 +46,7 @@ export async function safeReady(net: EthNet): Promise<boolean> {
 }
 
 /** Remember it, and create it on chain if nobody has yet (you pay the gas). */
-export async function addEthShared(name: string, owners: string[], threshold: number, create: boolean, net: EthNet = activeNets().eth): Promise<EthSharedSaved> {
+export async function addEthShared(name: string, owners: string[], threshold: number, create: boolean, net: EthNet = activeNets().eth, relayKey?: string): Promise<EthSharedSaved> {
   const s: EthShared = { name: name.trim() || 'Shared account', chainId: ETH_NETS[net].chainId, owners: owners.map((o) => getAddress(o)), threshold };
   const address = sharedAddress(s);
   if (create) {
@@ -51,7 +56,9 @@ export async function addEthShared(name: string, owners: string[], threshold: nu
       await sendEthCall(c.to, c.data, 0n, net);
     }
   }
-  const item = { ...s, address, at: Date.now() };
+  const before = ethShared.get().find((x) => x.address === address && x.chainId === s.chainId);
+  const relay = relayKey?.trim() || before?.relay || (create ? newGroupKey() : undefined);
+  const item = { ...s, address, at: Date.now(), ...(relay ? { relay } : {}) };
   await save([item, ...ethShared.get().filter((x) => x.address !== address || x.chainId !== s.chainId)]);
   return item;
 }
@@ -104,4 +111,10 @@ export async function sendEthPay(s: EthSharedSaved, p: Pay): Promise<string> {
   assertSignable(p);
   const { to, data } = await execData(p, s.owners, s.threshold);
   return sendEthCall(to, data, 0n, netOf(s));
+}
+
+/** Payments the others left for this account on the relay. Empty for an account with no group key. */
+export async function incomingPays(s: EthSharedSaved, nonce?: bigint): Promise<Pending[]> {
+  if (!s.relay) return [];
+  return pendingPays(await allFromGroup(s.relay), s.address, s.chainId, nonce, await goneSet());
 }

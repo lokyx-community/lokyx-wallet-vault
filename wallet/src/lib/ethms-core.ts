@@ -140,3 +140,36 @@ export function assertSignable(p: Pay): PayView {
   if (v.kind === 'other') throw new Error('This payment does something other than send a coin or a token, so this app will not sign it.');
   return v;
 }
+
+export interface Pending {
+  code: string;
+  hash: string;
+  /** signatures on it so far (counted, not yet checked: the screen checks them against the owners) */
+  sigs: number;
+}
+
+/**
+ * Out of everything the relay holds for a group, the payments still waiting on this account. Wrong account or network,
+ * a payment that is not a plain coin or token transfer, one already used up (its nonce is behind the account's) and any the
+ * person dismissed are dropped. Copies of one payment are merged into one with every signature seen.
+ */
+export function pendingPays(codes: string[], safe: string, chainId: number, nonce: bigint | undefined, gone: ReadonlySet<string>): Pending[] {
+  const best = new Map<string, { p: Pay; at: number }>();
+  codes.forEach((code, at) => {
+    try {
+      const p = decodePay(code);
+      if (p.chainId !== chainId || getAddress(p.safe) !== getAddress(safe)) return;
+      if (nonce !== undefined && BigInt(p.nonce) < nonce) return;
+      assertSignable(p);
+      const hash = payHash(p);
+      if (gone.has(hash)) return;
+      const cur = best.get(hash);
+      best.set(hash, { p: cur ? { ...cur.p, sigs: { ...cur.p.sigs, ...(p.sigs ?? {}) } } : { ...p, sigs: { ...(p.sigs ?? {}) } }, at });
+    } catch {
+      // not a payment for this account: ignore it
+    }
+  });
+  return [...best.entries()]
+    .sort((a, b) => b[1].at - a[1].at)
+    .map(([hash, { p }]) => ({ code: encodePay(p), hash, sigs: Object.keys(p.sigs).length }));
+}
