@@ -11,7 +11,9 @@ import { Icon } from './Icon';
 import { C, F } from './theme';
 import { EASE_OUT } from './motion';
 import { shortAddr } from '../lib/format';
-import { b64ToBytes, receiptImage, slipRows, slipText, type ImgItem, type SlipInput } from '../lib/slip-core';
+import { b64ToBytes, receiptImage, slipQrValue, slipRows, slipText, type ImgItem, type SlipInput } from '../lib/slip-core';
+import { qrCells } from '../lib/qr-cells';
+import { Qr } from './Qr';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -125,6 +127,12 @@ export function Slip({ slip, done, caption }: { slip: SlipInput; done: boolean; 
             </View>
           </Press>
         </Animated.View>
+        <Animated.View entering={FadeIn.delay(600 + rows.length * 90).duration(360)} style={{ alignItems: 'center', paddingTop: 14, paddingBottom: 4 }}>
+          <View style={{ borderRadius: 10, overflow: 'hidden' }}>
+            <Qr value={slipQrValue(slip)} size={92} />
+          </View>
+          <T v="caption" dim style={{ marginTop: 8 }}>Scan to look this payment up</T>
+        </Animated.View>
       </View>
       {w > 0 ? <Torn width={w} /> : null}
     </Animated.View>
@@ -190,7 +198,7 @@ function drawItem(it: ImgItem, i: number) {
 }
 
 function Capture({ req }: { req: ShareReq }) {
-  const img = useRef(receiptImage(req.slip, req.done)).current;
+  const img = useRef(receiptImage(req.slip, req.done, (() => { try { return qrCells(slipQrValue(req.slip)); } catch { return undefined; } })())).current;
   const ref = useRef<Svg>(null);
   useEffect(() => {
     let live = true;

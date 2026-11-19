@@ -10,6 +10,9 @@ import { Button, ErrorText, Note, Screen } from '../../ui/controls';
 import { SendCompose, SendReview } from '../../ui/SendCompose';
 import { LogoChips } from '../../ui/LogoChips';
 import { SlideToPay } from '../../ui/SlideToPay';
+import { WithdrawReceipt } from '../../ui/WithdrawReceipt';
+import { flyCoin } from '../../ui/CoinFlight';
+import type { SlipInput } from '../../lib/slip-core';
 import { confirmIt } from '../../lib/auth';
 import { useStore } from '../../lib/store';
 import { useAsync } from '../../lib/multichain';
@@ -26,7 +29,7 @@ export default function EthVaultSend() {
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
   const [err, setErr] = useState('');
-  const [done, setDone] = useState('');
+  const [receipt, setReceipt] = useState<{ slip: SlipInput; done: boolean; caption?: string } | null>(null);
   const [review, setReview] = useState(false);
   const snap = useAsync<Snapshot | null>(async () => { if (!v) await loadVaults(); const x = vaults.get()[net]; return x ? snapshot(x) : null; }, [net, !!v]);
   const s = snap.data;
@@ -56,7 +59,12 @@ export default function EthVaultSend() {
     if (!(await confirmIt(instant ? 'Send from your vault now' : 'Start a withdrawal that waits'))) return false;
     try {
       const r = await sendFromVault(v, s, token, to.trim() as Hex, raw);
-      setDone(r.how === 'instant' ? 'Sent.' : 'Started. It waits in the open, and you can cancel it until then. Open the vault to run it when the wait is over.');
+      setReceipt({
+        slip: { amount, unit, to: to.trim(), from: s.expected.safe, fromName: 'Vault', network: VAULT_NETS[net].label, at: Date.now(), hash: r.hash, testnet: !VAULT_NETS[net].real, url: `${VAULT_NETS[net].explorer}/tx/${r.hash}` },
+        done: r.how === 'instant',
+        caption: r.how === 'instant' ? undefined : 'Started · waits, and you can cancel it until then',
+      });
+      if (r.how === 'instant') flyCoin('out', net === 'bnb-testnet' ? 'bnb' : 'eth');
       checkEthVaults().catch(() => {});
       return true;
     } catch (e) {
@@ -77,16 +85,15 @@ export default function EthVaultSend() {
 
   if (review)
     return (
-      <Screen title="Review">
-        <SendReview amount={amount} unit={unit} to={to.trim()} lines={[words]}>
-          {info}
-        </SendReview>
+      <Screen title={receipt ? 'Sent' : 'Review'}>
+        {receipt ? null : (
+          <SendReview amount={amount} unit={unit} to={to.trim()} lines={[words]}>
+            {info}
+          </SendReview>
+        )}
         <ErrorText>{err}</ErrorText>
-        {done ? (
-          <>
-            <Note>{done}</Note>
-            <Button title="Back to the vault" onPress={() => router.replace(`/ethvault?net=${net}`)} />
-          </>
+        {receipt ? (
+          <WithdrawReceipt slip={receipt.slip} done={receipt.done} caption={receipt.caption} onDone={() => router.replace(`/ethvault?net=${net}`)} doneLabel="Back to the vault" />
         ) : (
           <>
             <SlideToPay label={instant ? 'Slide to send' : 'Slide to start (it waits)'} disabled={!call || !!refused || !s || !!problem} onSlide={go} />

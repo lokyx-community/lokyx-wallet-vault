@@ -11,10 +11,13 @@ import { LeadRow } from '../../../ui/LeadRow';
 import { Icon } from '../../../ui/Icon';
 import { Qr } from '../../../ui/Qr';
 import { Sheet } from '../../../ui/Sheet';
+import { WithdrawReceipt } from '../../../ui/WithdrawReceipt';
+import { flyCoin } from '../../../ui/CoinFlight';
+import type { SlipInput } from '../../../lib/slip-core';
 import { toast } from '../../../ui/Toast';
 import { C } from '../../../ui/theme';
 import { confirmIt } from '../../../lib/auth';
-import { ensurePrimary as ensureAddresses, lookupToken, tokensFor, useAsync } from '../../../lib/multichain';
+import { ensurePrimary as ensureAddresses, ethTxBlock, lookupToken, tokensFor, useAsync } from '../../../lib/multichain';
 import { ETH_NETS, EVM_FAMILIES, evmOf, formatUnits, type EthToken } from '../../../lib/multichain-core';
 import { decodePay, describePay, encodePay, netOfChainId, payHash, validSigners, type Pay, type PayView, type Pending } from '../../../lib/ethms-core';
 import { dismissPay, sendToGroup } from '../../../lib/relay';
@@ -36,7 +39,8 @@ export default function EthSharedScreen() {
   const info = useAsync(async () => (s ? readEthShared(s) : null), [address, chain], 20_000);
   const toks = useAsync(async () => (s ? readSharedTokens(s) : []), [address, chain], 30_000);
   const me = useAsync(async () => (await ensureAddresses()).eth, []);
-  const [sheet, setSheet] = useState<'' | 'pay' | 'code' | 'recv' | 'coin'>('');
+  const [sheet, setSheet] = useState<'' | 'pay' | 'code' | 'recv' | 'coin' | 'receipt'>('');
+  const [rcpt, setRcpt] = useState<SlipInput | null>(null);
   const [asset, setAsset] = useState('native');
   const [to, setTo] = useState('');
   const [amt, setAmt] = useState('');
@@ -139,6 +143,9 @@ export default function EthSharedScreen() {
       <Button title="I have a payment code" kind="line" onPress={() => setSheet('code')} />
       <Button title="Remove from this phone" kind="plain" onPress={async () => { await removeEthShared(s.address, s.chainId); router.back(); }} />
 
+      <Sheet open={sheet === 'receipt'} onClose={() => { setSheet(''); setRcpt(null); }}>
+        {rcpt ? <WithdrawReceipt slip={rcpt} poll={() => ethTxBlock(net, rcpt.hash)} onDone={() => { setSheet(''); setRcpt(null); }} /> : null}
+      </Sheet>
       <Sheet open={sheet === 'recv'} onClose={() => setSheet('')}>
         <View style={{ gap: 14, alignItems: 'center' }}>
           <T v="title">Receive</T>
@@ -208,7 +215,16 @@ export default function EthSharedScreen() {
               <LeadRow lead={<View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: C.fill2, alignItems: 'center', justifyContent: 'center' }}><Icon name="people" size={19} color={C.text} width={1.9} /></View>} title={`${n} of ${s.threshold} approved`} sub={iSigned ? 'Yours is on it' : 'You have not signed'} />
             </Group>
           ) : null}
-          {pay && view && view.kind !== 'other' && ready ? <Button title="Send it (you pay the network fee)" busy={busy} onPress={() => run('Send this payment', async () => { await sendEthPay(s, pay!); await dismissPay(payHash(pay!)); success(); toast(`Sent on ${ETH_NETS[net].label}`, 'send'); setCode(''); setSheet(''); info.refresh(); toks.refresh(); })} /> : null}
+          {pay && view && view.kind !== 'other' && ready ? <Button title="Send it (you pay the network fee)" busy={busy} onPress={() => run('Send this payment', async () => {
+            const txh = await sendEthPay(s, pay!);
+            const slipFor: SlipInput | null = view && view.kind === 'coin'
+              ? { amount: formatUnits(view.value, 18), unit, to: view.to, network: ETH_NETS[net].label, from: s.address, fromName: s.name, at: Date.now(), hash: txh, testnet: !ETH_NETS[net].real, url: `${ETH_NETS[net].explorer}/tx/${txh}` }
+              : view && view.kind === 'token' && tokMeta
+                ? { amount: formatUnits(view.amount, tokMeta.decimals), unit: tokMeta.symbol, to: view.to, network: ETH_NETS[net].label, from: s.address, fromName: s.name, at: Date.now(), hash: txh, testnet: !ETH_NETS[net].real, url: `${ETH_NETS[net].explorer}/tx/${txh}` }
+                : null;
+            await dismissPay(payHash(pay!)); success(); setCode(''); info.refresh(); toks.refresh();
+            if (slipFor) { setRcpt(slipFor); setSheet('receipt'); flyCoin('out', netLogoId(net) ?? 'eth'); } else { toast(`Sent on ${ETH_NETS[net].label}`, 'send'); setSheet(''); }
+          })} /> : null}
           {pay && view && view.kind !== 'other' && !ready && !iSigned ? <Button title="Approve" busy={busy} onPress={() => run(`Approve a payment of ${headline}`, async () => { const next = encodePay(await signEthPay(s, pay!)); setCode(next); success(); if (await sendToGroup(s.relay, next)) toast('Sent to the others', 'send'); })} /> : null}
           {pay && !ready && iSigned ? <Button title="Share it with the next person" kind="line" onPress={() => Share.share({ message: code })} /> : null}
           {pay ? <Button title="Decline" kind="plain" onPress={async () => { await dismissPay(payHash(pay!)); setCode(''); setSheet(''); inbox.refresh(); }} /> : null}

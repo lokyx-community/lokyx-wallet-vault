@@ -1,17 +1,12 @@
 import { useMemo } from 'react';
 import Svg, { Rect } from 'react-native-svg';
-import qrcode from 'qrcode-generator';
+import { qrCells } from '../lib/qr-cells';
 
 /** A QR code for an address or payment link (black on white so every scanner reads it). */
 export function Qr({ value, size = 220 }: { value: string; size?: number }) {
   const cells = useMemo(() => {
-    const q = qrcode(0, 'M');
-    q.addData(value);
-    q.make();
-    const n = q.getModuleCount();
-    const out: [number, number][] = [];
-    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (q.isDark(y, x)) out.push([x, y]);
-    return { n, out };
+    const { n, cells } = qrCells(value);
+    return { n, out: cells };
   }, [value]);
   const pad = 2;
   const total = cells.n + pad * 2;

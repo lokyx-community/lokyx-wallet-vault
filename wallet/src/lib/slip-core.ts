@@ -19,6 +19,13 @@ export type SlipInput = {
   url?: string;
 };
 
+/** What the receipt's QR code carries: the block explorer link when there is one, else the network and transaction id. */
+export function slipQrValue(s: SlipInput): string {
+  return s.url ?? `${s.network} ${s.hash}`;
+}
+
+export type QrCellsLike = { n: number; cells: [number, number][] };
+
 export type SlipRow = { label: string; value: string };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -101,7 +108,7 @@ export function tornPath(x: number, y: number, w: number, tooth = 10, depth = 6)
 }
 
 /** Where everything on the shared picture goes. Mirrors the receipt on screen: seal and state, amount, dotted rows, transaction. */
-export function receiptImage(s: SlipInput, done: boolean): ReceiptImage {
+export function receiptImage(s: SlipInput, done: boolean, qr?: QrCellsLike): ReceiptImage {
   const W = 390;
   const X0 = 24;
   const PW = W - X0 * 2;
@@ -145,7 +152,19 @@ export function receiptImage(s: SlipInput, done: boolean): ReceiptImage {
   y += 14;
   items.push({ k: 'circle', cx: W / 2 - 62, cy: y + 5, r: 4, fill: tint });
   items.push({ k: 'text', x: W / 2 - 50, y: y + 10, s: done ? `Confirmed on ${s.network}` : 'Confirming…', size: 13, weight: 'medium', fill: tint, anchor: 'start' });
-  y += 34;
+  y += 22;
+  if (qr && qr.n > 0) {
+    // a small white tile with the code, centred, so a scanner reads it straight off the picture
+    const tile = 104;
+    const pad = 2;
+    const cell = tile / (qr.n + pad * 2);
+    const tx = W / 2 - tile / 2;
+    items.push({ k: 'rect', x: tx, y, w: tile, h: tile, r: 8, fill: '#FFFFFF' });
+    for (const [cx, cy] of qr.cells) items.push({ k: 'rect', x: tx + (cx + pad) * cell, y: y + (cy + pad) * cell, w: cell + 0.3, h: cell + 0.3, r: 0, fill: '#000000' });
+    y += tile + 16;
+    items.push({ k: 'text', x: W / 2, y, s: 'Scan to look this payment up', size: 12, weight: 'regular', fill: SUB, anchor: 'middle' });
+    y += 22;
+  } else y += 12;
   items.push({ k: 'text', x: W / 2, y, s: 'LOKYX Wallet', size: 12, weight: 'medium', fill: FAINT, anchor: 'middle' });
   y += 24;
 

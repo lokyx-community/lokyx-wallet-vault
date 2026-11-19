@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { feeFromLines, slipRows, slipText } from '../src/lib/slip-core.ts';
+import { feeFromLines, slipRows, slipText, slipQrValue } from '../src/lib/slip-core.ts';
 
 const base = { amount: '0.015', unit: 'ETH', to: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', network: 'Sepolia', at: new Date(2026, 10, 18, 12, 41).getTime(), hash: '0x9f3a000000000000000000000000000000000000000000000000000000c21d' };
 
@@ -58,4 +58,17 @@ test('the torn edge is one closed zigzag that ends where it began', () => {
   const d = tornPath(24, 500, 342);
   assert.ok(d.startsWith('M24 500') && d.endsWith('Z'));
   assert.ok(d.includes('L366 500'));
+});
+
+test('the receipt QR carries the explorer link, or the network and id', () => {
+  const s = { amount: '1', unit: 'ETH', to: '0xabc', network: 'Sepolia', at: 0, hash: '0xdead' };
+  assert.equal(slipQrValue(s), 'Sepolia 0xdead');
+  assert.equal(slipQrValue({ ...s, url: 'https://x/tx/0xdead' }), 'https://x/tx/0xdead');
+});
+test('the receipt picture grows to hold the QR tile and stays unchanged without one', () => {
+  const s = { amount: '1', unit: 'ETH', to: '0xabc', network: 'Sepolia', at: 0, hash: '0xdead' };
+  const plain = receiptImage(s, true);
+  const withQr = receiptImage(s, true, { n: 21, cells: [[0, 0], [1, 1]] });
+  assert.ok(withQr.height > plain.height + 100);
+  assert.ok(withQr.items.length > plain.items.length);
 });
