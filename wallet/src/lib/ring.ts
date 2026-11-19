@@ -169,8 +169,8 @@ const RAYS = 180;
  * can be rotated any way, tilted a little, and either light on dark or dark on light. Returns the
  * type byte followed by the 20-byte address, or null.
  */
-export function decodeGray(gray: Uint8Array, w: number, h: number): Uint8Array | null {
-  return decodeSun(gray, w, h) ?? decodeRings(gray, w, h);
+export function decodeGray(gray: Uint8Array, w: number, h: number, until = Infinity): Uint8Array | null {
+  return decodeSun(gray, w, h, undefined, until) ?? decodeRings(gray, w, h);
 }
 
 /** The old four-ring codes only. */

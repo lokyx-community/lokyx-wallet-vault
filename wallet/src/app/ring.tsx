@@ -271,6 +271,7 @@ function Scan() {
   const [found, setFound] = useState<Found | null>(null);
   const [torch, setTorch] = useState(false);
   const [zoom, setZoom] = useState(0);
+  const [shot, setShot] = useState<string | undefined>(undefined);
   const [paste, setPaste] = useState(false);
   const [typed, setTyped] = useState('');
   const [note, setNote] = useState('');
@@ -285,6 +286,17 @@ function Scan() {
   }, []);
   const busy = useRef(false);
   const lastQr = useRef(0);
+
+  // The reader only needs the middle of the picture at 320 pixels, so ask the camera for a small photo (the same
+  // shape as its biggest, so the circle maps the same way) instead of a full 12-megapixel one: each photo then takes
+  // a fraction of the time to take and to shrink, and the ring is read several times more often.
+  useEffect(() => {
+    if (!ready || Platform.OS === 'web') return;
+    cam.current
+      ?.getAvailablePictureSizesAsync()
+      .then((all) => setShot(pickShotSize(all)))
+      .catch(() => {});
+  }, [ready]);
   const noteAt = useRef(0);
   const r = Math.min(width * 0.38, 170);
   const cy = height / 2;
@@ -337,7 +349,7 @@ function Scan() {
       const a = res.assets?.[0];
       if (res.canceled || !a) return;
       const qr = await scanFromURLAsync(a.uri, ['qr']).catch(() => []);
-      const f = qr[0] ? parsePayload(qr[0].data) : await ringFromPhoto({ uri: a.uri, width: a.width, height: a.height }, { w: a.width, h: a.height, r: Math.min(a.width, a.height) / 2 }).catch(() => null);
+      const f = qr[0] ? parsePayload(qr[0].data) : await ringFromPhoto({ uri: a.uri, width: a.width, height: a.height }, { w: a.width, h: a.height, r: Math.min(a.width, a.height) / 2 }, Infinity).catch(() => null);
       if (f) done(f);
       else say('No address or ring found in that photo.');
     } catch {
@@ -352,7 +364,7 @@ function Scan() {
     if (!ready || found) return;
     let live = true;
     const loop = async () => {
-      await new Promise((res) => setTimeout(res, 500));
+      await new Promise((res) => setTimeout(res, 200));
       while (live && !found) {
         const qrInView = Date.now() - lastQr.current < 1500;
         if (!busy.current && cam.current && !qrInView) {
@@ -368,7 +380,7 @@ function Scan() {
           }
           busy.current = false;
         }
-        await new Promise((res) => setTimeout(res, 120));
+        await new Promise((res) => setTimeout(res, 30));
       }
     };
     loop();
@@ -404,6 +416,7 @@ function Scan() {
         zoom={zoom}
         autofocus="on"
         animateShutter={false}
+        pictureSize={shot}
         onCameraReady={() => setReady(true)}
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         onBarcodeScanned={found ? undefined : (e) => {
@@ -541,4 +554,19 @@ function PasteSheet({ open, onClose, value, onChange, onFound, want }: { open: b
       </View>
     </Sheet>
   );
+}
+
+/** The smallest photo size of the camera's widest shape that still has at least 720 pixels on its short side. */
+export function pickShotSize(all: string[]): string | undefined {
+  const sizes = all
+    .map((s) => {
+      const m = /^(\d+)x(\d+)$/.exec(s);
+      return m ? { s, w: +m[1], h: +m[2] } : null;
+    })
+    .filter((x): x is { s: string; w: number; h: number } => !!x);
+  if (!sizes.length) return undefined;
+  const big = sizes.reduce((a, b) => (b.w * b.h > a.w * a.h ? b : a));
+  const shape = big.w / big.h;
+  const fit = sizes.filter((x) => Math.abs(x.w / x.h - shape) < 0.02 && Math.min(x.w, x.h) >= 720).sort((a, b) => a.w * a.h - b.w * b.h);
+  return fit[0]?.s;
 }

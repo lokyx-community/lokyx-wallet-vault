@@ -207,11 +207,11 @@ const TILTS: [number, number][] = (() => {
  * roughly in the middle and fill most of the picture. It can be turned any way, tilted a little,
  * mirrored, and light on dark or dark on light. Returns the type byte and the 20-byte address.
  */
-export function decodeSun(grayImg: Uint8Array, w: number, h: number, trace?: { marks: number; best: number[] }): Uint8Array | null {
-  return decodeWith(grayImg, w, h, STANDARD, trace) ?? decodeWith(grayImg, w, h, WIDE, trace);
+export function decodeSun(grayImg: Uint8Array, w: number, h: number, trace?: { marks: number; best: number[] }, until = Infinity): Uint8Array | null {
+  return decodeWith(grayImg, w, h, STANDARD, trace, until) ?? decodeWith(grayImg, w, h, WIDE, trace, until);
 }
 
-function decodeWith(grayImg: Uint8Array, w: number, h: number, p: Profile, trace?: { marks: number; best: number[] }): Uint8Array | null {
+function decodeWith(grayImg: Uint8Array, w: number, h: number, p: Profile, trace?: { marks: number; best: number[] }, until = Infinity): Uint8Array | null {
   // `trace` is for tools/sun-check: how many start marks were found, and the first reading
   const t = otsu(grayImg);
   for (const light of [true, false]) {
@@ -222,13 +222,50 @@ function decodeWith(grayImg: Uint8Array, w: number, h: number, p: Profile, trace
       const v = grayImg[yi * w + xi];
       return light ? (v > t ? 1 : 0) : v < t ? 1 : 0;
     };
-    const res = readWith(on, w, h, p, trace);
+    const res = readWith(on, w, h, p, trace, until);
     if (res) return res;
+    if (Date.now() > until) return null;
   }
   return null;
 }
 
-function readWith(on: (x: number, y: number) => number, w: number, h: number, p: Profile, trace?: { marks: number; best: number[] }): Uint8Array | null {
+/**
+ * Could this be a sun at all? Just inside the outer circle a sun is mostly empty space between thin rays, and
+ * further in the rays are still there. A blank wall, a hand or a bright disc fails this at once, so the slow
+ * search below only runs when a sun is really in the circle.
+ */
+function looksLikeSun(at: (rho: number, a: number) => [number, number], on: (x: number, y: number) => number, inner: number, rays: number): boolean {
+  const fill = (rho: number, n: number) => {
+    let k = 0;
+    for (let i = 0; i < n; i++) k += on(...at(rho, (i / n) * Math.PI * 2));
+    return k / n;
+  };
+  if (Math.max(fill(0.86, 180), fill(0.9, 180)) >= 0.8) return false;
+  // further in, every ray crosses: ink and gap take turns about once per ray, not once per pixel (noise) and not
+  // only a few times (a shadow, an edge, a plain wall). A blurry sun's rays run together near their base, so look
+  // at a few distances and keep the clearest.
+  const n = rays * 8;
+  let best = 0,
+    ink = 0;
+  for (const f of [0.3, 0.55, 0.8]) {
+    const rho = inner + (0.86 - inner) * f;
+    let k = 0,
+      turns = 0,
+      prev = on(...at(rho, 0));
+    for (let i = 1; i <= n; i++) {
+      const v = on(...at(rho, (i / n) * Math.PI * 2));
+      k += v;
+      if (v !== prev) turns++;
+      prev = v;
+    }
+    if (turns >= rays * 3) return false;
+    best = Math.max(best, turns);
+    ink = Math.max(ink, k / n);
+  }
+  return ink > 0.05 && best > rays * 0.2;
+}
+
+function readWith(on: (x: number, y: number) => number, w: number, h: number, p: Profile, trace?: { marks: number; best: number[] }, until = Infinity): Uint8Array | null {
   const { rays: RAYS, inner: INNER, base: BASE, step: STEP, rayStroke: RAY_STROKE, data: DATA } = p;
   const GAP = (i: number) => p.gaps.includes(i);
   let cx = w / 2,
@@ -281,6 +318,7 @@ function readWith(on: (x: number, y: number) => number, w: number, h: number, p:
       v = E.b * (rho / outer) * Math.sin(a);
     return [E.cx + cphi * u - sphi * v, E.cy + sphi * u + cphi * v];
   };
+  if (!looksLikeSun(flat, on, INNER, RAYS)) return null;
   const attempt = (bx: number, by: number): Uint8Array | null => {
     const b2 = bx * bx + by * by;
     const beta = Math.sqrt(b2);
@@ -417,6 +455,8 @@ function readWith(on: (x: number, y: number) => number, w: number, h: number, p:
   for (const [bx, by] of tries) {
     const m = attempt(bx, by);
     if (m) return m;
+    // out of time for this picture: the camera already has a newer one, which is a better bet
+    if (Date.now() > until) return null;
   }
   return null;
 }

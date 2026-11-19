@@ -16,7 +16,7 @@ const SIDE = 320;
  * Crops the circle out of a photo and looks for a ring in it. The circle sits in the middle of the
  * screen, so the crop is the photo's centre whichever way the photo came out.
  */
-export async function ringFromPhoto(photo: { uri: string; width: number; height: number }, view: { w: number; h: number; r: number }): Promise<Found | null> {
+export async function ringFromPhoto(photo: { uri: string; width: number; height: number }, view: { w: number; h: number; r: number }, budgetMs = 450): Promise<Found | null> {
   const portraitView = view.h >= view.w;
   const portraitPhoto = photo.height >= photo.width;
   const [vw, vh] = portraitView === portraitPhoto ? [view.w, view.h] : [view.h, view.w];
@@ -34,7 +34,8 @@ export async function ringFromPhoto(photo: { uri: string; width: number; height:
   const raw = jpeg.decode(base64.decode(out.base64.replace(/^data:.*?,/, '')), { useTArray: true, formatAsRGBA: true });
   const gray = new Uint8Array(raw.width * raw.height);
   for (let i = 0, j = 0; i < gray.length; i++, j += 4) gray[i] = (raw.data[j] * 77 + raw.data[j + 1] * 150 + raw.data[j + 2] * 29) >> 8;
-  const m = decodeGray(gray, raw.width, raw.height);
+  // at most about half a second on one picture: by then the camera has a newer, likely better one
+  const m = decodeGray(gray, raw.width, raw.height, Date.now() + budgetMs);
   if (!m) return null;
   const other = sunToChain(m[0], m.slice(1));
   if (other) return { address: other.address, how: 'ring', chain: other.chain };
