@@ -10,7 +10,6 @@ import { Icon } from '../../ui/Icon';
 import { Button } from '../../ui/controls';
 import { AppsCardArt, CARD_H, CARD_W } from '../../ui/AppsCardArt';
 import { C, F } from '../../ui/theme';
-import { EASE_OUT } from '../../ui/motion';
 
 /** Where the whole sequence is, 0 to 1. The end of it (0.92) is the settled "ready" screen. */
 const END = 0.92;
@@ -20,7 +19,7 @@ const LENGTH = 8300;
 const seg = (t: number, a: number, b: number) => {
   'worklet';
   const x = Math.min(1, Math.max(0, (t - a) / (b - a)));
-  return EASE_OUT(x);
+  return 1 - Math.pow(1 - x, 4); // a calm ease-out, the same feel as the app's own curve
 };
 const mix = (p: number, from: number, to: number) => {
   'worklet';

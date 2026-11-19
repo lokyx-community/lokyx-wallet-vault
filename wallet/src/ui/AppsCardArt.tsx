@@ -30,7 +30,7 @@ export function AppsCardArt({ anim }: { anim?: CardAnim }) {
   const id = 'c' + useId().replace(/[^a-zA-Z0-9]/g, '');
   return (
     <View style={{ width: CARD_W, height: CARD_H }}>
-      <View style={{ ...StyleSheet.absoluteFillObject, borderRadius: 26, overflow: 'hidden' }}>
+      <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 26, overflow: 'hidden' }}>
         <Svg width={CARD_W} height={CARD_H} style={StyleSheet.absoluteFill}>
           <Defs>
             <LG id={id + 'b'} x1="0.1" y1="0" x2="0.9" y2="1">
