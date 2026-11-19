@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { formatUnits } from 'viem';
 import { T } from '../../ui/Text';
-import { Button, ErrorText, Group, Note, Press, Row, Screen, success } from '../../ui/controls';
+import { Button, ErrorText, Group, Note, Press, Row, Screen } from '../../ui/controls';
 import { AppsCard } from '../../ui/AppsCard';
 import { CoinMark } from '../../ui/CoinMark';
 import { toast } from '../../ui/Toast';
@@ -35,7 +35,6 @@ export default function AppsWallet() {
   const { address } = useApps();
   const sites = useEvmSites().filter((s) => !!address && s.address.toLowerCase() === address.toLowerCase());
   const [making, setMaking] = useState(false);
-  const [fresh, setFresh] = useState(false);
   const [err, setErr] = useState('');
   const held = useAsync<Held[]>(() => (address ? holdings(address) : Promise.resolve([])), [address], 20000);
 
@@ -45,8 +44,7 @@ export default function AppsWallet() {
     setMaking(true);
     try {
       await ensureApps();
-      setFresh(true);
-      success();
+      router.replace('/apps-wallet/made');
     } catch (e) {
       setErr(plainError(e, 'the wallet'));
     }
@@ -65,7 +63,7 @@ export default function AppsWallet() {
 
   return (
     <Screen title="Apps wallet" large>
-      <AppsCard address={address} play={fresh} />
+      <AppsCard />
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Button title="Add money" onPress={() => router.push('/apps-wallet/refill')} style={{ flex: 1 }} />
         <Button title="Copy address" kind="line" onPress={async () => { await Clipboard.setStringAsync(address); toast('Address copied', 'copy'); }} style={{ flex: 1 }} />

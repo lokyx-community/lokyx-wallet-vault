@@ -1,5 +1,7 @@
 import { WordCheck } from '../../ui/Feature';
 import { VaultCreating } from '../../ui/VaultCreating';
+import type { CardKind } from '../../ui/WalletCards';
+import type { LogoId } from '../../ui/logos';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -23,6 +25,13 @@ import { DEFAULT_WAIT, ETH, MIN_WAIT, NATIVE, VAULT_NETS, checkSettings, type To
 
 type Step = 'phrase' | 'pledge' | 'check' | 'settings' | 'review' | 'working';
 const WAITS: [string, number][] = [['24 hours', MIN_WAIT], ['2 days', DEFAULT_WAIT], ['7 days', 7 * 86400]];
+const SHOW: Record<VaultNet, { name: string; logo: LogoId; kind: CardKind }> = {
+  'base-sepolia': { name: 'Base', logo: 'base', kind: 'base' },
+  'arbitrum-sepolia': { name: 'Arbitrum', logo: 'arb', kind: 'arb' },
+  sepolia: { name: 'Ethereum', logo: 'eth', kind: 'eth' },
+  'op-sepolia': { name: 'Optimism', logo: 'op', kind: 'op' },
+  'bnb-testnet': { name: 'BNB Chain', logo: 'bnb', kind: 'bnb' },
+};
 const STEPS: Record<string, string> = { checking: 'Checking the audited contracts on the network…', deploying: 'Creating your vault (your everyday address pays the fee)…', activating: 'Switching the protection on…', verifying: 'Checking the vault matches what you set…', done: 'Done.' };
 
 /** Same flow and wording as the LYX vault: allowance, wait, recovery words shown once and checked, safe address. No heir on Ethereum. */
@@ -45,7 +54,7 @@ export default function EthVaultSetup() {
   const everyday = useAsync(async () => (await ensureAddresses()).eth, []);
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [, setMsg] = useState('');
   const [stepKey, setStepKey] = useState('');
   const checked = ask.every((i, k) => answers[k].trim().toLowerCase() === words[i]);
   const ownAddr = useMemo(() => { const k = ethKey(phrase); k.sk.fill(0); return k.address; }, [phrase]);
@@ -88,7 +97,7 @@ export default function EthVaultSetup() {
       const bal = await balanceOf(net, a.eth as Hex);
       if (bal === 0n) throw new Error(`Your everyday address ${a.eth} has no test ${NATIVE[net]} on ${VAULT_NETS[net].label}. Get some from a faucet first: it pays the one-time setup fee.`);
       await createVault({ net, recoverySk: sk, recovery: recoveryAddr, sweepTo: safeNow as Hex, settings: built.settings!, onStep: (s) => { setMsg(STEPS[s]); setStepKey(s); } });
-      router.replace(`/ethvault?net=${net}`);
+      setStepKey('done');
       return true;
     } catch (e) {
       setErr(plainError(e, VAULT_NETS[net].label));
@@ -171,8 +180,16 @@ export default function EthVaultSetup() {
       )}
       {step === 'working' && (
         <>
-          <VaultCreating step={stepKey || 'checking'} />
-          <Note center>{msg || 'Working…'}</Note>
+          <VaultCreating
+            net={net}
+            name={SHOW[net].name}
+            coin={NATIVE[net]}
+            logo={SHOW[net].logo}
+            kind={SHOW[net].kind}
+            step={stepKey || 'checking'}
+            onMove={() => router.replace(`/ethvault?net=${net}`)}
+            onLater={() => router.replace('/vaults')}
+          />
         </>
       )}
     </Screen>
