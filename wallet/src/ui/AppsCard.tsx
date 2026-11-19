@@ -1,5 +1,5 @@
-import { useEffect, useId } from 'react';
-import { View } from 'react-native';
+import { useEffect, useId, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, LinearGradient as LG, Rect, Stop } from 'react-native-svg';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -17,6 +17,7 @@ const H = 188;
  */
 export function AppsCard({ address, play = false }: { address?: string | null; play?: boolean }) {
   const gid = 'a' + useId().replace(/[^a-zA-Z0-9]/g, '');
+  const [w, setW] = useState(0);
   const still = useReducedMotion();
   const rise = useSharedValue(play && !still ? 0 : 1);
   const chip = useSharedValue(play && !still ? 0 : 1);
@@ -34,22 +35,24 @@ export function AppsCard({ address, play = false }: { address?: string | null; p
   const sheenStyle = useAnimatedStyle(() => ({ transform: [{ translateX: sheen.value * 260 - 120 }, { rotate: '18deg' }] }));
 
   return (
-    <Animated.View style={[{ height: H, borderRadius: 26, overflow: 'hidden', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' }, card]}>
-      <Svg style={{ position: 'absolute' }} width="100%" height="100%">
-        <Defs>
-          <LG id={gid} x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor="#242426" />
-            <Stop offset="0.5" stopColor="#0B0B0C" />
-            <Stop offset="1" stopColor="#161618" />
-          </LG>
-        </Defs>
-        <Rect width="100%" height="100%" fill={`url(#${gid})`} />
-      </Svg>
+    <Animated.View onLayout={(e) => setW(Math.round(e.nativeEvent.layout.width))} style={[{ height: H, borderRadius: 26, overflow: 'hidden', backgroundColor: '#0B0B0C', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)' }, card]}>
+      {w > 0 ? (
+        <Svg style={StyleSheet.absoluteFill} width={w} height={H}>
+          <Defs>
+            <LG id={gid} x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor="#2A2A2D" />
+              <Stop offset="0.5" stopColor="#0B0B0C" />
+              <Stop offset="1" stopColor="#1A1A1D" />
+            </LG>
+          </Defs>
+          <Rect x={0} y={0} width={w} height={H} fill={`url(#${gid})`} />
+        </Svg>
+      ) : null}
       <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: -40, width: 70, height: H + 80, backgroundColor: 'rgba(255,255,255,0.07)' }, sheenStyle]} />
       <View style={{ flex: 1, padding: 20, justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Animated.View style={[{ width: 50, height: 36, borderRadius: 9, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }, chipStyle]}>
-            <Svg style={{ position: 'absolute' }} width="100%" height="100%">
+            <Svg style={StyleSheet.absoluteFill} width={50} height={36}>
               <Defs>
                 <LG id={gid + 'g'} x1="0" y1="0" x2="1" y2="1">
                   <Stop offset="0" stopColor="#F1E2C4" />
@@ -57,15 +60,15 @@ export function AppsCard({ address, play = false }: { address?: string | null; p
                   <Stop offset="1" stopColor="#76603C" />
                 </LG>
               </Defs>
-              <Rect width="100%" height="100%" fill={`url(#${gid}g)`} />
+              <Rect x={0} y={0} width={50} height={36} fill={`url(#${gid}g)`} />
             </Svg>
             <T style={{ fontFamily: F.semibold, fontSize: 8, letterSpacing: 1.4, color: '#2A2112' }}>LOKYX</T>
           </Animated.View>
-          <T style={{ fontFamily: F.semibold, fontSize: 11, letterSpacing: 2.2, color: 'rgba(255,255,255,0.55)' }}>APPS WALLET</T>
+          <T numberOfLines={1} style={{ flexShrink: 1, marginLeft: 12, fontFamily: F.semibold, fontSize: 11, letterSpacing: 1.6, color: 'rgba(255,255,255,0.55)' }}>APPS WALLET</T>
         </View>
         <View style={{ gap: 4 }}>
           <T style={{ fontFamily: F.medium, fontSize: 19, letterSpacing: -0.3 }}>For websites</T>
-          <T v="caption" dim>{address ? `${shortAddr(address, 8, 6)} · your vault stays hidden` : 'Your vault stays hidden'}</T>
+          <T v="caption" dim numberOfLines={1}>{address ? `${shortAddr(address, 8, 6)} · your vault stays hidden` : 'Your vault stays hidden'}</T>
         </View>
       </View>
     </Animated.View>
