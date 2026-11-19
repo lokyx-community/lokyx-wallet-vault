@@ -252,7 +252,7 @@ export function assess(req: Request, decoded: Decoded, ctx: Ctx): Assessment {
 
   const known = new Set([...ctx.known.map(lc), PERMIT2]);
   const reasons: Reason[] = [];
-  let level: Level = 'allow';
+  let level = 'allow' as Level;
   const raise = (l: Level) => {
     if (l === 'stop' || (l === 'review' && level === 'allow')) level = l;
   };
