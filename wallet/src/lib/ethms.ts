@@ -5,7 +5,7 @@
 import { decodeFunctionResult, encodeFunctionData, getAddress, parseUnits, type Hex } from 'viem';
 import { getItem, setItem } from './kv';
 import { store, useStore } from './store';
-import { activeNets, ensureAddresses, ethBalance, ethCode, ethRead, lookupToken, sendEthCall, tokenBalance, tokensFor, addToken, withEthKey } from './multichain';
+import { activeNets, ensurePrimary as ensureAddresses, ethBalance, ethCode, ethRead, lookupToken, sendEthCall, tokenBalance, tokensFor, addToken, withEthKey } from './multichain';
 import { ETH_NETS, type EthNet, type EthToken } from './multichain-core';
 import { ABI, deploymentOf } from './ethvault-core';
 import { pendingPays, type Pending } from './ethms-core';

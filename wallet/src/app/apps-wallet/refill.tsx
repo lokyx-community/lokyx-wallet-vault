@@ -13,12 +13,14 @@ import { SlideToPay } from '../../ui/SlideToPay';
 import { logoFor } from '../../ui/Logo';
 import { C, F } from '../../ui/theme';
 import { confirmIt } from '../../lib/auth';
+import { logEvent } from '../../lib/events';
 import { plainError } from '../../lib/plain-error';
 import { useStore } from '../../lib/store';
 import { ensureApps, useApps } from '../../lib/appswallet';
 import { arrivalText, refillPlan } from '../../lib/appswallet-core';
 import { activeNets, broadcastEth, ensureAddresses, ethBalance, prepareEth, tokenBalance, tokensFor, useAsync, useChainSettings } from '../../lib/multichain';
-import { ETH_NETS } from '../../lib/multichain-core';
+import { ETH_NETS, ethNetChoices, presetsFor, tokenId, type EthNet } from '../../lib/multichain-core';
+import { netLogoId } from '../../ui/CoinMark';
 import { NETS, checkEthVaults, loadVaults, sendFromVault, snapshot, tokensOn, vaults, type Snapshot } from '../../lib/ethvault';
 import { ETH, NATIVE, VAULT_NETS, refuseQueue, sweepable, tokenTransferCall, type VaultNet } from '../../lib/ethvault-core';
 
@@ -26,10 +28,11 @@ type Source = 'main' | VaultNet;
 
 /** Add money to the Apps wallet from the main wallet or a vault. From the main wallet it arrives at once. From a vault, inside today's allowance there is no wait; above it the vault's wait applies. */
 export default function Refill() {
-  useChainSettings();
+  const settings = useChainSettings();
+  const [chainSel, setChainSel] = useState<EthNet | null>(null);
   const [source, setSource] = useState<Source>('main');
   const [picking, setPicking] = useState(false);
-  const mainNet = activeNets().eth;
+  const mainNet = chainSel ?? activeNets().eth;
   const mainUnit = mainNet === 'sepolia' ? 'ETH' : ETH_NETS[mainNet].unit;
   const isMain = source === 'main';
   const vnet: VaultNet = isMain ? NETS[0] : source;
@@ -46,7 +49,7 @@ export default function Refill() {
   const s = snap.data;
   const vtok = isMain ? undefined : tokensOn(vnet).find((t) => t.symbol === coin);
   // ---- main wallet side
-  const mtoks = tokensFor(mainNet);
+  const mtoks = [...tokensFor(mainNet), ...presetsFor(ETH_NETS[mainNet].chainId)].filter((t, i, a) => a.findIndex((x) => tokenId(x) === tokenId(t)) === i);
   const mtok = isMain ? mtoks.find((t) => t.symbol === coin) : undefined;
   const bal = useAsync<bigint | null>(async () => {
     if (!isMain) return null;
@@ -78,13 +81,15 @@ export default function Refill() {
     try {
       const to = (await ensureApps()) as Hex;
       if (isMain) {
-        const p = await prepareEth(to, raw, 'normal', mtok);
+        const p = await prepareEth(to, raw, 'normal', mtok, mainNet);
         await broadcastEth(p.net, p.signed.raw);
+        logEvent('apps', 'Added to Apps wallet', `${amount} ${unit} from Main wallet`);
         setDone('Added. It shows in your Apps wallet in a moment.');
         return true;
       }
       if (!v || !s) return false;
       const r = await sendFromVault(v, s, token, to, raw);
+      logEvent('apps', r.how === 'instant' ? 'Added to Apps wallet' : 'Top-up waiting', `${amount} ${unit} from ${VAULT_MARK[vnet].name} vault`);
       setDone(r.how === 'instant' ? 'Added.' : 'Started. It waits in the open, and you can cancel it until then.');
       checkEthVaults().catch(() => {});
       return true;
@@ -136,12 +141,19 @@ export default function Refill() {
         </>
       ) : (
         <>
+          {isMain ? (
+            <LogoChips<EthNet>
+              value={mainNet}
+              onChange={(n) => { setChainSel(n); setCoin('NATIVE'); setAmount(''); setErr(''); }}
+              items={ethNetChoices(settings.allowMainnet).map((n) => ({ key: n, label: ETH_NETS[n].short, logo: netLogoId(n), seed: n }))}
+            />
+          ) : null}
           <LogoChips<string> value={coin} onChange={(c) => { setCoin(c); setAmount(''); }} items={chipItems} />
           <View style={{ alignItems: 'center', paddingVertical: 8, gap: 4 }}>
             <T style={{ fontFamily: F.semibold, fontSize: 48, letterSpacing: -1.5 }}>{amount || '0'}</T>
             <T v="sub" dim>{isMain ? `${unit} · in your main wallet: ${held != null ? formatUnits(held, dec) : '…'}` : `${unit} · left today without waiting: ${formatUnits(left, dec)}`}</T>
           </View>
-          <Keypad onKey={(k) => setAmount((a) => typeAmount(a, k, dec))} />
+          <Keypad round extra="." onKey={(k) => setAmount((a) => typeAmount(a, k, dec))} />
           {plan ? (
             <View style={{ gap: 4, padding: 16, borderRadius: 20, backgroundColor: C.fill }}>
               <T v="callout">{plan.instant ? 'No wait' : `This one waits ${Math.round(plan.waitSecs / 3600)} hours`}</T>

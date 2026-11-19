@@ -10,7 +10,7 @@ import { ScreenGuard } from '../ui/ScreenGuard';
 import { toast } from '../ui/Toast';
 import { C } from '../ui/theme';
 import { confirmIt } from '../lib/auth';
-import { readKeyHex, readPhrase } from '../lib/wallet';
+import { readKeyHex, readPhrase, wallet } from '../lib/wallet';
 import { activeNets } from '../lib/multichain';
 import { btcKey, ethKey, solKey, trxKey } from '../lib/multichain-core';
 import { bytesToHex } from '@noble/hashes/utils.js';
@@ -47,7 +47,8 @@ export default function Developer() {
         const phrase = await readPhrase();
         if (!phrase) throw new Error('This account was added from a private key, so it has no 24 words and no keys for other coins.');
         const n = activeNets();
-        const k = which === 'eth' ? ethKey(phrase) : which === 'btc' ? btcKey(phrase, n.btc) : which === 'sol' ? solKey(phrase) : trxKey(phrase);
+        const ac = wallet.get().current;
+        const k = which === 'eth' ? ethKey(phrase, 0, ac) : which === 'btc' ? btcKey(phrase, n.btc, 0, ac) : which === 'sol' ? solKey(phrase, ac) : trxKey(phrase, 0, ac);
         hex = bytesToHex(k.sk);
         k.sk.fill(0);
       }

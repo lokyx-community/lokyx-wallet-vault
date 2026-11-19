@@ -5,7 +5,7 @@ import { activeNets, chainSettings, ensureExtraAddresses, fetchT } from './multi
 import { assertAllowedX } from './xchains-core';
 import { getItem, setItem } from './kv';
 import { store, useStore } from './store';
-import { readPhrase } from './wallet';
+import { readPhrase, wallet } from './wallet';
 import { solKey, trxKey } from './multichain-core';
 import { SOL_NETS, signSolTransfer, solAddressOk, solDelta, type SolNet, type SolTxRow } from './sol-core';
 import { TRON_NETS, parseTronTxs, signTronTransfer, tronAddressOk, type TronNet, type TronTxRow } from './tron-core';
@@ -142,7 +142,7 @@ export async function prepareSol(to: string, lamports: bigint) {
   if (left > 0n && left < RENT_MIN) throw new Error('That would leave less than 0.00089 SOL, which Solana does not allow. Send everything but 0.001 SOL, or all of it minus the fee.');
   const phrase = await readPhrase();
   if (!phrase) throw new Error('No recovery words on this phone');
-  const k = solKey(phrase);
+  const k = solKey(phrase, wallet.get().current);
   try {
     if (k.address !== from) throw new Error('Your Solana address does not match your words');
     return { net, from, fee: SOL_FEE, ...signSolTransfer(k.sk, from, to, lamports, bh.value.blockhash) };
@@ -228,7 +228,7 @@ export async function prepareTron(to: string, sun: bigint) {
   const ref = { number: block.block_header.raw_data.number, id: block.blockID, timestamp: block.block_header.raw_data.timestamp };
   const phrase = await readPhrase();
   if (!phrase) throw new Error('No recovery words on this phone');
-  const k = trxKey(phrase);
+  const k = trxKey(phrase, 0, wallet.get().current);
   try {
     if (k.address !== from) throw new Error('Your Tron address does not match your words');
     return { net, from, newAccount, ...signTronTransfer(k.sk, from, to, sun, ref, Date.now()) };

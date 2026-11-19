@@ -218,6 +218,7 @@ export default function ChainSend() {
       <SendCompose
         title={`Send ${unit}`}
         unit={unit}
+        network={isBtc ? BTC_NETS[nets.btc].label : ETH_NETS[nets.eth].label}
         to={to}
         onTo={(t) => { setTo(t); setPrep(null); }}
         placeholder={isBtc ? (nets.btc === 'mainnet' ? 'bc1…' : 'tb1…') : '0x…'}

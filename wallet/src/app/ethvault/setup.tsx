@@ -1,5 +1,7 @@
 import { WordCheck } from '../../ui/Feature';
 import { VaultCreating } from '../../ui/VaultCreating';
+import { TowerStep } from '../../ui/TowerStep';
+import { logEvent } from '../../lib/events';
 import type { CardKind } from '../../ui/WalletCards';
 import type { LogoId } from '../../ui/logos';
 import { useMemo, useState } from 'react';
@@ -18,12 +20,12 @@ import { SlideToPay } from '../../ui/SlideToPay';
 import { confirmIt } from '../../lib/auth';
 import { newShortMnemonic, isMnemonic } from '../../lib/lokyx';
 import { ethKey } from '../../lib/multichain-core';
-import { ensureAddresses, useAsync } from '../../lib/multichain';
+import { ensurePrimary as ensureAddresses, useAsync } from '../../lib/multichain';
 import { NETS, createVault, vaults, balanceOf, tokensOn } from '../../lib/ethvault';
 import { useStore } from '../../lib/store';
 import { DEFAULT_WAIT, ETH, MIN_WAIT, NATIVE, VAULT_NETS, checkSettings, type TokenAllowance, type VaultNet } from '../../lib/ethvault-core';
 
-type Step = 'phrase' | 'pledge' | 'check' | 'settings' | 'review' | 'working';
+type Step = 'phrase' | 'pledge' | 'check' | 'settings' | 'tower' | 'review' | 'working';
 const WAITS: [string, number][] = [['24 hours', MIN_WAIT], ['2 days', DEFAULT_WAIT], ['7 days', 7 * 86400]];
 const SHOW: Record<VaultNet, { name: string; logo: LogoId; kind: CardKind }> = {
   'base-sepolia': { name: 'Base', logo: 'base', kind: 'base' },
@@ -98,6 +100,7 @@ export default function EthVaultSetup() {
       if (bal === 0n) throw new Error(`Your everyday address ${a.eth} has no test ${NATIVE[net]} on ${VAULT_NETS[net].label}. Get some from a faucet first: it pays the one-time setup fee.`);
       await createVault({ net, recoverySk: sk, recovery: recoveryAddr, sweepTo: safeNow as Hex, settings: built.settings!, onStep: (s) => { setMsg(STEPS[s]); setStepKey(s); } });
       setStepKey('done');
+      logEvent('vault', 'Vault created', VAULT_NETS[net].label);
       return true;
     } catch (e) {
       setErr(plainError(e, VAULT_NETS[net].label));
@@ -160,9 +163,10 @@ export default function EthVaultSetup() {
           <Field value={safe} onChangeText={setSafe} placeholder={everyday.data ?? 'Your everyday address'} autoCapitalize="none" autoCorrect={false} mono />
           <Note>Ethereum vaults have no heir yet.</Note>
           <ErrorText>{err || safeProblem || built.error}</ErrorText>
-          <Button title="Review" disabled={!built.settings || !!safeProblem} onPress={() => { setErr(''); setStep('review'); }} />
+          <Button title="Review" disabled={!built.settings || !!safeProblem} onPress={() => { setErr(''); setStep('tower'); }} />
         </>
       )}
+      {step === 'tower' && <TowerStep kind="eth" onContinue={() => setStep('review')} onBack={() => setStep('settings')} />}
       {step === 'review' && built.settings && (
         <>
           <Note>{`Last look. Once the vault exists, at most ${[`${ethAllow || '0'} ${NATIVE[net]}`, ...tokensOn(net).map((t) => `${tokAllow[t.symbol] ?? '10'} ${t.symbol}`)].join(', ')} leave each day without waiting; anything else waits ${WAITS[wait][0]} and you can cancel it. Money is only protected once you send it to the vault address.`}</Note>
@@ -175,7 +179,7 @@ export default function EthVaultSetup() {
           )}
           <ErrorText>{err}</ErrorText>
           <SlideToPay label="Slide to create" onSlide={create} />
-          <Button title="Back" kind="plain" onPress={() => setStep('settings')} />
+          <Button title="Back" kind="plain" onPress={() => setStep('tower')} />
         </>
       )}
       {step === 'working' && (

@@ -18,7 +18,7 @@ import { rpc, type ChainInfo } from './rpc';
 import { readPhrase, sendSwap, withLyxKey } from './wallet';
 import { btcKey, ethKey, ETH_NETS, formatBtc, formatUnits, signBtc, type BtcNet } from './multichain-core';
 import { formatLyx } from './lokyx';
-import { btcRates, btcUtxos, chainSettings, ensureAddresses, ethFees } from './multichain';
+import { btcRates, btcUtxos, chainSettings, ensurePrimary as ensureAddresses, ethFees } from './multichain';
 import { keyHex } from './ethvault-core';
 
 export { sw };

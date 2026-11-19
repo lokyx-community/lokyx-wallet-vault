@@ -11,7 +11,7 @@ import { C, F } from './theme';
 import { confirmIt } from '../lib/auth';
 import { shortAddr } from '../lib/format';
 import { plainError } from '../lib/plain-error';
-import { activeNets, ensureAddresses, sendEthCall } from '../lib/multichain';
+import { activeNets, ensurePrimary as ensureAddresses, sendEthCall } from '../lib/multichain';
 import { ETH_NETS } from '../lib/multichain-core';
 import { evmSites } from '../lib/data';
 import { signPersonal, signTyped } from '../lib/evm-dapp';

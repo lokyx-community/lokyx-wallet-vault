@@ -12,7 +12,9 @@ import { ContractsOnly } from '../ui/ContractsOnly';
 import { WalletCard } from '../ui/WalletCards';
 import { toast } from '../ui/Toast';
 import { C, F } from '../ui/theme';
-import { useChainSettings } from '../lib/multichain';
+import { activeNets, useChainSettings } from '../lib/multichain';
+import { ETH_NETS, presetsFor } from '../lib/multichain-core';
+import { CoinMark } from '../ui/CoinMark';
 import { plainError } from '../lib/plain-error';
 import { CHAIN_NAME, TOKEN_CHAINS, asChain, canAdd, cardKindFor, guessChain, shortId, verdictFor, type TokenChain } from '../lib/add-token-core';
 import { lookupFor, netLabel, type Looked } from '../lib/add-token';
@@ -83,7 +85,7 @@ function Body() {
 
   return (
     <Screen title="Add a token" large>
-      <T v="callout" dim>Pick the network, then paste the token's address.</T>
+      <T v="callout" dim>Pick the network, then choose a popular coin or paste the token's address.</T>
       <View style={{ alignItems: 'center', gap: 10 }}>
         <View style={{ flexDirection: 'row', gap: 10 }}>{TOKEN_CHAINS.map((c) => <Disc key={c} chain={c} on={c === chain} onPress={() => pick(c)} />)}</View>
         <T v="caption" dim>{`${CHAIN_NAME[chain]} · ${netLabel(chain)}`}</T>
@@ -113,6 +115,20 @@ function Body() {
         </Press>
       ) : null}
       <ErrorText>{err}</ErrorText>
+
+      {chain === 'eth' && !text ? (
+        <View style={{ gap: 10 }}>
+          <T v="caption" dim>{`Popular on ${ETH_NETS[activeNets().eth].label}`}</T>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {presetsFor(ETH_NETS[activeNets().eth].chainId).map((t) => (
+              <Press key={t.contract} onPress={() => change(t.contract)} accessibilityLabel={`Add ${t.symbol}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.fill, borderRadius: 20, paddingVertical: 6, paddingLeft: 7, paddingRight: 14 }}>
+                <CoinMark symbol={t.symbol} seed={t.contract} size={26} />
+                <T style={{ fontFamily: F.semibold, fontSize: 14 }}>{t.symbol}</T>
+              </Press>
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       {v ? (
         <View style={{ gap: 10 }}>

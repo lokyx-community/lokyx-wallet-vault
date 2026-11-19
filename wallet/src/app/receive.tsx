@@ -150,7 +150,7 @@ export default function Receive() {
             <T style={{ fontFamily: F.semibold, fontSize: 48, letterSpacing: -2, color: amt ? C.text : C.faint }}>{amt || '0'}</T>
             <T style={{ fontFamily: F.medium, fontSize: 20, color: C.sub }}>{c.unit}</T>
           </View>
-          <Keypad onKey={(k) => setAmt((a) => typeAmount(a, k, tok ? tok.decimals : chain === 'btc' ? 8 : 18))} extra="." />
+          <Keypad round onKey={(k) => setAmt((a) => typeAmount(a, k, tok ? tok.decimals : chain === 'btc' ? 8 : 18))} extra="." />
           <Press
             disabled={!amt || Number(amt) === 0}
             onPress={() => (setAsk(false), setReq(amt.replace(/\.$/, '')))}

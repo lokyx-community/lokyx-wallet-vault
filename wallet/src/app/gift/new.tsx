@@ -61,7 +61,7 @@ export default function NewGift() {
           );
         })}
       </View>
-      <Keypad onKey={(k) => setAmt((a) => typeAmount(a, k, coin === 'btc' ? 8 : 18))} extra="." />
+      <Keypad round onKey={(k) => setAmt((a) => typeAmount(a, k, coin === 'btc' ? 8 : 18))} extra="." />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6 }}>
         <T v="sub" dim>Fee {percentText(GIFT_BPS)}, in {UNIT[coin]}</T>
         <T v="sub" color={feeText ? C.text : C.good}>{feeText || (FEE_CHARGED ? 'None for this card' : 'Not charged on the test network')}</T>

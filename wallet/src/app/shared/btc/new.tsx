@@ -13,6 +13,7 @@ import { groupKeyOk, newGroupKey } from '../../../lib/relay-seal';
 import { activeNets } from '../../../lib/multichain';
 import { KEY_PREFIX, msAddress, parseKey } from '../../../lib/btcms-core';
 import { addBtcShared, myMsPub } from '../../../lib/btcms';
+import { logEvent } from '../../../lib/events';
 
 /**
  * A shared Bitcoin account. Nothing goes on chain to make one: everyone puts in the same keys and number,
@@ -90,6 +91,7 @@ export default function NewBtcShared() {
           try {
             if (!groupKeyOk(relayKey)) throw new Error("That relay key isn't valid. Copy it again.");
             const s = await addBtcShared({ name: name.trim() || 'Shared Bitcoin', net, m: t, keys }, relayKey);
+            logEvent('shared', 'Shared account made', `${name.trim() || 'Shared Bitcoin'} · ${t} of ${n}`);
             router.replace(`/shared/btc/${s.address}`);
           } catch (e) {
             toast((e as Error).message, 'info');

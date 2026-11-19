@@ -14,7 +14,7 @@ import { Sheet } from '../../../ui/Sheet';
 import { toast } from '../../../ui/Toast';
 import { C } from '../../../ui/theme';
 import { confirmIt } from '../../../lib/auth';
-import { ensureAddresses, lookupToken, tokensFor, useAsync } from '../../../lib/multichain';
+import { ensurePrimary as ensureAddresses, lookupToken, tokensFor, useAsync } from '../../../lib/multichain';
 import { ETH_NETS, EVM_FAMILIES, evmOf, formatUnits, type EthToken } from '../../../lib/multichain-core';
 import { decodePay, describePay, encodePay, netOfChainId, payHash, validSigners, type Pay, type PayView, type Pending } from '../../../lib/ethms-core';
 import { dismissPay, sendToGroup } from '../../../lib/relay';

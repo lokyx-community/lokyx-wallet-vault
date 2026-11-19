@@ -14,6 +14,7 @@ import { labelFor, niceLyx, timeAgo } from '../lib/format';
 import { DUR, EASE_OUT } from './motion';
 import { CoinLogo } from './CoinLogo';
 import { Logo } from './Logo';
+import type { AppEvent } from '../lib/events-core';
 import { F } from './theme';
 
 export type Pos = 'first' | 'mid' | 'last' | 'only';
@@ -117,6 +118,24 @@ export function FeedRow({ item, i = 0, hide, pos = 'only' }: { item: FeedItem; i
           <Amount text={hide ? '•••' : `${plus ? '+' : '−'}${item.amount}`} unit={item.unit} good={plus && !item.failed} />
           <T v="caption" dim>{item.time ? timeAgo(item.time) : 'Pending'}</T>
         </View>
+      </Shell>
+    </Animated.View>
+  );
+}
+
+/** Something that happened in the app that is not a payment: a vault made, a shared account made, money added to the Apps wallet. */
+export function EventRow({ item, i = 0, pos = 'only' }: { item: AppEvent; i?: number; pos?: Pos }) {
+  const icon: IconName = item.kind === 'vault' ? 'lock' : item.kind === 'shared' ? 'people' : 'send';
+  return (
+    <Animated.View entering={FadeInDown.delay(Math.min(i, 8) * 30).duration(DUR.base).easing(EASE_OUT)}>
+      <Rule pos={pos} />
+      <Shell pos={pos} onPress={() => router.push(item.kind === 'vault' ? '/vaults' : item.kind === 'shared' ? '/shared' : '/apps-wallet')}>
+        <Badge icon={icon} />
+        <View style={{ flex: 1, gap: 2 }}>
+          <T style={{ fontFamily: F.medium, fontSize: 16 }} numberOfLines={1}>{item.title}</T>
+          <T v="caption" dim numberOfLines={1}>{item.sub}</T>
+        </View>
+        <T v="caption" dim>{timeAgo(item.time)}</T>
       </Shell>
     </Animated.View>
   );

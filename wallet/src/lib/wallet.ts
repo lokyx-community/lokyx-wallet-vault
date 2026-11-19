@@ -104,6 +104,8 @@ export async function createFromPhrase(phrase: string) {
   await secrets.del(K.key(0)).catch(() => {});
   keysLost.set(false);
   await removeItem('w.addrs');
+  // addresses kept for the old words' other accounts must not outlive them
+  for (const a of wallet.get().accounts) await removeItem(`w.addrs.${a.index}`).catch(() => {});
   reset();
   await secrets.set(K.phrase, words);
   await secrets.set(K.key(0), bytesToHex(sk));
@@ -124,6 +126,9 @@ export async function addAccount(name: string) {
   const index = Math.max(-1, ...w.accounts.map((a) => a.index)) + 1;
   const sk = await later(() => deriveKey(phrase, index));
   const a: AccountRef = { index, name: name.trim() || `Account ${index + 1}`, address: addressFromPrivateKey(sk) };
+  // the new account gets its own Bitcoin, Ethereum, Solana and Tron addresses now, while the words are in hand
+  const chains = await later(() => allAddresses(phrase, index));
+  await setItem(`w.addrs.${index}`, JSON.stringify(chains));
   await secrets.set(K.key(index), bytesToHex(sk));
   sk.fill(0);
   const accounts = [...w.accounts, a];
@@ -171,13 +176,14 @@ export async function wipe() {
     return;
   }
   for (const a of wallet.get().accounts) await secrets.del(K.key(a.index));
+  for (const a of wallet.get().accounts) await removeItem(`w.addrs.${a.index}`).catch(() => {});
   await secrets.del(K.phrase);
   keysLost.set(false);
   // gift card keys: the list says which ones this phone holds
   try {
     for (const g of JSON.parse((await getItem('w.gifts')) ?? '[]') as { address: string }[]) await secrets.del(`gift.${g.address}`).catch(() => {});
   } catch {}
-  for (const k of ['w.gifts', 'w.btcms', 'w.ethms', 'w.shared', 'w.boardposts', 'w.tokenlocks', K.accounts, K.current, K.settings, K.pin, 'w.addrs', 'w.chains', 'w.ethtokens', 'w.dest.btc', 'w.dest.eth', 'w.dest.sol', 'w.dest.trx', 'w.started', 'w.told', 'w.nodes', 'w.pin', 'w.secmode', 'w.tokens', 'w.contacts', 'w.pending', 'w.sites', 'w.recent', 'w.jars', 'w.capsules', 'w.genesis', 'w.swaps', 'w.swapcfg', 'browser.bookmarks', 'w.watch', 'w.spent', 'w.backup.ok', 'w.trusted', 'w.trustprot', 'w.newdev', 'w.towers']) await removeItem(k);
+  for (const k of ['w.gifts', 'w.btcms', 'w.ethms', 'w.shared', 'w.boardposts', 'w.tokenlocks', K.accounts, K.current, K.settings, K.pin, 'w.addrs', 'w.chains', 'w.ethtokens', 'w.dest.btc', 'w.dest.eth', 'w.dest.sol', 'w.dest.trx', 'w.started', 'w.told', 'w.nodes', 'w.pin', 'w.secmode', 'w.tokens', 'w.contacts', 'w.pending', 'w.sites', 'w.recent', 'w.jars', 'w.capsules', 'w.genesis', 'w.swaps', 'w.swapcfg', 'browser.bookmarks', 'w.watch', 'w.spent', 'w.backup.ok', 'w.trusted', 'w.trustprot', 'w.newdev', 'w.towers', 'w.events']) await removeItem(k);
   // the decoy goes with the real wallet
   await clearDecoyData().catch(() => {});
   await removeItem(DECOY).catch(() => {});

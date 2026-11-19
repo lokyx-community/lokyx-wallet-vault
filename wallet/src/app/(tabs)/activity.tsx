@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, SectionList, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T } from '../../ui/Text';
-import { ActivityRow, FeedRow, PendingRow } from '../../ui/ActivityRow';
+import { ActivityRow, EventRow, FeedRow, PendingRow } from '../../ui/ActivityRow';
+import { useEvents } from '../../lib/events';
+import type { AppEvent } from '../../lib/events-core';
 import { Press } from '../../ui/controls';
 import { C, F } from '../../ui/theme';
 import { SkeletonRows } from '../../ui/Skeleton';
@@ -14,9 +16,9 @@ import { dayLabel } from '../../lib/format';
 import { useOtherFeed } from '../../lib/feed';
 import { FEED_COINS, type FeedCoin, type FeedItem } from '../../lib/feed-core';
 
-type Filter = 'all' | 'sent' | 'received' | 'mined';
-type Row = { k: 'lyx'; it: HistoryItem; time: number } | { k: 'x'; it: FeedItem; time: number };
-const kindOk = (kind: string, f: Filter) => f === 'all' || (f === 'sent' ? kind === 'sent' || kind === 'self' : kind === f);
+type Filter = 'all' | 'sent' | 'received' | 'mined' | 'events';
+type Row = { k: 'lyx'; it: HistoryItem; time: number } | { k: 'x'; it: FeedItem; time: number } | { k: 'ev'; it: AppEvent; time: number };
+const kindOk = (kind: string, f: Filter) => f === 'all' || (f === 'events' ? false : f === 'sent' ? kind === 'sent' || kind === 'self' : kind === f);
 
 export default function Activity() {
   const insets = useSafeAreaInsets();
@@ -31,6 +33,7 @@ export default function Activity() {
   const [coin, setCoin] = useState<FeedCoin | 'all'>('all');
   const [pulling, setPulling] = useState(false);
   const other = useOtherFeed();
+  const evs = useEvents();
 
   const load = useCallback(
     async (before?: number) => {
@@ -61,6 +64,7 @@ export default function Activity() {
     const rows: Row[] = [];
     if (coin === 'all' || coin === 'lyx') for (const it of items) if (kindOk(it.kind, filter)) rows.push({ k: 'lyx', it, time: it.timestamp });
     for (const it of other.data ?? []) if ((coin === 'all' || coin === it.coin) && kindOk(it.kind, filter)) rows.push({ k: 'x', it, time: it.time });
+    if (coin === 'all' && (filter === 'all' || filter === 'events')) for (const it of evs) rows.push({ k: 'ev', it, time: it.time });
     rows.sort((a, b) => (b.time || Infinity) - (a.time || Infinity));
     const out: { title: string; data: Row[] }[] = [];
     for (const r of rows) {
@@ -69,7 +73,7 @@ export default function Activity() {
       out.at(-1)!.data.push(r);
     }
     return out;
-  }, [items, other.data, filter, coin]);
+  }, [items, other.data, filter, coin, evs]);
   const summary = useMemo(() => {
     const week = Date.now() / 1000 - 7 * 86400;
     const all: { t: number; inn: boolean }[] = [];
@@ -106,7 +110,7 @@ export default function Activity() {
     );
   }, [items, other.data]);
   const loading = busy || (!other.data && !other.error);
-  const anyItems = items.length > 0 || (other.data ?? []).length > 0;
+  const anyItems = items.length > 0 || (other.data ?? []).length > 0 || evs.length > 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -114,7 +118,7 @@ export default function Activity() {
         <T v="display">Activity</T>
         {summary}
         <View style={{ flexDirection: 'row', gap: 26, paddingHorizontal: 4 }}>
-          {([['all', 'All'], ['sent', 'Sent'], ['received', 'Received'], ['mined', 'Mined']] as [Filter, string][]).map(([id, name]) => (
+          {([['all', 'All'], ['sent', 'Sent'], ['received', 'Received'], ['mined', 'Mined'], ['events', 'Account']] as [Filter, string][]).map(([id, name]) => (
             <Press key={id} onPress={() => setFilter(id)} haptic={false} accessibilityLabel={name} style={{ paddingBottom: 8, borderBottomWidth: 1.5, borderBottomColor: filter === id ? C.text : 'transparent' }}>
               <T style={{ fontFamily: F.medium, fontSize: 15, color: filter === id ? C.text : C.sub }}>{name}</T>
             </Press>
@@ -132,7 +136,7 @@ export default function Activity() {
       </View>
       <SectionList
         sections={sections}
-        keyExtractor={(r, i) => (r.k === 'x' ? r.it.id : `${r.it.txHash ?? r.it.blockHash}${r.it.kind}${i}`)}
+        keyExtractor={(r, i) => (r.k === 'ev' ? r.it.id : r.k === 'x' ? r.it.id : `${r.it.txHash ?? r.it.blockHash}${r.it.kind}${i}`)}
         stickySectionHeadersEnabled={false}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 130 }}
         refreshControl={
@@ -160,6 +164,7 @@ export default function Activity() {
         renderItem={({ item, index, section }) => {
           const n = section.data.length;
           const pos = n === 1 ? 'only' : index === 0 ? 'first' : index === n - 1 ? 'last' : 'mid';
+          if (item.k === 'ev') return <EventRow item={item.it} i={index} pos={pos} />;
           return item.k === 'lyx' ? <ActivityRow item={item.it} i={index} hide={hide} pos={pos} /> : <FeedRow item={item.it} i={index} hide={hide} pos={pos} />;
         }}
         onEndReachedThreshold={0.4}

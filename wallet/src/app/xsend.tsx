@@ -176,6 +176,7 @@ export default function XSend() {
       <SendCompose
         title={`Send ${unit}`}
         unit={unit}
+        network={netLabel}
         to={to}
         onTo={(t) => { setTo(t); setPrep(null); }}
         placeholder={isSol ? 'Solana address' : 'Tron address (T…)'}

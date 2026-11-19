@@ -151,7 +151,7 @@ function Show() {
             <T style={{ fontFamily: F.semibold, fontSize: 52, letterSpacing: -2, color: amt ? C.text : C.faint }}>{amt || '0'}</T>
             <T style={{ fontFamily: F.medium, fontSize: 20, color: C.sub }}>LYX</T>
           </View>
-          <Keypad onKey={(k) => setAmt((a) => typeAmount(a, k))} extra="." />
+          <Keypad round onKey={(k) => setAmt((a) => typeAmount(a, k))} extra="." />
           <Button
             title="Share request"
             disabled={!amt || Number(amt) === 0}

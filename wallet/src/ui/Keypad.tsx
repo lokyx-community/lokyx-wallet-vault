@@ -5,7 +5,8 @@ import { Icon, type IconName } from './Icon';
 import { C } from './theme';
 
 /** A phone-style number pad. `extra` sits bottom-left: a dot for amounts, Face ID for passcodes. */
-export function Keypad({ onKey, extra, extraIcon, extraLabel }: { onKey: (k: string) => void; extra?: string; extraIcon?: IconName; extraLabel?: string }) {
+export function Keypad({ onKey, extra, extraIcon, extraLabel, round }: { onKey: (k: string) => void; extra?: string; extraIcon?: IconName; extraLabel?: string; round?: boolean }) {
+  const size = round ? 66 : 64;
   const rows = [
     ['1', '2', '3'],
     ['4', '5', '6'],
@@ -13,26 +14,27 @@ export function Keypad({ onKey, extra, extraIcon, extraLabel }: { onKey: (k: str
     [extra ?? (extraIcon ? 'x' : ''), '0', 'del'],
   ];
   return (
-    <View style={{ gap: 6, width: '100%', maxWidth: 360, alignSelf: 'center' }}>
+    <View style={{ gap: round ? 10 : 6, width: '100%', maxWidth: 360, alignSelf: 'center' }}>
       {rows.map((r, i) => (
         <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           {r.map((k, j) =>
             k === '' ? (
-              <View key={j} style={{ flex: 1, height: 64 }} />
+              <View key={j} style={{ flex: 1, height: size }} />
             ) : (
-              <Press
-                key={j}
-                haptic={false}
-                scaleTo={0.88}
-                accessibilityLabel={k === 'del' ? 'Delete' : k === 'x' ? extraLabel : k}
-                onPress={() => {
-                  tick();
-                  onKey(k);
-                }}
-                style={{ flex: 1, height: 64, alignItems: 'center', justifyContent: 'center', borderRadius: 32 }}
-              >
-                {k === 'del' ? <Icon name="backspace" size={26} color={C.text} /> : k === 'x' && extraIcon ? <Icon name={extraIcon} size={28} color={C.text} /> : <T style={{ fontSize: 30, lineHeight: 38, fontFamily: 'Geist_400Regular', letterSpacing: -0.5 }}>{k}</T>}
-              </Press>
+              <View key={j} style={{ flex: 1, alignItems: 'center' }}>
+                <Press
+                  haptic={false}
+                  scaleTo={0.88}
+                  accessibilityLabel={k === 'del' ? 'Delete' : k === 'x' ? extraLabel : k}
+                  onPress={() => {
+                    tick();
+                    onKey(k);
+                  }}
+                  style={{ width: round ? size : '100%', height: size, alignItems: 'center', justifyContent: 'center', borderRadius: size / 2, backgroundColor: round && k !== 'del' ? C.fill : 'transparent' }}
+                >
+                  {k === 'del' ? <Icon name="backspace" size={26} color={C.text} /> : k === 'x' && extraIcon ? <Icon name={extraIcon} size={28} color={C.text} /> : <T style={{ fontSize: 30, lineHeight: 38, fontFamily: 'Geist_400Regular', letterSpacing: -0.5 }}>{k}</T>}
+                </Press>
+              </View>
             ),
           )}
         </View>

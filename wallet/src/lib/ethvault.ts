@@ -14,7 +14,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { getItem, setItem } from "./kv";
 import { store } from "./store";
 import { readPhrase, resetHooks } from "./wallet";
-import { ensureAddresses } from "./multichain";
+import { ensurePrimary as ensureAddresses } from "./multichain";
 import { ethKey } from "./multichain-core";
 import {
   ABI,

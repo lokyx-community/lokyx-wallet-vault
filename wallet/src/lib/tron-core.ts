@@ -21,7 +21,7 @@ export const TRON_NETS: Record<TronNet, { label: string; short: string; unit: st
 
 export const SUN = 1_000_000n;
 export const TRX_DECIMALS = 6;
-export const tronPath = (i: number) => `m/44'/195'/0'/0/${i}`;
+export const tronPath = (i: number, acct = 0) => `m/44'/195'/${acct}'/0/${i}`;
 
 const b58c = base58check(sha256);
 
@@ -31,8 +31,8 @@ export function tronAddressFromPub(pub: Uint8Array): string {
   return b58c.encode(concatBytes(Uint8Array.of(0x41), h.slice(-20)));
 }
 
-export function tronKey(root: HDKey, i = 0): { sk: Uint8Array; address: string } {
-  const k = root.derive(tronPath(i));
+export function tronKey(root: HDKey, i = 0, acct = 0): { sk: Uint8Array; address: string } {
+  const k = root.derive(tronPath(i, acct));
   if (!k.privateKey || !k.publicKey) throw new Error('Key derivation failed');
   return { sk: k.privateKey, address: tronAddressFromPub(k.publicKey) };
 }

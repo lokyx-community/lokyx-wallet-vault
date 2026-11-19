@@ -109,33 +109,34 @@ export function assertAllowed(s: ChainSettings, chain: 'btc' | 'eth', net: BtcNe
 
 // ---------- keys ----------
 
-export const btcPath = (net: BtcNet, i: number) => `m/84'/${BTC_NETS[net].coinType}'/0'/0/${i}`;
-export const ethPath = (i: number) => `m/44'/60'/0'/0/${i}`;
+/** `acct` is the wallet account (BIP44 account level). Account 0 is the original wallet, so nothing it had changes. */
+export const btcPath = (net: BtcNet, i: number, acct = 0) => `m/84'/${BTC_NETS[net].coinType}'/${acct}'/0/${i}`;
+export const ethPath = (i: number, acct = 0) => `m/44'/60'/${acct}'/0/${i}`;
 
 const root = (phrase: string) => HDKey.fromMasterSeed(mnemonicToSeedSync(phrase.trim().toLowerCase().split(/\s+/).join(' ')));
 
-export function btcKey(phrase: string, net: BtcNet, i = 0) {
-  const k = root(phrase).derive(btcPath(net, i));
+export function btcKey(phrase: string, net: BtcNet, i = 0, acct = 0) {
+  const k = root(phrase).derive(btcPath(net, i, acct));
   if (!k.privateKey || !k.publicKey) throw new Error('Key derivation failed');
   return { sk: k.privateKey, address: btc.p2wpkh(k.publicKey, BTC_NETS[net].net).address! };
 }
 
 /** Every public address at once, from one seed: the slow part (turning words into a seed) runs once, not once per chain. */
-export function allAddresses(phrase: string): { btc: Record<BtcNet, string>; eth: string; sol: string; trx: string } {
+export function allAddresses(phrase: string, acct = 0): { btc: Record<BtcNet, string>; eth: string; sol: string; trx: string } {
   const seed = mnemonicToSeedSync(phrase.trim().toLowerCase().split(/\s+/).join(' '));
   const r = HDKey.fromMasterSeed(seed);
   const b = (net: BtcNet) => {
-    const k = r.derive(btcPath(net, 0));
+    const k = r.derive(btcPath(net, 0, acct));
     if (!k.publicKey) throw new Error('Key derivation failed');
     return btc.p2wpkh(k.publicKey, BTC_NETS[net].net).address!;
   };
-  const e = r.derive(ethPath(0));
+  const e = r.derive(ethPath(0, acct));
   if (!e.privateKey) throw new Error('Key derivation failed');
   const eth = privateKeyToAccount(`0x${bytesToHex(e.privateKey)}`).address;
   e.privateKey.fill(0);
-  const s = solKeyFromSeed(seed, 0);
+  const s = solKeyFromSeed(seed, acct);
   s.sk.fill(0);
-  const t = tronKey(r, 0);
+  const t = tronKey(r, 0, acct);
   t.sk.fill(0);
   seed.fill(0);
   return { btc: { signet: b('signet'), testnet4: b('testnet4'), testnet: b('testnet'), mainnet: b('mainnet') }, eth, sol: s.address, trx: t.address };
@@ -151,10 +152,10 @@ export function solKey(phrase: string, i = 0) {
   }
 }
 /** The Tron key, for signing one payment. Wipe `sk` after. */
-export const trxKey = (phrase: string, i = 0) => tronKey(root(phrase), i);
+export const trxKey = (phrase: string, i = 0, acct = 0) => tronKey(root(phrase), i, acct);
 
-export function ethKey(phrase: string, i = 0) {
-  const k = root(phrase).derive(ethPath(i));
+export function ethKey(phrase: string, i = 0, acct = 0) {
+  const k = root(phrase).derive(ethPath(i, acct));
   if (!k.privateKey) throw new Error('Key derivation failed');
   return { sk: k.privateKey, address: privateKeyToAccount(`0x${bytesToHex(k.privateKey)}`).address };
 }
@@ -325,7 +326,20 @@ export const KNOWN_TOKENS: EthToken[] = [
   { chainId: 1, contract: '0x6B175474E89094C44Da98b954EedeAC495271d0F', symbol: 'DAI', decimals: 18, name: 'Dai' },
   { chainId: 1, contract: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599', symbol: 'WBTC', decimals: 8, name: 'Wrapped Bitcoin' },
   { chainId: 1, contract: '0x514910771AF9Ca656af840dff83E8264EcF986CA', symbol: 'LINK', decimals: 18, name: 'Chainlink' },
+  // Solana's coin as an Ethereum token: Wormhole's wrapped SOL (9 decimals), minted against SOL locked on Solana.
+  { chainId: 1, contract: '0xD31a59c85aE9D8edEFeC411D448f90841571b89c', symbol: 'SOL', decimals: 9, name: 'Wrapped SOL (Wormhole)' },
+  { chainId: 8453, contract: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', symbol: 'USDC', decimals: 6, name: 'USD Coin' },
+  { chainId: 42161, contract: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', symbol: 'USDC', decimals: 6, name: 'USD Coin' },
+  { chainId: 10, contract: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85', symbol: 'USDC', decimals: 6, name: 'USD Coin' },
+  { chainId: 137, contract: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359', symbol: 'USDC', decimals: 6, name: 'USD Coin' },
+  // BNB Chain's test dollar tokens have 18 decimals, not 6. Real-money USDT on Arbitrum, Optimism, Polygon and BNB, and USDC on BNB, are not here until their addresses are checked.
+  { chainId: 97, contract: '0x337610d27c682E347C9cD60BD4b3b107C9d34dDd', symbol: 'USDT', decimals: 18, name: 'Tether (test)' },
+  { chainId: 97, contract: '0x64544969ed7EBf5f083679233325356EbE738930', symbol: 'USDC', decimals: 18, name: 'USD Coin (test)' },
+  { chainId: 11155420, contract: '0x5fd84259d66Cd46123540766Be93DFE6D43130D7', symbol: 'USDC', decimals: 6, name: 'USD Coin (test)' },
 ];
+
+/** The coins every wallet offers on a network without anyone pasting an address: the list above, for that chain. */
+export const presetsFor = (chainId: number): EthToken[] => KNOWN_TOKENS.filter((k) => k.chainId === chainId);
 
 /** Tokens on the list that match what someone typed: a symbol or a name, from the start of a word. */
 export function searchKnown(chainId: number, q: string): EthToken[] {

@@ -75,8 +75,17 @@ export default function SharedList() {
         </Group>
       )}
       <Group title="Other">
-        <Row icon="plus" title="Shared Bitcoin account" sub="Make or add one" onPress={() => router.push('/shared/btc/new')} />
-        <Row icon="plus" title="Shared Ethereum account" sub="Make or add one" onPress={() => router.push('/shared/eth/new')} />
+        <View style={{ flexDirection: 'row', gap: 10, padding: 12 }}>
+          {([['btc', 'Bitcoin', '/shared/btc/new'], ['eth', 'Ethereum', '/shared/eth/new']] as const).map(([id, name, to]) => (
+            <Press key={id} onPress={() => router.push(to)} scaleTo={0.97} accessibilityLabel={`New shared ${name} account`} style={{ flex: 1, backgroundColor: C.fill2, borderRadius: 20, padding: 14, gap: 12 }}>
+              <Logo id={id} size={40} />
+              <View style={{ gap: 2 }}>
+                <T style={{ fontFamily: F.semibold, fontSize: 16 }}>{name}</T>
+                <T v="caption" dim>Make or add one</T>
+              </View>
+            </Press>
+          ))}
+        </View>
         {contractsOn && <Row icon="plus" title="Add a LYX one you're part of" sub="Ask whoever made it for the address" onPress={() => setAdding(true)} />}
       </Group>
       <Sheet open={adding} onClose={() => setAdding(false)}>

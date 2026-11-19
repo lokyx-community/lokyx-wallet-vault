@@ -7,7 +7,7 @@ import { plainError } from './plain-error';
 import { useCallback, useEffect, useState } from 'react';
 import { getItem, setItem } from './kv';
 import { store, useStore } from './store';
-import { readPhrase, resetHooks } from './wallet';
+import { readPhrase, resetHooks, wallet } from './wallet';
 import {
   allAddresses, formatBtc, formatUnits, BTC_NETS, DEFAULT_CHAIN_SETTINGS, ETH_NETS, ERC20_ABI, assertAllowed, btcKey, effective, ethFeeChoices, ethKey, pickFeeRates, signBtc, signEth,
   tokenId, KNOWN_TOKENS, BLOCKSCOUT, parseEthTxs, parseTokenTxs, type EthTxRow, type BtcNet, type ChainSettings, type EthNet, type EthToken, type Fees, type Speed, type Utxo,
@@ -61,33 +61,50 @@ export interface Addrs {
 }
 export const addrs = store<Addrs | null>(null);
 
-/** Derive and remember the public addresses (needs the phone's check once; the keys are not kept). */
-let deriving: Promise<Addrs> | null = null;
-/** Several screens ask at once on first use; they share one derivation, so the phone asks for your fingerprint once. */
+/** The wallet account in use. Account 0 is the original one; each new account has its own address on every coin. */
+const curAcct = () => wallet.get().current;
+const addrKey = (acct: number) => (acct === 0 ? 'w.addrs' : `w.addrs.${acct}`);
+
+/** Derive and remember the public addresses of one account (needs the phone's check once; the keys are not kept). */
+const deriving = new Map<number, Promise<Addrs>>();
+const cached = new Map<number, Addrs>();
+/** The addresses of the account in use. Several screens ask at once; they share one derivation, so the phone asks for your fingerprint once. */
 export function ensureAddresses(): Promise<Addrs> {
-  const have = addrs.get();
-  if (have) return Promise.resolve(have);
-  if (!deriving) deriving = deriveAddresses().finally(() => { deriving = null; });
-  return deriving;
+  return addrsFor(curAcct());
 }
-async function deriveAddresses(): Promise<Addrs> {
-  const have = addrs.get();
-  if (have) return have;
+/** The first account's addresses. Vaults, shared accounts and swaps belong to it, whichever account is in use. */
+export const ensurePrimary = (): Promise<Addrs> => addrsFor(0);
+
+function addrsFor(acct: number): Promise<Addrs> {
+  const have = cached.get(acct);
+  if (have) return Promise.resolve(have);
+  let p = deriving.get(acct);
+  if (!p) {
+    p = deriveAddresses(acct).finally(() => deriving.delete(acct));
+    deriving.set(acct, p);
+  }
+  return p;
+}
+const publish = (acct: number, a: Addrs) => {
+  cached.set(acct, a);
+  if (acct === curAcct()) addrs.set(a);
+};
+async function deriveAddresses(acct: number): Promise<Addrs> {
   try {
-    const raw = await getItem('w.addrs');
+    const raw = await getItem(addrKey(acct));
     if (raw) {
       const a = JSON.parse(raw) as Addrs;
       // every test network uses the same key and the same tb1 address (testnet4 came later)
       if (!a.btc.testnet4) a.btc.testnet4 = a.btc.signet;
-      addrs.set(a);
+      publish(acct, a);
       return a;
     }
   } catch {}
   const phrase = await readPhrase();
   if (!phrase) throw new Error('No recovery words on this phone');
-  const out: Addrs = await new Promise((res, rej) => setTimeout(() => { try { res(allAddresses(phrase)); } catch (e) { rej(e); } }, 30));
-  addrs.set(out);
-  await setItem('w.addrs', JSON.stringify(out));
+  const out: Addrs = await new Promise((res, rej) => setTimeout(() => { try { res(allAddresses(phrase, acct)); } catch (e) { rej(e); } }, 30));
+  publish(acct, out);
+  await setItem(addrKey(acct), JSON.stringify(out));
   return out;
 }
 /** Solana and Tron addresses for a wallet made before they existed: needs the words once, like the first time. */
@@ -95,26 +112,28 @@ let extraing: Promise<Addrs> | null = null;
 export function ensureExtraAddresses(): Promise<Addrs> {
   if (!extraing)
     extraing = (async () => {
-      const a = await ensureAddresses();
+      const acct = curAcct();
+      const a = await addrsFor(acct);
       if (a.sol && a.trx) return a;
       const phrase = await readPhrase();
       if (!phrase) throw new Error('No recovery words on this phone');
-      const all: Addrs = await new Promise((res, rej) => setTimeout(() => { try { res(allAddresses(phrase)); } catch (e) { rej(e); } }, 30));
+      const all: Addrs = await new Promise((res, rej) => setTimeout(() => { try { res(allAddresses(phrase, acct)); } catch (e) { rej(e); } }, 30));
       const out = { ...a, sol: all.sol, trx: all.trx };
-      addrs.set(out);
-      await setItem('w.addrs', JSON.stringify(out));
+      publish(acct, out);
+      await setItem(addrKey(acct), JSON.stringify(out));
       return out;
     })().finally(() => { extraing = null; });
   return extraing;
 }
-resetHooks.push(() => addrs.set(null));
+resetHooks.push(() => { addrs.set(null); cached.clear(); });
 switchHooks.push(async () => {
-  addrs.set(null);
+  addrs.set(cached.get(curAcct()) ?? null);
   await loadTokens();
 });
 
 export const forgetAddresses = async () => {
   addrs.set(null);
+  cached.clear();
   await setItem('w.addrs', '');
 };
 
@@ -185,13 +204,14 @@ export async function btcRates(net: BtcNet): Promise<Record<Speed, number>> {
 export async function prepareBtc(to: string, amount: bigint, speed: Speed) {
   const net = activeNets().btc;
   assertAllowed(chainSettings.get(), 'btc', net);
-  const a = await ensureAddresses();
+  const acct = curAcct();
+  const a = await addrsFor(acct);
   const from = a.btc[net];
   const [utxos, rates] = await Promise.all([btcUtxos(net, from), btcRates(net)]);
   const rate = rates[speed];
   const phrase = await readPhrase();
   if (!phrase) throw new Error('No recovery words on this phone');
-  const k = btcKey(phrase, net);
+  const k = btcKey(phrase, net, 0, acct);
   try {
     const signed = signBtc({ sk: k.sk, from, to, net, utxos, amount, rate });
     return { net, from, rate, signed };
@@ -275,10 +295,11 @@ export async function ethFees(net: EthNet): Promise<Record<Speed, Fees>> {
   return ethFeeChoices(BigInt(block.baseFeePerGas ?? '0x3b9aca00'), tip);
 }
 
-export async function prepareEth(to: string, amount: bigint, speed: Speed, token?: EthToken) {
-  const net = activeNets().eth;
+export async function prepareEth(to: string, amount: bigint, speed: Speed, token?: EthToken, onNet?: EthNet) {
+  const net = onNet ?? activeNets().eth;
   assertAllowed(chainSettings.get(), 'eth', net);
-  const a = await ensureAddresses();
+  const acct = curAcct();
+  const a = await addrsFor(acct);
   const [nonce, fees] = await Promise.all([eth<string>(net, 'eth_getTransactionCount', [a.eth, 'pending']), ethFees(net)]);
   const probe: { from: string; to: string; value?: string; data?: string } = token
     ? { from: a.eth, to: token.contract, data: encodeFunctionData({ abi: ERC20_ABI, functionName: 'transfer', args: [to as Hex, amount] }) }
@@ -287,7 +308,7 @@ export async function prepareEth(to: string, amount: bigint, speed: Speed, token
   const gas = (est * 120n) / 100n;
   const phrase = await readPhrase();
   if (!phrase) throw new Error('No recovery words on this phone');
-  const k = ethKey(phrase);
+  const k = ethKey(phrase, 0, acct);
   try {
     const signed = await signEth({ net, sk: k.sk, nonce: Number(BigInt(nonce)), to, amount, token, gas, fees: fees[speed] });
     return { net, from: a.eth, gas, fees: fees[speed], signed, token };
@@ -317,7 +338,7 @@ export async function sendEthCall(to: string | null, data: Hex, value = 0n, onNe
   const net = onNet ?? activeNets().eth;
   assertAllowed(chainSettings.get(), 'eth', net);
   await checkEth(net);
-  const from = index ? await ensureApps() : (await ensureAddresses()).eth;
+  const from = index ? await ensureApps() : (await ensurePrimary()).eth;
   const [nonce, fees, est] = await Promise.all([
     eth<string>(net, 'eth_getTransactionCount', [from, 'pending']),
     ethFees(net),

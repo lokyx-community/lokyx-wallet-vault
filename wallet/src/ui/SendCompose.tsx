@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
+import { CoinMark } from './CoinMark';
 import { Icon } from './Icon';
 import { Keypad, typeAmount } from './Keypad';
 import { Button, ErrorText, Field, Press, Screen } from './controls';
@@ -31,6 +32,8 @@ export function SendCompose(p: {
   onMax?: () => void;
   /** One quiet line under the speed control: the fee and how long it takes. */
   feeNote?: string;
+  /** The chain it goes on: shows a coin pill (logo, coin and chain) above the amount. */
+  network?: string;
 }) {
   const big = p.amt.length > 9;
   return (
@@ -47,8 +50,16 @@ export function SendCompose(p: {
           <Icon name="copy" size={18} color={C.text} width={1.9} />
         </Press>
       </View>
-      {p.to && p.badTo ? <ErrorText>{p.badTo}</ErrorText> : p.to ? <T v="caption" dim style={{ marginTop: -8, paddingHorizontal: 6 }}>{shortAddr(p.to.trim(), 10, 6)}</T> : null}
+      {p.to && p.badTo ? <ErrorText>{p.badTo}</ErrorText> : p.to ? <T v="caption" dim style={{ marginTop: -8, paddingHorizontal: 6 }}>{'Check the first and last four characters: '}<T v="caption" style={{ fontFamily: F.semibold ?? F.regular }}>{p.to.trim().slice(0, 6)}</T>{'…'}<T v="caption" style={{ fontFamily: F.semibold ?? F.regular }}>{p.to.trim().slice(-4)}</T></T> : null}
       {p.guard}
+      {p.network ? (
+        <View style={{ alignItems: 'center', paddingTop: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.fill, borderRadius: 20, paddingVertical: 6, paddingLeft: 7, paddingRight: 14 }}>
+            <CoinMark symbol={p.unit} seed={p.network} size={26} />
+            <T style={{ fontFamily: F.semibold, fontSize: 14 }}>{`${p.unit} · ${p.network}`}</T>
+          </View>
+        </View>
+      ) : null}
       <View style={{ alignItems: 'center', paddingTop: 8, gap: 2 }}>
         <T style={{ fontFamily: F.regular, fontSize: big ? 46 : 64, lineHeight: big ? 54 : 72, letterSpacing: -2.4, color: p.amt ? C.text : C.faint }}>{p.amt || '0'}</T>
         {p.have ? (
@@ -62,7 +73,7 @@ export function SendCompose(p: {
       {p.below}
       {p.feeNote ? <T v="caption" dim style={{ textAlign: 'center', marginTop: -6 }}>{p.feeNote}</T> : null}
       <ErrorText>{p.err ?? ''}</ErrorText>
-      <Keypad onKey={(k) => p.onAmt(typeAmount(p.amt, k, Math.min(p.decimals, 8)))} extra="." />
+      <Keypad round onKey={(k) => p.onAmt(typeAmount(p.amt, k, Math.min(p.decimals, 8)))} extra="." />
       <Button title="Review" busy={p.busy} disabled={p.disabled} onPress={p.onReview} />
     </Screen>
   );

@@ -1,4 +1,6 @@
 import { WordCheck } from '../../ui/Feature';
+import { TowerStep } from '../../ui/TowerStep';
+import { logEvent } from '../../lib/events';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
@@ -15,7 +17,7 @@ import { newShortMnemonic } from '../../lib/lokyx';
 import { buildSettings, DELAYS, HEIR_WAITS, recoveryKeys } from '../../lib/vault-core';
 import { usePoll, type ChainInfo } from '../../lib/rpc';
 
-type Step = 'phrase' | 'pledge' | 'check' | 'settings' | 'review';
+type Step = 'phrase' | 'pledge' | 'check' | 'settings' | 'tower' | 'review';
 
 export default function VaultSetup() {
   const me = currentAddress();
@@ -104,14 +106,15 @@ export default function VaultSetup() {
             </>
           )}
           <ErrorText>{err || safeProblem || built.error}</ErrorText>
-          <Button title="Review" disabled={!built.settings || !!safeProblem} onPress={() => { setErr(''); setStep('review'); }} />
+          <Button title="Review" disabled={!built.settings || !!safeProblem} onPress={() => { setErr(''); setStep('tower'); }} />
         </>
       )}
+      {step === 'tower' && <TowerStep kind="lyx" onContinue={() => setStep('review')} onBack={() => setStep('settings')} />}
       {step === 'review' && built.settings && (
         <>
           <Note>Last look. Once the vault exists, nothing bigger than the allowance leaves quickly.</Note>
-          <ConfirmOp op={{ kind: 'vaultCreate', settings: built.settings }} me={me} blockTime={bt} delayBlocks={Number(built.settings.delay)} label="Slide to create" onDone={() => router.replace('/vault')} />
-          <Button title="Back" kind="plain" onPress={() => setStep('settings')} />
+          <ConfirmOp op={{ kind: 'vaultCreate', settings: built.settings }} me={me} blockTime={bt} delayBlocks={Number(built.settings.delay)} label="Slide to create" onDone={() => { logEvent('vault', 'Vault created', 'LOKYX'); router.replace('/vault'); }} />
+          <Button title="Back" kind="plain" onPress={() => setStep('tower')} />
         </>
       )}
     </Screen>

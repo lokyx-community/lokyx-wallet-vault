@@ -134,7 +134,7 @@ export default function Send() {
               </ScrollView>
             )}
           </View>
-          <Keypad onKey={(k) => setAmt((a) => typeAmount(a, k, Math.min(decimals, 8)))} extra="." />
+          <Keypad round onKey={(k) => setAmt((a) => typeAmount(a, k, Math.min(decimals, 8)))} extra="." />
           <Button title="Review" disabled={value === 0n || tooMuch || !guardOk} onPress={() => setStep('review')} style={{ marginTop: 14 }} />
         </Animated.View>
       )}

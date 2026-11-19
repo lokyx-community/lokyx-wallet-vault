@@ -99,6 +99,7 @@ export default function EthVaultSend() {
     <SendCompose
       title="Send from vault"
       unit={unit}
+      network={VAULT_NETS[net].label}
       to={to}
       onTo={setTo}
       placeholder="0x…"

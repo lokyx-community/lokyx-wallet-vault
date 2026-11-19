@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
+import { SharedCreated, SharedCreating } from '../../../ui/SharedStatus';
+import { logEvent } from '../../../lib/events';
 import * as Clipboard from 'expo-clipboard';
 import { T } from '../../../ui/Text';
 import { Button, Field, Group, Press, Screen } from '../../../ui/controls';
@@ -13,7 +15,7 @@ import { LeadRow } from '../../../ui/LeadRow';
 import { Stepper } from '../../../ui/Stepper';
 import { C, F } from '../../../ui/theme';
 import { confirmIt } from '../../../lib/auth';
-import { activeNets, ensureAddresses, useChainSettings } from '../../../lib/multichain';
+import { activeNets, ensurePrimary as ensureAddresses, useChainSettings } from '../../../lib/multichain';
 import { ETH_NETS, ethAddressOk, ethNetChoices, type EthNet } from '../../../lib/multichain-core';
 import { sharedAddress } from '../../../lib/ethms-core';
 import { groupKeyOk } from '../../../lib/relay-seal';
@@ -45,6 +47,8 @@ export default function NewEthShared() {
   const [need, setNeed] = useState(2);
   const [mode, setMode] = useState<'make' | 'add'>('make');
   const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<'form' | 'creating' | 'created'>('form');
+  const [made, setMade] = useState<{ address: string; chainId: number } | null>(null);
   const [relayKey, setRelayKey] = useState('');
   useEffect(() => {
     ensureAddresses().then((a) => setMe(a.eth), () => {});
@@ -75,6 +79,9 @@ export default function NewEthShared() {
   const shown = nets.filter((x) => ETH_NETS[x].label.toLowerCase().includes(q.trim().toLowerCase()));
   const netSub = ready === 'checking' ? 'Checking Safe on this network…' : ready === 'yes' ? 'Safe is on this network' : 'Safe is not on this network yet';
 
+  const shownName = name.trim() || 'Shared account';
+  if (phase === 'creating') return <SharedCreating name={shownName} net={net} people={owners.length} need={t} />;
+  if (phase === 'created' && made) return <SharedCreated name={shownName} net={net} address={made.address} people={owners.length} need={t} onInvite={() => router.replace(`/shared/eth/${made.address}?chain=${made.chainId}`)} />;
   return (
     <Screen title="New shared account" large>
       <Segmented value={mode} onChange={setMode} options={[['make', 'Make one'], ['add', "I've been added"]]} />
@@ -113,12 +120,21 @@ export default function NewEthShared() {
         onPress={async () => {
           if (mode === 'make' && !(await confirmIt(`Create the shared account on ${ETH_NETS[net].label} (network fee)`))) return;
           setBusy(true);
+          if (mode === 'make') setPhase('creating');
           try {
             if (mode === 'add' && relayKey.trim() && !groupKeyOk(relayKey)) throw new Error("That relay key isn't valid. Copy it again from the setup message.");
             const s = await addEthShared(name, owners, t, mode === 'make', net, mode === 'add' ? relayKey : undefined);
+            logEvent('shared', mode === 'make' ? 'Shared account made' : 'Joined a shared account', `${name.trim() || 'Shared Ethereum'} · ${t} of ${n}`);
+            if (mode === 'make') {
+              setMade({ address: s.address, chainId: s.chainId });
+              setPhase('created');
+              setBusy(false);
+              return;
+            }
             router.replace(`/shared/eth/${s.address}?chain=${s.chainId}`);
           } catch (e) {
             toast((e as Error).message, 'info');
+            setPhase('form');
             setBusy(false);
           }
         }}
