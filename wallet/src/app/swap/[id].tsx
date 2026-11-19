@@ -7,6 +7,10 @@ import { T } from '../../ui/Text';
 import { Icon } from '../../ui/Icon';
 import { Button, ErrorText, Field, Group, Note, Press, Row, Screen, success } from '../../ui/controls';
 import { CoinLogo } from '../../ui/CoinLogo';
+import { COIN_TINT, PassCard } from '../../ui/PassCard';
+import { SwapOrbit } from '../../ui/SwapOrbit';
+import { WithdrawReceipt } from '../../ui/WithdrawReceipt';
+import type { SlipInput } from '../../lib/slip-core';
 import { C, F } from '../../ui/theme';
 import { DUR } from '../../ui/motion';
 import { toast } from '../../ui/Toast';
@@ -43,6 +47,33 @@ const stageOf = (step: sw.Step, r: sw.SwapRecord): number => {
       return -1;
   }
 };
+
+/** The black receipt for a finished swap. `gotLyx` says which side you ended up with. */
+function swapSlip(r: sw.SwapRecord, gotLyx: boolean, asset: 'btc' | 'eth'): SlipInput {
+  const got = gotLyx ? lyxText(r.offer) : otherText(r.offer);
+  const paid = gotLyx ? otherText(r.offer) : lyxText(r.offer);
+  const cut = got.lastIndexOf(' ');
+  const net = `LOKYX testnet · ${asset === 'btc' ? 'Bitcoin test network' : 'Sepolia'}`;
+  return {
+    amount: got.slice(0, cut),
+    unit: got.slice(cut + 1),
+    to: '',
+    network: net,
+    at: r.updated,
+    hash: swapId(r),
+    hashLabel: 'Swap id',
+    noQr: true,
+    verb: 'Swapped',
+    sub: `${paid} for ${got}`,
+    testnet: true,
+    rows: [
+      { label: 'Paid', value: paid },
+      { label: 'Received', value: got },
+      { label: 'With', value: 'Another person' },
+      { label: 'Network', value: net },
+    ],
+  };
+}
 
 function copyText(t: string, what: string) {
   return async () => {
@@ -95,6 +126,7 @@ export default function SwapView() {
   const asset = sw.assetOf(r.offer);
   const sym = asset === 'btc' ? 'BTC' : 'ETH';
   const stage = step ? stageOf(step, r) : 0;
+  const waiting = !!step && (step.kind.startsWith('wait') || step.kind === 'confirming');
   const lyxFirst = r.offer.dir === 'sell-lyx';
   const iLockLyx = sw.locksLyx(r);
   const offerCode = sw.offerCode(r.offer);
@@ -146,14 +178,18 @@ export default function SwapView() {
 
   return (
     <Screen title="Swap" large>
-      <View style={{ alignItems: 'center', gap: 10, paddingTop: 4 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <CoinLogo chain="lyx" size={40} />
-          <Icon name="swap" size={20} color={C.sub} width={2} />
-          <CoinLogo chain={asset} size={40} />
-        </View>
+      <PassCard tint={COIN_TINT[asset]} style={{ alignItems: 'center', gap: 10, paddingVertical: 20, paddingHorizontal: 18 }}>
+        {waiting ? (
+          <SwapOrbit a="lyx" b={asset} size={150} />
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <CoinLogo chain="lyx" size={44} />
+            <Icon name="swap" size={20} color={C.sub} width={2} />
+            <CoinLogo chain={asset} size={44} />
+          </View>
+        )}
         <T style={{ fontFamily: F.semibold, fontSize: 21, letterSpacing: -0.4, textAlign: 'center' }}>{swapTitle(r)}</T>
-      </View>
+      </PassCard>
 
       <View style={{ borderRadius: 16, backgroundColor: C.fill2, padding: 16 }}>
         {stages.map((t, i) => {
@@ -173,7 +209,8 @@ export default function SwapView() {
         })}
       </View>
 
-      {step ? (
+      {step?.kind === 'done' ? <WithdrawReceipt slip={swapSlip(r, step.got === 'lyx', asset)} done caption="Both sides claimed" onDone={() => router.replace('/swap')} /> : null}
+      {step && step.kind !== 'done' ? (
         <Animated.View key={step.kind} entering={FadeIn.duration(DUR.base)} style={{ gap: 12 }}>
           <T v="callout" color={step.kind === 'unsafe' ? C.bad : C.text} style={{ lineHeight: 22 }}>{say(step)}</T>
           {step.kind === 'lock-lyx' && <Button title={`Lock ${lyxText(r.offer)}`} busy={busy} onPress={act('Lock LYX for this swap', () => lockLyx(r, step.refundHeight))} />}
@@ -192,9 +229,9 @@ export default function SwapView() {
           {step.kind === 'refund-lyx' && <Button title="Take my LYX back" busy={busy} onPress={act('Take LYX back', () => refundLyx(r, step.lockId))} />}
           {step.kind === 'refund-other' && <Button title={`Take my ${sym} back`} busy={busy} onPress={act(`Take ${sym} back`, () => refundOther(r, live!))} />}
         </Animated.View>
-      ) : (
+      ) : !step ? (
         <T v="sub" dim>{loadErr || 'Reading the chains…'}</T>
-      )}
+      ) : null}
       <ErrorText>{err}</ErrorText>
 
       {r.role === 'initiator' && !r.accept && <BoardBox r={r} onPicked={() => void refresh()} />}

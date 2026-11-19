@@ -72,3 +72,16 @@ test('the receipt picture grows to hold the QR tile and stays unchanged without 
   assert.ok(withQr.height > plain.height + 100);
   assert.ok(withQr.items.length > plain.items.length);
 });
+
+test('a swap receipt uses its own rows, word and id label', () => {
+  const s = { amount: '0.0004', unit: 'BTC', to: '', network: 'LOKYX testnet', at: 0, hash: 'abc:initiator', hashLabel: 'Swap id', verb: 'Swapped', rows: [{ label: 'Paid', value: '1 LYX' }, { label: 'Received', value: '0.0004 BTC' }] };
+  assert.deepEqual(slipRows(s).map((r) => r.label), ['Paid', 'Received']);
+  const t = slipText(s);
+  assert.match(t, /^Swapped 0.0004 BTC/);
+  assert.match(t, /Paid: 1 LYX/);
+  assert.match(t, /Swap id: abc:initiator/);
+  assert.doesNotMatch(t, /To:/);
+  const img = receiptImage({ ...s, sub: '1 LYX for 0.0004 BTC' }, true);
+  assert.ok(img.items.some((i) => i.k === 'text' && i.s === 'Swapped'));
+  assert.ok(img.items.some((i) => i.k === 'text' && i.s === '1 LYX for 0.0004 BTC · test network' || (i.k === 'text' && i.s === '1 LYX for 0.0004 BTC')));
+});

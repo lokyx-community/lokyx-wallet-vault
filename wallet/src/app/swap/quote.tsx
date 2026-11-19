@@ -10,6 +10,7 @@ import { Field, IconButton, Press, tick } from '../../ui/controls';
 import { Segmented } from '../../ui/Segmented';
 import { KeyboardScroll } from '../../ui/KeyboardScroll';
 import { Panel, Primary, Secondary } from '../../ui/Glass';
+import { COIN_TINT, PassCard } from '../../ui/PassCard';
 import { Logo } from '../../ui/Logo';
 import { C, F } from '../../ui/theme';
 import { DUR, EASE_OUT } from '../../ui/motion';
@@ -78,9 +79,9 @@ export default function SwapQuote() {
     <KeyboardScroll contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 20, paddingBottom: insets.bottom + 130, gap: 14 }} style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <IconButton name="back" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
-        <T v="display">Instant swap</T>
+        <T v="display">Swap</T>
       </View>
-      <Segmented<SwapMode> value={mode} onChange={setMode} options={[['direct', 'Direct'], ['instant', 'Instant']]} />
+      <Segmented<SwapMode> value={mode} onChange={setMode} options={[['direct', 'Atomic'], ['instant', 'Instant']]} />
       <Animated.View key={mode} entering={FadeIn.duration(DUR.base).easing(EASE_OUT)}>
         <T v="sub" dim style={{ lineHeight: 21 }}>
           {mode === 'direct'
@@ -89,25 +90,25 @@ export default function SwapQuote() {
         </T>
       </Animated.View>
 
-      <Panel style={{ paddingVertical: 14, gap: 12 }}>
+      <PassCard tint={COIN_TINT[from]} style={{ paddingHorizontal: 18, paddingTop: 16, paddingBottom: 28, gap: 12 }}>
         <T v="caption" dim>You pay</T>
         <Chips value={from} onPick={pick('from')} />
         <Field value={amt} onChangeText={setAmt} placeholder="0.0" keyboardType="decimal-pad" big accessibilityLabel={`Amount of ${fc.symbol} to pay`} />
-      </Panel>
+      </PassCard>
 
       <View style={{ alignItems: 'center', height: 8, zIndex: 2 }}>
-        <Press onPress={flip} accessibilityLabel="Turn the pair round" style={{ position: 'absolute', top: -22, width: 44, height: 44, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line2, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="swap" size={20} color={C.text} width={2} />
+        <Press onPress={flip} accessibilityLabel="Turn the pair round" style={{ position: 'absolute', top: -26, width: 46, height: 46, borderRadius: 23, backgroundColor: C.text, borderWidth: 5, borderColor: C.bg, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="swap" size={20} color={C.bg} width={2.4} />
         </Press>
       </View>
 
-      <Panel style={{ paddingVertical: 14, gap: 12 }}>
+      <PassCard tint={COIN_TINT[to]} style={{ paddingHorizontal: 18, paddingTop: 28, paddingBottom: 16, gap: 12 }}>
         <T v="caption" dim>You get</T>
         <Chips value={to} onPick={pick('to')} />
         <T style={{ fontFamily: F.regular, fontSize: 20, color: C.faint }}>
           {mode === 'instant' ? 'The quote shows here' : 'Set by the offer you pick'}
         </T>
-      </Panel>
+      </PassCard>
 
       <Panel style={{ paddingVertical: 6 }}>
         <Line k="Fee" v={`${percentText(bps)} of what you pay`} />

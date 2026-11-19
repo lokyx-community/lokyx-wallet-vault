@@ -116,10 +116,10 @@ export function Slip({ slip, done, caption }: { slip: SlipInput; done: boolean; 
               tick();
               setCopied(true);
             }}
-            accessibilityLabel="Copy the transaction id"
+            accessibilityLabel={`Copy the ${(slip.hashLabel ?? 'transaction').toLowerCase()} id`}
             style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 7 }}
           >
-            <T v="sub" dim style={{ fontSize: 14 }}>Transaction</T>
+            <T v="sub" dim style={{ fontSize: 14 }}>{slip.hashLabel ?? 'Transaction'}</T>
             <View style={{ flex: 1, height: 1, marginHorizontal: 8, marginTop: 6, borderBottomWidth: 1.5, borderStyle: 'dotted', borderColor: '#3A3A41' }} />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
               <T style={{ fontFamily: F.mono, fontSize: 13, color: copied ? C.good : C.text }} numberOfLines={1}>{copied ? 'Copied' : shortAddr(slip.hash, 6, 4)}</T>
@@ -127,12 +127,12 @@ export function Slip({ slip, done, caption }: { slip: SlipInput; done: boolean; 
             </View>
           </Press>
         </Animated.View>
-        <Animated.View entering={FadeIn.delay(600 + rows.length * 90).duration(360)} style={{ alignItems: 'center', paddingTop: 14, paddingBottom: 4 }}>
+        {slip.noQr ? null : <Animated.View entering={FadeIn.delay(600 + rows.length * 90).duration(360)} style={{ alignItems: 'center', paddingTop: 14, paddingBottom: 4 }}>
           <View style={{ borderRadius: 10, overflow: 'hidden' }}>
             <Qr value={slipQrValue(slip)} size={92} />
           </View>
           <T v="caption" dim style={{ marginTop: 8 }}>Scan to look this payment up</T>
-        </Animated.View>
+        </Animated.View>}
       </View>
       {w > 0 ? <Torn width={w} /> : null}
     </Animated.View>
@@ -198,7 +198,7 @@ function drawItem(it: ImgItem, i: number) {
 }
 
 function Capture({ req }: { req: ShareReq }) {
-  const img = useRef(receiptImage(req.slip, req.done, (() => { try { return qrCells(slipQrValue(req.slip)); } catch { return undefined; } })())).current;
+  const img = useRef(receiptImage(req.slip, req.done, (() => { if (req.slip.noQr) return undefined; try { return qrCells(slipQrValue(req.slip)); } catch { return undefined; } })())).current;
   const ref = useRef<Svg>(null);
   useEffect(() => {
     let live = true;

@@ -17,6 +17,16 @@ export type SlipInput = {
   testnet?: boolean;
   /** a link to the payment on a block explorer */
   url?: string;
+  /** replaces the To / From / Network / Fee / Time rows, e.g. for a swap */
+  rows?: SlipRow[];
+  /** the word for the finished picture ("Sent" by default, "Swapped" for a swap) */
+  verb?: string;
+  /** the line under the amount in the picture, instead of "to <address>" */
+  sub?: string;
+  /** the label of the last row ("Transaction" by default) */
+  hashLabel?: string;
+  /** leave the QR code out: the id has nothing to look up */
+  noQr?: boolean;
 };
 
 /** What the receipt's QR code carries: the block explorer link when there is one, else the network and transaction id. */
@@ -46,6 +56,7 @@ export function feeFromLines(lines: string[]): string | undefined {
 
 /** The rows of the slip, in order. Rows with nothing to show are left out. */
 export function slipRows(s: SlipInput): SlipRow[] {
+  if (s.rows) return s.rows;
   const who = (name: string | undefined, a: string) => (name ? `${name} · ${shortAddr(a, 6, 4)}` : shortAddr(a, 8, 6));
   const rows: SlipRow[] = [{ label: 'To', value: who(s.toName, s.to) }];
   if (s.from) rows.push({ label: 'From', value: who(s.fromName, s.from) });
@@ -57,12 +68,18 @@ export function slipRows(s: SlipInput): SlipRow[] {
 
 /** The slip as plain text, for sharing. Carries the full address and transaction id. */
 export function slipText(s: SlipInput): string {
-  const out = [`Sent ${s.amount} ${s.unit}`, s.testnet ? 'Test network, no market value' : '', ''].filter((x, i) => x || i === 2);
-  out.push(`To: ${s.toName ? `${s.toName} ` : ''}${s.to}`);
-  if (s.from) out.push(`From: ${s.fromName ? `${s.fromName} ` : ''}${s.from}`);
-  out.push(`Network: ${s.network}`);
-  if (s.fee) out.push(`Fee: ${s.fee}`);
-  out.push(`Time: ${slipTime(s.at)}`, `Transaction: ${s.hash}`);
+  const out = [`${s.verb ?? 'Sent'} ${s.amount} ${s.unit}`, s.testnet ? 'Test network, no market value' : '', ''].filter((x, i) => x || i === 2);
+  if (s.rows) {
+    for (const r of s.rows) out.push(`${r.label}: ${r.value}`);
+    out.push(`Time: ${slipTime(s.at)}`);
+  } else {
+    out.push(`To: ${s.toName ? `${s.toName} ` : ''}${s.to}`);
+    if (s.from) out.push(`From: ${s.fromName ? `${s.fromName} ` : ''}${s.from}`);
+    out.push(`Network: ${s.network}`);
+    if (s.fee) out.push(`Fee: ${s.fee}`);
+    out.push(`Time: ${slipTime(s.at)}`);
+  }
+  out.push(`${s.hashLabel ?? 'Transaction'}: ${s.hash}`);
   if (s.url) out.push(s.url);
   return out.join('\n');
 }
@@ -122,13 +139,13 @@ export function receiptImage(s: SlipInput, done: boolean, qr?: QrCellsLike): Rec
   // state: a small seal and a word on the left, the time on the right
   items.push({ k: 'circle', cx: L + 11, cy: y + 10, r: 11, fill: tint });
   items.push({ k: 'path', d: `M${L + 6} ${y + 10.5}l3.6 3.6 6.4-7.2`, stroke: '#06210F', w: 2.4 });
-  items.push({ k: 'text', x: L + 28, y: y + 16, s: done ? 'Sent' : 'On its way', size: 16, weight: 'semibold', fill: INK, anchor: 'start' });
+  items.push({ k: 'text', x: L + 28, y: y + 16, s: done ? (s.verb ?? 'Sent') : 'On its way', size: 16, weight: 'semibold', fill: INK, anchor: 'start' });
   items.push({ k: 'text', x: R, y: y + 15, s: slipTime(s.at), size: 12, weight: 'regular', fill: SUB, anchor: 'end' });
 
   y += 64;
   items.push({ k: 'text', x: W / 2, y: y + 40, s: `${s.amount} ${s.unit}`, size: s.amount.length > 9 ? 34 : 46, weight: 'semibold', fill: INK, anchor: 'middle' });
   y += 62;
-  const sub = `to ${s.toName ?? shortAddr(s.to, 8, 6)}${s.testnet ? ' · test network' : ''}`;
+  const sub = `${s.sub ?? `to ${s.toName ?? shortAddr(s.to, 8, 6)}`}${s.testnet ? ' · test network' : ''}`;
   items.push({ k: 'text', x: W / 2, y: y + 12, s: sub, size: 14, weight: 'regular', fill: SUB, anchor: 'middle' });
 
   y += 36;
@@ -148,7 +165,7 @@ export function receiptImage(s: SlipInput, done: boolean, qr?: QrCellsLike): Rec
   y += 6;
   items.push({ k: 'line', x1: L, x2: R, y, stroke: RULE, w: 1, dash: '5 4' });
   y += 10;
-  row('Transaction', shortAddr(s.hash, 8, 6));
+  row(s.hashLabel ?? 'Transaction', shortAddr(s.hash, 8, 6));
   y += 14;
   items.push({ k: 'circle', cx: W / 2 - 62, cy: y + 5, r: 4, fill: tint });
   items.push({ k: 'text', x: W / 2 - 50, y: y + 10, s: done ? `Confirmed on ${s.network}` : 'Confirming…', size: 13, weight: 'medium', fill: tint, anchor: 'start' });
