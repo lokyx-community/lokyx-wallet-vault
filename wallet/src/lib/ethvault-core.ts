@@ -55,6 +55,9 @@ export const FORBIDDEN_ZODIAC = ['Delay 1.1.0', 'Delay 1.1.1', 'Roles 2.1.0', 'R
 export const ZODIAC_ADVISORY = 'https://www.gnosis.io/blog/post-mortem-gnosis-pay-vulnerability-exploit';
 export const ZODIAC_ADVISORY_SAFE = 'https://help.safe.global/articles/3569845223-zodiac-module-vulnerability';
 
+/** The coin a network pays fees in, as the vault screens call it. */
+export const NATIVE: Record<VaultNet, string> = { 'base-sepolia': 'ETH', 'arbitrum-sepolia': 'ETH', sepolia: 'ETH', 'op-sepolia': 'ETH', 'bnb-testnet': 'BNB' };
+
 export const SENTINEL: Hex = '0x0000000000000000000000000000000000000001';
 export const ETH: Hex = zeroAddress;
 export const DAY_MIN = 1440;

@@ -10,7 +10,7 @@ import { OpenBackup } from '../../ui/BackupSheets';
 import { ethKey } from '../../lib/multichain-core';
 import { useStore } from '../../lib/store';
 import { NETS, balanceOf, checkEthVaults, loadVaults, recoveryCancel, recoverySweep, vaults } from '../../lib/ethvault';
-import { VAULT_NETS, type VaultNet } from '../../lib/ethvault-core';
+import { VAULT_NETS, type VaultNet, NATIVE } from '../../lib/ethvault-core';
 import { shortAddr } from '../../lib/format';
 import { formatUnits } from '../../lib/multichain-core';
 
@@ -41,8 +41,8 @@ export default function EthRecover() {
       if (k.address.toLowerCase() !== v.recovery.toLowerCase()) return setErr('Those words are not the recovery words of this vault.');
       setBusy(true);
       const bal = await balanceOf(net, k.address);
-      setFuel(`${formatUnits(bal, 18, 6)} ETH`);
-      if (bal === 0n) return setErr(`The recovery address ${shortAddr(k.address, 8, 6)} has no ETH on ${VAULT_NETS[net].label}. Send it a little, then try again: the recovery key pays its own fees.`);
+      setFuel(`${formatUnits(bal, 18, 6)} ${NATIVE[net]}`);
+      if (bal === 0n) return setErr(`The recovery address ${shortAddr(k.address, 8, 6)} has no ${NATIVE[net]} on ${VAULT_NETS[net].label}. Send it a little, then try again: the recovery key pays its own fees.`);
       if (what === 'cancel') await recoveryCancel(v, k.sk);
       else await recoverySweep(v, k.sk);
       success();

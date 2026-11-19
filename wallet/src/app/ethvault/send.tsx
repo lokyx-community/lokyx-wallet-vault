@@ -13,8 +13,8 @@ import { SlideToPay } from '../../ui/SlideToPay';
 import { confirmIt } from '../../lib/auth';
 import { useStore } from '../../lib/store';
 import { useAsync } from '../../lib/multichain';
-import { NETS, USDC, checkEthVaults, loadVaults, sendFromVault, snapshot, tokensOn, vaults, type Snapshot } from '../../lib/ethvault';
-import { ETH, VAULT_NETS, describeCall, refuseQueue, refuseToBuild, sweepable, tokenTransferCall, type VaultNet } from '../../lib/ethvault-core';
+import { NETS, checkEthVaults, loadVaults, sendFromVault, snapshot, tokensOn, vaults, type Snapshot } from '../../lib/ethvault';
+import { ETH, NATIVE, VAULT_NETS, describeCall, refuseQueue, refuseToBuild, sweepable, tokenTransferCall, type VaultNet } from '../../lib/ethvault-core';
 import { shortAddr } from '../../lib/format';
 
 /** Send from the vault. Within today's allowance it goes straight away; more than that waits, and the text says which. */
@@ -22,7 +22,7 @@ export default function EthVaultSend() {
   const p = useLocalSearchParams<{ net?: VaultNet }>();
   const net: VaultNet = p.net && NETS.includes(p.net) ? p.net : NETS[0];
   const v = useStore(vaults)[net];
-  const [coin, setCoin] = useState<'ETH' | 'USDC'>('ETH');
+  const [coin, setCoin] = useState<string>('NATIVE');
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
   const [err, setErr] = useState('');
@@ -30,21 +30,24 @@ export default function EthVaultSend() {
   const [review, setReview] = useState(false);
   const snap = useAsync<Snapshot | null>(async () => { if (!v) await loadVaults(); const x = vaults.get()[net]; return x ? snapshot(x) : null; }, [net, !!v]);
   const s = snap.data;
-  const token: Hex = coin === 'ETH' ? ETH : (USDC[net] ?? ETH);
-  const dec = coin === 'ETH' ? 18 : 6;
+  const tok = tokensOn(net).find((t) => t.symbol === coin);
+  const isNative = !tok;
+  const token: Hex = tok ? tok.address : ETH;
+  const dec = tok ? tok.decimals : 18;
+  const unit = tok ? tok.symbol : NATIVE[net];
   let raw: bigint | null = null;
   try { raw = amount ? parseUnits(amount, dec) : null; } catch { raw = null; }
   const okTo = isAddress(to.trim());
   const left = s?.today.find((t) => t.token.toLowerCase() === token.toLowerCase())?.left ?? 0n;
   const instant = raw != null && raw <= left;
-  const call = raw != null && okTo ? (coin === 'ETH' ? { to: to.trim() as Hex, value: raw, data: '0x' as Hex, operation: 0 } : { ...tokenTransferCall(token, to.trim() as Hex, raw), value: 0n, operation: 0 }) : null;
+  const call = raw != null && okTo ? (isNative ? { to: to.trim() as Hex, value: raw, data: '0x' as Hex, operation: 0 } : { ...tokenTransferCall(token, to.trim() as Hex, raw), value: 0n, operation: 0 }) : null;
   const words = call ? describeCall(call, tokensOn(net), { safe: s?.expected.safe }).line : '';
   const refused = call ? refuseToBuild(call) : null;
-  const held = coin === 'ETH' ? s?.eth : s?.tokens.find((t) => t.token.address.toLowerCase() === token.toLowerCase())?.amount;
+  const held = isNative ? s?.eth : s?.tokens.find((t) => t.token.address.toLowerCase() === token.toLowerCase())?.amount;
   const short = s != null && raw != null && raw > 0n && held != null && raw > held;
   const toVault = !!s && to.trim().toLowerCase() === s.expected.safe.toLowerCase();
   const noQueue = v?.gated && call && !instant ? refuseQueue(call, v.sweepTo, sweepable({ allowances: v.allowances })) : null;
-  const problem = noQueue ? noQueue : toVault ? "That is the vault's own address. Pick where the coins should go." : short ? `The vault holds ${formatUnits(held!, dec)} ${coin} on ${VAULT_NETS[net].label}. Send some to the vault address first, then try again.` : '';
+  const problem = noQueue ? noQueue : toVault ? "That is the vault's own address. Pick where the coins should go." : short ? `The vault holds ${formatUnits(held!, dec)} ${unit} on ${VAULT_NETS[net].label}. Send some to the vault address first, then try again.` : '';
   const mine = to.trim().toLowerCase() === s?.expected.phone.toLowerCase();
 
   const go = async () => {
@@ -75,7 +78,7 @@ export default function EthVaultSend() {
   if (review)
     return (
       <Screen title="Review">
-        <SendReview amount={amount} unit={coin} to={to.trim()} lines={[words]}>
+        <SendReview amount={amount} unit={unit} to={to.trim()} lines={[words]}>
           {info}
         </SendReview>
         <ErrorText>{err}</ErrorText>
@@ -95,7 +98,7 @@ export default function EthVaultSend() {
   return (
     <SendCompose
       title="Send from vault"
-      unit={coin}
+      unit={unit}
       to={to}
       onTo={setTo}
       placeholder="0x…"
@@ -106,8 +109,8 @@ export default function EthVaultSend() {
       badTo={badTo}
       below={
         <View style={{ gap: 12 }}>
-          <Segmented<'ETH' | 'USDC'> value={coin} onChange={(c) => { setCoin(c); setAmount(''); }} options={[['ETH', 'ETH'], ['USDC', 'USDC']]} />
-          {s && <T v="caption" dim style={{ textAlign: 'center' }}>{`Left today without waiting: ${Number(left) / 10 ** dec} ${coin}`}</T>}
+          <Segmented<string> value={coin} onChange={(c) => { setCoin(c); setAmount(''); }} options={[['NATIVE', NATIVE[net]], ...tokensOn(net).map((t) => [t.symbol, t.symbol] as [string, string])]} />
+          {s && <T v="caption" dim style={{ textAlign: 'center' }}>{`Left today without waiting: ${Number(left) / 10 ** dec} ${unit}`}</T>}
         </View>
       }
       disabled={!call || !!refused || !s || !!problem || !raw}

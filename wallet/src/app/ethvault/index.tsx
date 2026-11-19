@@ -35,6 +35,7 @@ import {
   VAULT_NETS,
   describeCall,
   ETH,
+  NATIVE,
   itemState,
   type VaultNet,
 } from "../../lib/ethvault-core";
@@ -142,7 +143,7 @@ export default function EthVault() {
               title: `${CARD[net].name} vault`,
               sub: !s ? "Checking…" : s.issues.some((i) => i.level === "danger") ? "Needs a look" : "Protected",
               balance: s ? eth(s.eth, 18, 4) : "",
-              unit: "ETH",
+              unit: NATIVE[net],
               address: s?.expected.safe,
             }}
             width={width - 40}
@@ -163,7 +164,7 @@ export default function EthVault() {
               <View style={{ borderRadius: 24, backgroundColor: C.fill, padding: 16, gap: 12 }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
                   <T v="callout" style={{ fontSize: 16 }}>Allowance today</T>
-                  <T v="sub" dim>{`${eth(BigInt(a.amount) - l, 18, 4)} of ${eth(BigInt(a.amount), 18, 4)} ETH`}</T>
+                  <T v="sub" dim>{`${eth(BigInt(a.amount) - l, 18, 4)} of ${eth(BigInt(a.amount), 18, 4)} ${NATIVE[net]}`}</T>
                 </View>
                 <View style={{ height: 6, borderRadius: 3, backgroundColor: C.fill2 }}>
                   <View style={{ height: 6, borderRadius: 3, backgroundColor: C.blue, width: `${Math.round(used * 100)}%` }} />
@@ -228,7 +229,7 @@ export default function EthVault() {
           <Group title="Coins in this vault">
             {(() => {
               const rows = [
-                { key: "ETH", symbol: "ETH", token: ETH as string, decimals: 18, have: s?.eth ?? 0n },
+                { key: "ETH", symbol: NATIVE[net], token: ETH as string, decimals: 18, have: s?.eth ?? 0n },
                 ...(s?.tokens ?? []).map((t) => ({ key: t.token.address, symbol: t.token.symbol, token: t.token.address as string, decimals: t.token.decimals, have: t.amount })),
               ].filter((r) => r.key === "ETH" || r.have > 0n || v.allowances.some((a) => a.token.toLowerCase() === r.token.toLowerCase()));
               return rows.map((r) => {
@@ -265,7 +266,7 @@ export default function EthVault() {
             <View style={{ padding: 16, gap: 10 }}>
               <T v="sub" dim style={{ lineHeight: 20 }}>Your vault address is a separate account that holds your protected coins. Coins sent there are not spent from your everyday address.</T>
               <T v="sub" dim style={{ lineHeight: 20 }}>{`Your phone can move the daily allowance straight away. Anything bigger waits ${waitText(v.wait)} in the open, and you can cancel it in that time.`}</T>
-              <T v="sub" dim style={{ lineHeight: 20 }}>The recovery address belongs to your 12 words. They can cancel a waiting withdrawal or move everything to your safe address. It holds a little ETH to pay for that.</T>
+              <T v="sub" dim style={{ lineHeight: 20 }}>The recovery address belongs to your 12 words. They can cancel a waiting withdrawal or move everything to your safe address. It holds a little {NATIVE[net]} to pay for that.</T>
             </View>
           </Group>
           <Group title="Recovery">
@@ -283,13 +284,13 @@ export default function EthVault() {
             />
           </Group>
           {s?.recoveryGas.low && (
-            <Note>{`Low fuel on your recovery address ${shortAddr(v.recovery, 8, 6)}: it has ${eth(s.recoveryGas.have, 18, 6)} ETH and a cancel or sweep needs about ${eth(s.recoveryGas.needed, 18, 6)}. Send a little ETH there: the recovery key sends its own transactions, so without fuel it cannot cancel or sweep.`}</Note>
+            <Note>{`Low fuel on your recovery address ${shortAddr(v.recovery, 8, 6)}: it has ${eth(s.recoveryGas.have, 18, 6)} ${NATIVE[net]} and a cancel or sweep needs about ${eth(s.recoveryGas.needed, 18, 6)}. Send a little ${NATIVE[net]} there: the recovery key sends its own transactions, so without fuel it cannot cancel or sweep.`}</Note>
           )}
           {s && !s.recoveryGas.low && (
             <T
               v="caption"
               dim
-            >{`Recovery address ${shortAddr(v.recovery, 8, 6)} holds ${eth(s.recoveryGas.have, 18, 6)} ETH for fees.`}</T>
+            >{`Recovery address ${shortAddr(v.recovery, 8, 6)} holds ${eth(s.recoveryGas.have, 18, 6)} ${NATIVE[net]} for fees.`}</T>
           )}
           <ErrorText>{err || snap.error}</ErrorText>
           <Button

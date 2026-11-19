@@ -17,9 +17,9 @@ import { confirmIt } from '../../lib/auth';
 import { newShortMnemonic, isMnemonic } from '../../lib/lokyx';
 import { ethKey } from '../../lib/multichain-core';
 import { ensureAddresses, useAsync } from '../../lib/multichain';
-import { NETS, USDC, createVault, vaults, balanceOf } from '../../lib/ethvault';
+import { NETS, createVault, vaults, balanceOf, tokensOn } from '../../lib/ethvault';
 import { useStore } from '../../lib/store';
-import { DEFAULT_WAIT, ETH, MIN_WAIT, VAULT_NETS, checkSettings, type TokenAllowance, type VaultNet } from '../../lib/ethvault-core';
+import { DEFAULT_WAIT, ETH, MIN_WAIT, NATIVE, VAULT_NETS, checkSettings, type TokenAllowance, type VaultNet } from '../../lib/ethvault-core';
 
 type Step = 'phrase' | 'pledge' | 'check' | 'settings' | 'review' | 'working';
 const WAITS: [string, number][] = [['24 hours', MIN_WAIT], ['2 days', DEFAULT_WAIT], ['7 days', 7 * 86400]];
@@ -38,7 +38,7 @@ export default function EthVaultSetup() {
   const [answers, setAnswers] = useState(['', '']);
   const [typed, setTyped] = useState('');
   const [ethAllow, setEthAllow] = useState('0.01');
-  const [usdcAllow, setUsdcAllow] = useState('10');
+  const [tokAllow, setTokAllow] = useState<Record<string, string>>({});
   const [wait, setWait] = useState(1);
   const [safe, setSafe] = useState('');
   const [pledged, setPledged] = useState<boolean[]>(STORAGE_PLEDGES.map(() => false));
@@ -57,8 +57,8 @@ export default function EthVaultSetup() {
   const build = (): { settings: { wait: number; allowances: TokenAllowance[] } | null; error: string } => {
     try {
       const allowances: TokenAllowance[] = [
-        { token: ETH, symbol: 'ETH', decimals: 18, amount: parseUnits(ethAllow || '0', 18) },
-        ...(USDC[net] ? [{ token: USDC[net] as Hex, symbol: 'USDC', decimals: 6, amount: parseUnits(usdcAllow || '0', 6) }] : []),
+        { token: ETH, symbol: NATIVE[net], decimals: 18, amount: parseUnits(ethAllow || '0', 18) },
+        ...tokensOn(net).map((t) => ({ token: t.address, symbol: t.symbol, decimals: t.decimals, amount: parseUnits(tokAllow[t.symbol] ?? '10', t.decimals) })),
       ];
       const settings = { wait: WAITS[wait][1], allowances };
       const bad = checkSettings(settings);
@@ -86,7 +86,7 @@ export default function EthVaultSetup() {
     try {
       const a = await ensureAddresses();
       const bal = await balanceOf(net, a.eth as Hex);
-      if (bal === 0n) throw new Error(`Your everyday address ${a.eth} has no test ETH on ${VAULT_NETS[net].label}. Get some from a faucet first: it pays the one-time setup fee.`);
+      if (bal === 0n) throw new Error(`Your everyday address ${a.eth} has no test ${NATIVE[net]} on ${VAULT_NETS[net].label}. Get some from a faucet first: it pays the one-time setup fee.`);
       await createVault({ net, recoverySk: sk, recovery: recoveryAddr, sweepTo: safeNow as Hex, settings: built.settings!, onStep: (s) => { setMsg(STEPS[s]); setStepKey(s); } });
       router.replace(`/ethvault?net=${net}`);
       return true;
@@ -134,11 +134,15 @@ export default function EthVaultSetup() {
       )}
       {step === 'settings' && (
         <>
-          <T v="headline">Daily allowance (ETH)</T>
+          <T v="headline">{`Daily allowance (${NATIVE[net]})`}</T>
           <Note>This much can leave your vault each day without waiting. A thief with your phone gets at most this.</Note>
           <Field value={ethAllow} onChangeText={setEthAllow} keyboardType="decimal-pad" />
-          <T v="headline">Daily allowance (USDC)</T>
-          <Field value={usdcAllow} onChangeText={setUsdcAllow} keyboardType="decimal-pad" />
+          {tokensOn(net).map((t) => (
+            <View key={t.symbol} style={{ gap: 8 }}>
+              <T v="headline">{`Daily allowance (${t.symbol})`}</T>
+              <Field value={tokAllow[t.symbol] ?? '10'} onChangeText={(x) => setTokAllow((m) => ({ ...m, [t.symbol]: x }))} keyboardType="decimal-pad" />
+            </View>
+          ))}
           <Note>Any other coin has no quick allowance: it always waits.</Note>
           <T v="headline">Wait for bigger withdrawals</T>
           <Segmented value={String(wait)} options={WAITS.map(([l], i) => [String(i), l] as [string, string])} onChange={(k) => setWait(Number(k))} />
@@ -152,7 +156,7 @@ export default function EthVaultSetup() {
       )}
       {step === 'review' && built.settings && (
         <>
-          <Note>{`Last look. Once the vault exists, at most ${ethAllow || '0'} ETH and ${usdcAllow || '0'} USDC leave each day without waiting; anything else waits ${WAITS[wait][0]} and you can cancel it. Money is only protected once you send it to the vault address.`}</Note>
+          <Note>{`Last look. Once the vault exists, at most ${[`${ethAllow || '0'} ${NATIVE[net]}`, ...tokensOn(net).map((t) => `${tokAllow[t.symbol] ?? '10'} ${t.symbol}`)].join(', ')} leave each day without waiting; anything else waits ${WAITS[wait][0]} and you can cancel it. Money is only protected once you send it to the vault address.`}</Note>
           {existing && (
             <>
               <T v="headline">Your 12 recovery words</T>

@@ -65,7 +65,7 @@ import { ethAlerts, startedKey, type EthAlert } from "./ethvault-watch-core";
 export const NETS = Object.keys(VAULT_NETS) as VaultNet[];
 
 /** Circle's test USDC (from Circle's developer docs; the app checks symbol and decimals on chain before using it). */
-/** A network without a known test USDC has no entry; its vault holds the coin only until one is added. */
+/** Circle's test USDC per network (kept for callers that only want USDC). */
 export const USDC: Partial<Record<VaultNet, Hex>> = {
   "base-sepolia": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
   "arbitrum-sepolia": "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
@@ -73,7 +73,16 @@ export const USDC: Partial<Record<VaultNet, Hex>> = {
   // Circle's test USDC on Optimism Sepolia. The app checks symbol and decimals on chain before relying on it.
   "op-sepolia": "0x5fd84259d66Cd46123540766Be93DFE6D43130D7",
 };
+/**
+ * The tokens each vault network lists with a daily allowance. BNB Chain's dollar tokens have 18 decimals, not 6,
+ * so the decimals travel with the token. The app checks symbol and decimals on chain before relying on one.
+ */
+const BNB_TEST: KnownToken[] = [
+  { address: "0x337610d27c682E347C9cD60BD4b3b107C9d34dDd", symbol: "USDT", decimals: 18 },
+  { address: "0x64544969ed7EBf5f083679233325356EbE738930", symbol: "USDC", decimals: 18 },
+];
 export const tokensOn = (net: VaultNet): KnownToken[] => {
+  if (net === "bnb-testnet") return BNB_TEST;
   const a = USDC[net];
   return a ? [{ address: a, symbol: "USDC", decimals: 6 }] : [];
 };

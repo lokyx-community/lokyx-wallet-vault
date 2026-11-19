@@ -15,15 +15,15 @@ import { useAsync } from '../../lib/multichain';
 import { ensureApps, useApps } from '../../lib/appswallet';
 import { arrivalText, refillPlan } from '../../lib/appswallet-core';
 import { NETS, checkEthVaults, loadVaults, sendFromVault, snapshot, tokensOn, vaults, type Snapshot } from '../../lib/ethvault';
-import { ETH, VAULT_NETS, refuseQueue, sweepable, tokenTransferCall, type VaultNet } from '../../lib/ethvault-core';
+import { ETH, NATIVE, VAULT_NETS, refuseQueue, sweepable, tokenTransferCall, type VaultNet } from '../../lib/ethvault-core';
 
 /** Add money to the Apps wallet from a vault. Inside today's allowance there is no wait; above it the vault's wait applies. */
 export default function Refill() {
   const [net, setNet] = useState<VaultNet>(NETS[0]);
   const dest = (useApps().address ?? '0x0000000000000000000000000000000000000001') as Hex;
   const v = useStore(vaults)[net];
-  const coins = ['ETH', ...tokensOn(net).map((t) => t.symbol)];
-  const [coin, setCoin] = useState('ETH');
+  const coins = [NATIVE[net], ...tokensOn(net).map((t) => t.symbol)];
+  const [coin, setCoin] = useState<string>(NATIVE[NETS[0]]);
   const [amount, setAmount] = useState('');
   const [err, setErr] = useState('');
   const [done, setDone] = useState('');
@@ -78,7 +78,7 @@ export default function Refill() {
 
   return (
     <Screen title="Add money">
-      <Segmented<VaultNet> value={net} onChange={(n) => { setNet(n); setCoin('ETH'); setAmount(''); }} options={NETS.map((n) => [n, VAULT_NETS[n].label.replace(' Sepolia', '')] as [VaultNet, string])} />
+      <Segmented<VaultNet> value={net} onChange={(n) => { setNet(n); setCoin(NATIVE[n]); setAmount(''); }} options={NETS.map((n) => [n, VAULT_NETS[n].label.replace(' Sepolia', '')] as [VaultNet, string])} />
       <Segmented<string> value={coin} onChange={(c) => { setCoin(c); setAmount(''); }} options={coins.map((c) => [c, c] as [string, string])} />
       <View style={{ alignItems: 'center', paddingVertical: 8, gap: 4 }}>
         <T style={{ fontFamily: F.semibold, fontSize: 48, letterSpacing: -1.5 }}>{amount || '0'}</T>

@@ -14,7 +14,7 @@ import { usePoll, type Account } from '../lib/rpc';
 import { niceLyx } from '../lib/format';
 import { useAsync } from '../lib/multichain';
 import { NETS, loadVaults, partsStatus, snapshot, vaults, type Snapshot } from '../lib/ethvault';
-import { VAULT_NETS, itemState, type VaultNet } from '../lib/ethvault-core';
+import { NATIVE, VAULT_NETS, itemState, type VaultNet } from '../lib/ethvault-core';
 import { useStore } from '../lib/store';
 import type { LogoId } from '../ui/logos';
 
@@ -52,11 +52,11 @@ function EthVaultRow({ net }: { net: VaultNet }) {
   const sub = !s ? 'Checking…' : danger ? 'Needs a look' : waiting ? `${waiting} withdrawal${waiting === 1 ? '' : 's'} waiting` : 'Protected';
   return (
     <LeadRow
-      lead={<CoinMark symbol="ETH" seed={net} logo={MARK[net].logo} size={40} />}
+      lead={<CoinMark symbol={NATIVE[net]} seed={net} logo={MARK[net].logo} size={40} />}
       title={`${MARK[net].name} vault`}
       sub={sub}
       subColor={danger ? C.bad : waiting ? C.wait : undefined}
-      detail={s ? `${eth4(s.eth)} ETH` : ''}
+      detail={s ? `${eth4(s.eth)} ${NATIVE[net]}` : ''}
       chevron
       onPress={() => router.push(`/ethvault?net=${net}`)}
     />
@@ -100,7 +100,7 @@ export default function Vaults() {
         <Group title="Add a vault">
           {!hasLyx ? <LeadRow lead={<LyxLogo size={40} />} title="LOKYX" sub="Set up a vault" chevron onPress={() => router.push('/vault')} /> : <></>}
           {todo.map((n) => (
-            <LeadRow key={n} lead={<CoinMark symbol="ETH" seed={n} logo={MARK[n].logo} size={40} />} title={VAULT_NETS[n].label} sub={parts.data?.[n] === true ? 'Ready' : parts.data?.[n] === false ? 'First-time setup' : 'Test network'} chevron onPress={() => router.push(`/ethvault?net=${n}`)} />
+            <LeadRow key={n} lead={<CoinMark symbol={NATIVE[n]} seed={n} logo={MARK[n].logo} size={40} />} title={VAULT_NETS[n].label} sub={parts.data?.[n] === true ? 'Ready' : parts.data?.[n] === false ? 'First-time setup' : 'Test network'} chevron onPress={() => router.push(`/ethvault?net=${n}`)} />
           ))}
         </Group>
       )}
