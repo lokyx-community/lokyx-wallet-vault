@@ -111,6 +111,7 @@ export default function AddCoin() {
           <Box>
             <Row first mark={<Plus />} title="A token" sub="By its address" right={<More />} onPress={() => router.push('/add-token?chain=eth')} />
             <Row mark={<Plus />} title="A blockchain" sub="Dogecoin, Monero and more" right={<More />} onPress={() => router.push('/blockchains')} />
+            <Row mark={<Plus />} title="Your own token" sub="Name, symbol and supply" right={<More />} onPress={() => router.push('/make-token')} />
           </Box>
         </>
       )}

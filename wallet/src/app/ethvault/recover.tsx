@@ -3,7 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { plainError } from '../../lib/plain-error';
 import { T } from '../../ui/Text';
 import { Button, ErrorText, Field, Note, Screen, success } from '../../ui/controls';
-import { Segmented } from '../../ui/Segmented';
+import { LogoChips, VAULT_MARK } from '../../ui/LogoChips';
 import { ScreenGuard } from '../../ui/ScreenGuard';
 import { isMnemonic } from '../../lib/lokyx';
 import { OpenBackup } from '../../ui/BackupSheets';
@@ -60,7 +60,7 @@ export default function EthRecover() {
   return (
     <Screen title="Ethereum recovery key" large>
       <ScreenGuard />
-      <Segmented<VaultNet> value={net} onChange={setNet} options={NETS.map((n) => [n, VAULT_NETS[n].label] as [VaultNet, string])} />
+      <LogoChips<VaultNet> value={net} onChange={setNet} items={NETS.map((n) => ({ key: n, label: VAULT_MARK[n].name, logo: VAULT_MARK[n].logo }))} />
       <T v="callout" dim style={{ lineHeight: 22 }}>Type the 12 words you wrote down when you made the vault. They never leave this phone. With them you can cancel everything waiting, or move the coins to your safe address. They can do nothing else.</T>
       <Button title="Use my encrypted backup" kind="line" onPress={() => setBk(true)} />
       <OpenBackup open={bk} onClose={() => setBk(false)} kind="vault" onSecret={setWords} />

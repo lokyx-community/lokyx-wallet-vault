@@ -17,6 +17,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ToastHost } from '../ui/Toast';
 import { CoinFlightHost } from '../ui/CoinFlight';
+import { ReceiptImageHost } from '../ui/Slip';
 import { PasscodeHost } from '../ui/PasscodeHost';
 import { FaceCheckHost } from '../ui/FaceCheck';
 import { C } from '../ui/theme';
@@ -125,6 +126,7 @@ function Gate() {
       <PasscodeHost />
       <FaceCheckHost />
       <CoinFlightHost />
+      <ReceiptImageHost />
       <ToastHost />
     </>
   );

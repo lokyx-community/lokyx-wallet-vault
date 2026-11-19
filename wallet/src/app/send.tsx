@@ -419,7 +419,7 @@ function Sent({ amount, unit, to, hash, fee, at }: { amount: string; unit: strin
       </View>
       <Animated.View entering={FadeIn.delay(700)} exiting={FadeOut} style={{ gap: 10 }}>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <View style={{ flex: 1 }}><Button title="Share receipt" kind="line" onPress={() => shareSlip(slip)} /></View>
+          <View style={{ flex: 1 }}><Button title="Share receipt" kind="line" onPress={() => shareSlip(slip, inBlock)} /></View>
           <View style={{ flex: 1 }}><Button title="Done" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} /></View>
         </View>
         <Button title="See details" kind="plain" onPress={() => router.replace(`/tx/${hash}`)} />

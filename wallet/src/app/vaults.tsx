@@ -7,6 +7,7 @@ import { Icon } from '../ui/Icon';
 import { Logo } from '../ui/Logo';
 import { LeadRow } from '../ui/LeadRow';
 import { CoinMark } from '../ui/CoinMark';
+import { VAULT_MARK } from '../ui/LogoChips';
 import { LyxLogo } from '../ui/CoinLogo';
 import { C } from '../ui/theme';
 import { currentAddress } from '../lib/wallet';
@@ -18,13 +19,7 @@ import { NATIVE, VAULT_NETS, itemState, type VaultNet } from '../lib/ethvault-co
 import { useStore } from '../lib/store';
 import type { LogoId } from '../ui/logos';
 
-const MARK: Record<VaultNet, { logo: LogoId; name: string }> = {
-  'base-sepolia': { logo: 'base', name: 'Base' },
-  'arbitrum-sepolia': { logo: 'arb', name: 'Arbitrum' },
-  sepolia: { logo: 'eth', name: 'Ethereum' },
-  'op-sepolia': { logo: 'op', name: 'Optimism' },
-  'bnb-testnet': { logo: 'bnb', name: 'BNB Chain' },
-};
+const MARK = VAULT_MARK;
 const eth4 = (w: bigint) => {
   const s = w.toString().padStart(19, '0');
   const fr = s.slice(s.length - 18).slice(0, 4).replace(/0+$/, '');

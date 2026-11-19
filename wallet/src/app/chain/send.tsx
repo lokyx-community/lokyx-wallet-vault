@@ -276,7 +276,7 @@ function Progress({ chain, to, amount, stage, block, err, isBtc, slip }: { chain
           />
         </View>
       )}
-      {slipOn && slip ? <Button title="Share receipt" kind="line" onPress={() => shareSlip(slip)} /> : null}
+      {slipOn && slip ? <Button title="Share receipt" kind="line" onPress={() => shareSlip(slip, stage === 'done')} /> : null}
       {(stage === 'done' || stage === 'failed' || stage === 'waiting') && <Button title="Done" kind={stage === 'waiting' ? 'line' : 'solid'} onPress={() => router.back()} />}
     </Screen>
   );

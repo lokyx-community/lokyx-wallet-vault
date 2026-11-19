@@ -165,7 +165,7 @@ export default function XSend() {
           </View>
         )}
         {txid && prep ? <Button title="Open in explorer" kind="line" onPress={() => Linking.openURL(prep.explorer(txid)).catch(() => {})} /> : null}
-        {slipOn && state !== 'failed' && txid ? <Button title="Share receipt" kind="line" onPress={() => shareSlip(slip)} /> : null}
+        {slipOn && state !== 'failed' && txid ? <Button title="Share receipt" kind="line" onPress={() => shareSlip(slip, state === 'done')} /> : null}
         {state !== 'sending' ? <Button title="Done" onPress={() => router.back()} /> : null}
       </Screen>
     );

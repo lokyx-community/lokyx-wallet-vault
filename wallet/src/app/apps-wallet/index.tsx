@@ -13,6 +13,7 @@ import { confirmIt } from '../../lib/auth';
 import { plainError } from '../../lib/plain-error';
 import { ensureApps, useApps } from '../../lib/appswallet';
 import { useEvmSites, evmSites } from '../../lib/data';
+import { logoFor } from '../../ui/Logo';
 import { ethBalance, tokenBalance, useAsync } from '../../lib/multichain';
 import { ETH_NETS, KNOWN_TOKENS, type EthNet } from '../../lib/multichain-core';
 
@@ -64,6 +65,18 @@ export default function AppsWallet() {
   return (
     <Screen title="Apps wallet" large>
       <AppsCard />
+      {held.data && held.data.length > 0 ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+          <T v="caption" dim>Holds</T>
+          <View style={{ flexDirection: 'row' }}>
+            {[...new Set(held.data.map((h) => h.symbol))].slice(0, 6).map((sym, i) => (
+              <View key={sym} style={{ marginLeft: i ? -8 : 0, borderRadius: 99, borderWidth: 2, borderColor: C.bg }}>
+                <CoinMark symbol={sym} seed={sym} logo={logoFor(sym)} size={26} />
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Button title="Add money" onPress={() => router.push('/apps-wallet/refill')} style={{ flex: 1 }} />
         <Button title="Copy address" kind="line" onPress={async () => { await Clipboard.setStringAsync(address); toast('Address copied', 'copy'); }} style={{ flex: 1 }} />
@@ -74,7 +87,7 @@ export default function AppsWallet() {
         {held.data == null ? (
           <View style={{ padding: 16 }}><T v="sub" dim>Looking…</T></View>
         ) : held.data.length === 0 ? (
-          <View style={{ padding: 16 }}><T v="sub" dim>Nothing here yet. Add money from a vault, or send to the address above.</T></View>
+          <View style={{ padding: 16 }}><T v="sub" dim>Nothing here yet. Add money from your main wallet or a vault, or send to the address above.</T></View>
         ) : (
           held.data.map((h) => (
             <View key={h.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 64, paddingHorizontal: 16 }}>

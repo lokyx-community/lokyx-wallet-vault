@@ -33,3 +33,29 @@ test('history receipt text', () => {
   assert.equal(t.split('\n')[0], 'Sent 1000 TRX');
   assert.ok(t.includes('To: TLxs2gJfa7N6JA9nX3') && t.includes('Transaction: abc123') && t.includes('https://x.test/tx/abc123'));
 });
+
+import { b64ToBytes, receiptImage, tornPath } from '../src/lib/slip-core.ts';
+
+test('base64 decodes, with or without padding and a data prefix', () => {
+  assert.deepEqual([...b64ToBytes('SGVsbG8=')], [72, 101, 108, 108, 111]);
+  assert.deepEqual([...b64ToBytes('data:image/png;base64,SGVsbG8')], [72, 101, 108, 108, 111]);
+  assert.throws(() => b64ToBytes('@@'));
+});
+
+test('the receipt picture lays out in order and stays inside the paper', () => {
+  const a = receiptImage({ ...base, from: '0x0369aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa6697', fee: '0.00008 ETH', testnet: true }, true);
+  assert.equal(a.width, 390);
+  const texts = a.items.filter((i) => i.k === 'text').map((i) => (i as { s: string }).s);
+  assert.ok(texts.includes('Sent') && texts.includes('0.015 ETH') && texts.includes('Confirmed on Sepolia'));
+  assert.ok(texts.some((t) => t.includes('test network')));
+  const w = receiptImage(base, false);
+  assert.ok(w.items.some((i) => i.k === 'text' && i.s === 'On its way'));
+  assert.ok(w.height > 300 && a.height > w.height - 1);
+  for (const i of a.items) if (i.k === 'text') assert.ok(i.y > 0 && i.y < a.height);
+});
+
+test('the torn edge is one closed zigzag that ends where it began', () => {
+  const d = tornPath(24, 500, 342);
+  assert.ok(d.startsWith('M24 500') && d.endsWith('Z'));
+  assert.ok(d.includes('L366 500'));
+});

@@ -8,7 +8,7 @@ import { C } from '../../ui/theme';
 import * as Clipboard from 'expo-clipboard';
 import { Button, ErrorText, Note, Screen } from '../../ui/controls';
 import { SendCompose, SendReview } from '../../ui/SendCompose';
-import { Segmented } from '../../ui/Segmented';
+import { LogoChips } from '../../ui/LogoChips';
 import { SlideToPay } from '../../ui/SlideToPay';
 import { confirmIt } from '../../lib/auth';
 import { useStore } from '../../lib/store';
@@ -109,7 +109,7 @@ export default function EthVaultSend() {
       badTo={badTo}
       below={
         <View style={{ gap: 12 }}>
-          <Segmented<string> value={coin} onChange={(c) => { setCoin(c); setAmount(''); }} options={[['NATIVE', NATIVE[net]], ...tokensOn(net).map((t) => [t.symbol, t.symbol] as [string, string])]} />
+          <LogoChips<string> value={coin} onChange={(c) => { setCoin(c); setAmount(''); }} items={[{ key: 'NATIVE', label: NATIVE[net] }, ...tokensOn(net).map((t) => ({ key: t.symbol, label: t.symbol }))]} />
           {s && <T v="caption" dim style={{ textAlign: 'center' }}>{`Left today without waiting: ${Number(left) / 10 ** dec} ${unit}`}</T>}
         </View>
       }

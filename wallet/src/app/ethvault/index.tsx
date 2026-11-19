@@ -13,7 +13,7 @@ import { CoinMark } from "../../ui/CoinMark";
 import { LeadRow } from "../../ui/LeadRow";
 import type { LogoId } from "../../ui/logos";
 import { Button, ErrorText, Group, Note, Row, Screen } from "../../ui/controls";
-import { Segmented } from "../../ui/Segmented";
+import { LogoChips, VAULT_MARK } from "../../ui/LogoChips";
 import { IntroHero, Feature, Features } from "../../ui/Feature";
 import { SlideToPay } from "../../ui/SlideToPay";
 import { confirmIt } from "../../lib/auth";
@@ -98,13 +98,7 @@ export default function EthVault() {
 
   return (
     <Screen title="Ethereum vault" large>
-      <Segmented<VaultNet>
-        value={net}
-        onChange={setNet}
-        options={NETS.map(
-          (n) => [n, VAULT_NETS[n].label] as [VaultNet, string],
-        )}
-      />
+      <LogoChips<VaultNet> value={net} onChange={setNet} items={NETS.map((n) => ({ key: n, label: VAULT_MARK[n].name, logo: VAULT_MARK[n].logo }))} />
       {!v ? (
         <>
           <IntroHero icon="shield" text={`A vault keeps your coins safe even if your phone is lost or stolen. On ${VAULT_NETS[net].label} it works like this.`} />

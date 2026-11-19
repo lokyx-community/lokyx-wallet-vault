@@ -70,3 +70,108 @@ export function receiptText(head: string, pairs: [string, string][], hash: strin
   if (url) out.push(url);
   return out.join('\n');
 }
+
+// ---------- the receipt as a picture ----------
+// The share sheet gets a PNG of the receipt. The layout is worked out here, as plain numbers, so it can be tested without a phone;
+// `ReceiptImageHost` (ui/Slip.tsx) only draws these items with react-native-svg.
+
+export type ImgItem =
+  | { k: 'rect'; x: number; y: number; w: number; h: number; r: number; fill: string }
+  | { k: 'text'; x: number; y: number; s: string; size: number; weight: 'regular' | 'medium' | 'semibold'; fill: string; anchor: 'start' | 'middle' | 'end'; mono?: boolean }
+  | { k: 'line'; x1: number; x2: number; y: number; stroke: string; w: number; dash?: string }
+  | { k: 'circle'; cx: number; cy: number; r: number; fill: string }
+  | { k: 'path'; d: string; stroke?: string; fill?: string; w?: number };
+
+export type ReceiptImage = { width: number; height: number; items: ImgItem[] };
+
+const GOOD = '#3DD68C';
+const WAIT = '#F5B83D';
+const INK = '#F5F5F7';
+const SUB = '#9A9AA3';
+const FAINT = '#5C5C63';
+const RULE = '#34343A';
+
+/** A torn bottom edge as one closed path, from the paper's left edge to its right edge and back along `y`. */
+export function tornPath(x: number, y: number, w: number, tooth = 10, depth = 6): string {
+  const n = Math.max(1, Math.round(w / tooth));
+  const step = w / n;
+  let d = `M${x} ${y}`;
+  for (let i = 0; i < n; i++) d += `L${+(x + i * step + step / 2).toFixed(2)} ${y + depth}L${+(x + (i + 1) * step).toFixed(2)} ${y}`;
+  return `${d}Z`;
+}
+
+/** Where everything on the shared picture goes. Mirrors the receipt on screen: seal and state, amount, dotted rows, transaction. */
+export function receiptImage(s: SlipInput, done: boolean): ReceiptImage {
+  const W = 390;
+  const X0 = 24;
+  const PW = W - X0 * 2;
+  const L = X0 + 22;
+  const R = X0 + PW - 22;
+  const TOP = 40;
+  const items: ImgItem[] = [];
+  const tint = done ? GOOD : WAIT;
+
+  let y = TOP + 22;
+  // state: a small seal and a word on the left, the time on the right
+  items.push({ k: 'circle', cx: L + 11, cy: y + 10, r: 11, fill: tint });
+  items.push({ k: 'path', d: `M${L + 6} ${y + 10.5}l3.6 3.6 6.4-7.2`, stroke: '#06210F', w: 2.4 });
+  items.push({ k: 'text', x: L + 28, y: y + 16, s: done ? 'Sent' : 'On its way', size: 16, weight: 'semibold', fill: INK, anchor: 'start' });
+  items.push({ k: 'text', x: R, y: y + 15, s: slipTime(s.at), size: 12, weight: 'regular', fill: SUB, anchor: 'end' });
+
+  y += 64;
+  items.push({ k: 'text', x: W / 2, y: y + 40, s: `${s.amount} ${s.unit}`, size: s.amount.length > 9 ? 34 : 46, weight: 'semibold', fill: INK, anchor: 'middle' });
+  y += 62;
+  const sub = `to ${s.toName ?? shortAddr(s.to, 8, 6)}${s.testnet ? ' · test network' : ''}`;
+  items.push({ k: 'text', x: W / 2, y: y + 12, s: sub, size: 14, weight: 'regular', fill: SUB, anchor: 'middle' });
+
+  y += 36;
+  items.push({ k: 'line', x1: L, x2: R, y, stroke: RULE, w: 1, dash: '5 4' });
+  y += 10;
+  const row = (label: string, value: string, strong = false) => {
+    const mid = y + 20;
+    items.push({ k: 'text', x: L, y: mid, s: label, size: 14, weight: 'regular', fill: SUB, anchor: 'start' });
+    items.push({ k: 'text', x: R, y: mid, s: value, size: 14, weight: strong ? 'semibold' : 'medium', fill: INK, anchor: 'end' });
+    // the dotted leader between them; text widths are estimated, which is plenty for a dotted line
+    const a = L + label.length * 7.3 + 8;
+    const b = R - value.length * 7.7 - 8;
+    if (b - a > 12) items.push({ k: 'line', x1: a, x2: b, y: mid - 4, stroke: '#3A3A41', w: 1.5, dash: '1.5 4' });
+    y += 30;
+  };
+  for (const r of slipRows(s)) row(r.label, r.value);
+  y += 6;
+  items.push({ k: 'line', x1: L, x2: R, y, stroke: RULE, w: 1, dash: '5 4' });
+  y += 10;
+  row('Transaction', shortAddr(s.hash, 8, 6));
+  y += 14;
+  items.push({ k: 'circle', cx: W / 2 - 62, cy: y + 5, r: 4, fill: tint });
+  items.push({ k: 'text', x: W / 2 - 50, y: y + 10, s: done ? `Confirmed on ${s.network}` : 'Confirming…', size: 13, weight: 'medium', fill: tint, anchor: 'start' });
+  y += 34;
+  items.push({ k: 'text', x: W / 2, y, s: 'LOKYX Wallet', size: 12, weight: 'medium', fill: FAINT, anchor: 'middle' });
+  y += 24;
+
+  const paperH = y - TOP;
+  items.unshift({ k: 'rect', x: X0, y: TOP, w: PW, h: paperH, r: 0, fill: '#131315' });
+  items.push({ k: 'path', d: tornPath(X0, TOP + paperH, PW), fill: '#131315' });
+  return { width: W, height: TOP + paperH + 6 + 40, items };
+}
+
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+/** Base64 text to bytes (no atob needed). Ignores whitespace and a data-URL prefix. */
+export function b64ToBytes(input: string): Uint8Array {
+  const s = input.replace(/^data:[^,]*,/, '').replace(/[\s=]/g, '');
+  const out = new Uint8Array(Math.floor((s.length * 3) / 4));
+  let o = 0;
+  let buf = 0;
+  let bits = 0;
+  for (let i = 0; i < s.length; i++) {
+    const v = B64.indexOf(s[i]);
+    if (v < 0) throw new Error('Not base64.');
+    buf = (buf << 6) | v;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out[o++] = (buf >> bits) & 0xff;
+    }
+  }
+  return out.subarray(0, o);
+}
