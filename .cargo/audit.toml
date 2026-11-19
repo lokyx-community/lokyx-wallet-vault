@@ -1,0 +1,9 @@
+# Advisories I've looked at and can't fix yet. Each one is listed in docs/SECURITY.md too.
+[advisories]
+ignore = [
+    # crypto-bigint 0.5 timing side channels. Comes in through k256 0.13, which bip32 0.5 still
+    # pins. Nodes only verify signatures (public data); the CLI wallet and faucet sign locally.
+    # The web wallet and the Snap use noble, which isn't affected. Drop this when I can move to
+    # k256 0.14.
+    "RUSTSEC-2026-0387",
+]

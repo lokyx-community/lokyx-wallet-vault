@@ -1,0 +1,56 @@
+name: wallet apk
+
+# Builds the wallet as an installable APK. Open the run, scroll to Artifacts, download the zip and
+# unzip it on the phone. The same file is kept on the "beta" release as lokyx-wallet.apk, which is what the
+# website's Download button points at. The APK is signed with the debug key, so uninstall an older one first.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['wallet/**', '.github/workflows/wallet-apk.yml']
+
+jobs:
+  apk:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wallet
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: wallet/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm ci
+      - run: npm test
+      - run: npx tsc --noEmit
+      - run: npx expo prebuild -p android --no-install
+      # arm64 only, like the phones people actually have, and it halves the build time
+      - run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
+        working-directory: wallet/android
+      - name: Name the file
+        run: |
+          v=$(node -p "require('./package.json').version")
+          cp android/app/build/outputs/apk/release/app-release.apk "lokyx-wallet-$v.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lokyx-wallet-apk
+          path: wallet/lokyx-wallet-*.apk
+          retention-days: 30
+      - name: Keep it on the beta release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(node -p "require('./package.json').version")
+          cp "lokyx-wallet-$v.apk" lokyx-wallet.apk
+          gh release view beta --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create beta --repo "$GITHUB_REPOSITORY" --prerelease --title "Beta" --notes "Latest test build."
+          gh release upload beta lokyx-wallet.apk --clobber --repo "$GITHUB_REPOSITORY"
+          gh release edit beta --repo "$GITHUB_REPOSITORY" --notes "Version $v, built from $(git rev-parse --short HEAD)."

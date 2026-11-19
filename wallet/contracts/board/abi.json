@@ -1,0 +1,17 @@
+{
+  "name": "Board",
+  "deploy": [],
+  "methods": [
+    { "name": "post", "args": [["code", "string"], ["expires", "u64"]], "returns": "u64" },
+    { "name": "answer", "args": [["id", "u64"], ["code", "string"]], "returns": "u64" },
+    { "name": "close", "args": [["id", "u64"]] },
+    { "name": "count", "args": [], "returns": "u64", "view": true },
+    { "name": "offer", "args": [["id", "u64"]], "returns": ["address", "string", "u64", "bool", "u64"], "view": true },
+    { "name": "answer_at", "args": [["id", "u64"], ["n", "u64"]], "returns": ["address", "string"], "view": true }
+  ],
+  "events": [
+    { "name": "Posted", "fields": [["id", "u64"], ["maker", "address"], ["expires", "u64"]] },
+    { "name": "Answered", "fields": [["id", "u64"], ["taker", "address"]] },
+    { "name": "Closed", "fields": [["id", "u64"]] }
+  ]
+}

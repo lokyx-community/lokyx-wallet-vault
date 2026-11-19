@@ -1,0 +1,9 @@
+{
+  "name": "TokenLock",
+  "deploy": [["token", "address"], ["beneficiary", "address"], ["unlock_height", "u64"]],
+  "methods": [
+    { "name": "release", "args": [], "returns": "amount" },
+    { "name": "info", "args": [], "returns": ["address", "address", "u64", "amount"], "view": true }
+  ],
+  "events": [{ "name": "Released", "fields": [["to", "address"], ["amount", "amount"]] }]
+}

@@ -1,0 +1,6 @@
+[build]
+target = "wasm32-unknown-unknown"
+
+[target.wasm32-unknown-unknown]
+# A small stack keeps contracts' memory small. 64 KiB is plenty for ordinary contracts.
+rustflags = ["-C", "link-arg=-zstack-size=65536"]

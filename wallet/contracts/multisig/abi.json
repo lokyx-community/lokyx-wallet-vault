@@ -1,0 +1,24 @@
+{
+  "name": "Multisig",
+  "deploy": [["owners", "list<address>"], ["threshold", "u64"]],
+  "methods": [
+    { "name": "deposit", "args": [], "payable": true },
+    { "name": "propose", "args": [["to", "address"], ["amount", "amount"], ["note", "string"]], "returns": "u64" },
+    { "name": "approve", "args": [["id", "u64"]], "returns": "bool" },
+    { "name": "execute", "args": [["id", "u64"]], "returns": "bool" },
+    { "name": "revoke", "args": [["id", "u64"]] },
+    { "name": "cancel", "args": [["id", "u64"]] },
+    { "name": "info", "args": [], "returns": ["list<address>", "u64", "amount", "u64"], "view": true },
+    { "name": "proposal", "args": [["id", "u64"]], "returns": ["address", "amount", "string", "address", "u64"], "view": true },
+    { "name": "approvals", "args": [["id", "u64"]], "returns": "list<address>", "view": true }
+  ],
+  "events": [
+    { "name": "Made", "fields": [["owners", "list<address>"], ["threshold", "u64"]] },
+    { "name": "Deposit", "fields": [["from", "address"], ["amount", "amount"]] },
+    { "name": "Proposed", "fields": [["id", "u64"], ["by", "address"], ["to", "address"], ["amount", "amount"]] },
+    { "name": "Approved", "fields": [["id", "u64"], ["by", "address"]] },
+    { "name": "Revoked", "fields": [["id", "u64"], ["by", "address"]] },
+    { "name": "Cancelled", "fields": [["id", "u64"], ["by", "address"]] },
+    { "name": "Sent", "fields": [["id", "u64"], ["to", "address"], ["amount", "amount"]] }
+  ]
+}

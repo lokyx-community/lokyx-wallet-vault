@@ -1,0 +1,30 @@
+{
+  "version": "0.1.0",
+  "description": "Use your LOKYX lyx1 address from MetaMask: view it and sign LOKYX transfers.",
+  "proposedName": "LOKYX",
+  "source": {
+    "shasum": "QjiCUsWr/foF4b4yodwfjcNbfaA2dg8TLuoH2iNEn88=",
+    "location": {
+      "npm": {
+        "filePath": "dist/bundle.js",
+        "iconPath": "images/icon.svg",
+        "packageName": "lokyx-snap",
+        "registry": "https://registry.npmjs.org/"
+      }
+    }
+  },
+  "initialPermissions": {
+    "endowment:rpc": {
+      "dapps": true,
+      "snaps": false
+    },
+    "snap_dialog": {},
+    "snap_getBip44Entropy": [
+      {
+        "coinType": 7701
+      }
+    ]
+  },
+  "platformVersion": "12.1.0",
+  "manifestVersion": "0.1"
+}

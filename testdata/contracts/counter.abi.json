@@ -1,0 +1,11 @@
+{
+  "name": "Counter",
+  "deploy": [["start", "u64"]],
+  "methods": [
+    { "name": "increment", "args": [], "returns": "u64" },
+    { "name": "get", "args": [], "returns": "u64", "view": true }
+  ],
+  "events": [
+    { "name": "Incremented", "fields": [["by", "address"], ["count", "u64"]] }
+  ]
+}

@@ -1,0 +1,5 @@
+target/
+lokyx-data/
+devnet-data/
+*.phrase.txt
+dist/

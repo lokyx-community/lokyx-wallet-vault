@@ -1,0 +1,99 @@
+name: ci
+
+# Everything that has to hold for every change. The release script runs these again plus the
+# cross-platform builds, but nothing waits for a release to find out.
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  node:
+    name: node (fmt, clippy, tests, test-pow)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update && sudo apt-get install -y cmake
+      - run: cargo fmt --check
+      - run: cargo clippy --release --all-targets --locked -- -D warnings
+      - run: cargo test --release --locked
+      # Runs after the tests on purpose: `cargo test --release` leaves a target/release/lokyxd
+      # that *does* contain the test proof of work (it refuses to start), so this proves a plain
+      # release build replaces it with a clean one.
+      - run: CHECK_TARGET_DIR=target ./scripts/check-test-pow.sh
+
+  # Consensus is supported on x86-64 and aarch64. The node job above covers x86-64; this runs the
+  # parts that have to come out identical (state roots, the replayed chain, contract recursion
+  # depth, RandomX vectors, the trie) on a real arm64 machine.
+  consensus-arm64:
+    name: consensus on aarch64
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update && sudo apt-get install -y cmake
+      - run: cargo test --release --locked --lib
+      - run: cargo test --release --locked --test golden --test determinism --test restart --test reorg --test contract
+
+  # Same decoders, but a long pass from a fresh seed each run, so CI keeps looking for inputs
+  # the fixed-seed test in `cargo test` never reaches. A failure prints its seed to re-run with.
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update && sudo apt-get install -y cmake
+      - run: cargo test --release --locked --test decode_fuzz -- --nocapture
+        env:
+          FUZZ_ROUNDS: 3000000
+          FUZZ_SEED: random
+
+  # Known vulnerabilities in dependencies (RustSec advisory database). Waivers are in
+  # .cargo/audit.toml, each with a reason.
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - run: cargo audit
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  snap:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: snap
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: snap/package-lock.json
+      - run: npm ci
+      - run: npm test

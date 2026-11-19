@@ -1,0 +1,16 @@
+{
+  "name": "Capsule",
+  "deploy": [["to", "address"], ["opens", "u64"], ["note", "string"]],
+  "methods": [
+    { "name": "add", "args": [], "payable": true },
+    { "name": "open", "args": [], "returns": "amount" },
+    { "name": "note", "args": [], "returns": "string", "view": true },
+    { "name": "sealed", "args": [], "returns": "u64", "view": true },
+    { "name": "info", "args": [], "returns": ["address", "address", "u64", "u64", "amount"], "view": true }
+  ],
+  "events": [
+    { "name": "Sealed", "fields": [["from", "address"], ["to", "address"], ["opens", "u64"], ["amount", "amount"]] },
+    { "name": "Added", "fields": [["from", "address"], ["amount", "amount"]] },
+    { "name": "Opened", "fields": [["to", "address"], ["amount", "amount"]] }
+  ]
+}

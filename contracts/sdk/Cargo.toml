@@ -1,0 +1,8 @@
+[package]
+name = "lokyx-sdk"
+version = "0.1.0"
+edition = "2024"
+description = "Write LOKYX contracts in Rust"
+license = "MIT"
+
+[dependencies]

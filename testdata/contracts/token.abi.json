@@ -1,0 +1,19 @@
+{
+  "name": "Token",
+  "deploy": [["name", "string"], ["symbol", "string"], ["supply", "amount"]],
+  "methods": [
+    { "name": "name", "args": [], "returns": "string", "view": true },
+    { "name": "symbol", "args": [], "returns": "string", "view": true },
+    { "name": "decimals", "args": [], "returns": "u8", "view": true },
+    { "name": "total_supply", "args": [], "returns": "amount", "view": true },
+    { "name": "balance_of", "args": [["who", "address"]], "returns": "amount", "view": true },
+    { "name": "transfer", "args": [["to", "address"], ["amount", "amount"]], "returns": "bool" },
+    { "name": "approve", "args": [["spender", "address"], ["amount", "amount"]], "returns": "bool" },
+    { "name": "allowance", "args": [["owner", "address"], ["spender", "address"]], "returns": "amount", "view": true },
+    { "name": "transfer_from", "args": [["owner", "address"], ["to", "address"], ["amount", "amount"]], "returns": "bool" }
+  ],
+  "events": [
+    { "name": "Transfer", "fields": [["from", "address"], ["to", "address"], ["amount", "amount"]] },
+    { "name": "Approval", "fields": [["owner", "address"], ["spender", "address"], ["amount", "amount"]] }
+  ]
+}

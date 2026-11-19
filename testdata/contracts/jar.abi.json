@@ -1,0 +1,13 @@
+{
+  "name": "Jar",
+  "deploy": [["unlock_height", "u64"]],
+  "methods": [
+    { "name": "deposit", "args": [], "payable": true },
+    { "name": "withdraw", "args": [], "returns": "amount" },
+    { "name": "info", "args": [], "returns": ["address", "u64", "amount"], "view": true }
+  ],
+  "events": [
+    { "name": "Deposit", "fields": [["from", "address"], ["amount", "amount"]] },
+    { "name": "Withdraw", "fields": [["to", "address"], ["amount", "amount"]] }
+  ]
+}

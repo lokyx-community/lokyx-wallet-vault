@@ -1,0 +1,60 @@
+[package]
+name = "lokyx"
+version = "0.5.0"
+description = "LOKYX: an independent RandomX proof-of-work Layer 1 (pre-alpha, unaudited)"
+license = "MIT"
+rust-version = "1.94"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+argon2 = "0.5"
+axum = "0.8"
+bech32 = "0.11"
+bip32 = { version = "0.5", features = ["secp256k1"] }
+bip39 = "2"
+borsh = { version = "1", features = ["derive"] }
+chacha20poly1305 = "0.10"
+clap = { version = "4", features = ["derive"] }
+hex = "0.4"
+k256 = { version = "0.13", features = ["ecdsa", "sha256"] }
+parking_lot = "0.12"
+primitive-types = "0.12"
+rand = "0.8"
+randomx-rs = "1.6"
+redb = "2"
+rpassword = "7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+snow = "0.10"
+sha3 = "0.10"
+sha2 = "0.10"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+wasmi = { version = "2", default-features = false, features = ["std", "stable", "validate", "deterministic", "portable-dispatch"] }
+ureq = { version = "2", default-features = false, features = ["json", "tls"] }
+zeroize = { version = "1", features = ["derive"] }
+
+[profile.release]
+# Consensus code must behave the same in every build. Without this, arithmetic that overflows
+# panics in a debug build and wraps silently in a release one, so a bug could be invisible in
+# testing and mint coins in production. Every such spot returns an error instead, and this makes
+# a crash the worst case if one is ever missed.
+overflow-checks = true
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[features]
+# Test builds only: lets tests swap RandomX for a cheap hash. Never enabled in a release build.
+test-pow = []
+
+[dev-dependencies]
+wat = "1"
+lokyx = { path = ".", features = ["test-pow"] }

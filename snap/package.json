@@ -1,0 +1,40 @@
+{
+  "name": "lokyx-snap",
+  "version": "0.1.0",
+  "description": "MetaMask Snap for LOKYX: lyx1 addresses and transfer signing.",
+  "main": "./dist/bundle.js",
+  "scripts": {
+    "build": "mm-snap build",
+    "serve": "mm-snap serve",
+    "start": "mm-snap watch",
+    "test": "mm-snap build && jest"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@metamask/key-tree": "^10.1.1",
+    "@metamask/snaps-sdk": "^12.1.0",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@babel/preset-env": "^7.29.7",
+    "@babel/preset-react": "^7.29.7",
+    "@babel/preset-typescript": "^7.29.7",
+    "@metamask/snaps-cli": "^8.4.1",
+    "@metamask/snaps-jest": "^10.2.2",
+    "@types/jest": "^30.0.0",
+    "babel-jest": "^30.5.2",
+    "jest": "^30.5.2",
+    "typescript": "^5.9.3"
+  },
+  "files": [
+    "dist/",
+    "images/",
+    "snap.manifest.json"
+  ],
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}
