@@ -26,6 +26,10 @@ contract PredictionMarketTest is Test {
     uint256 constant CENT = UNIT / 100;
     uint256 constant FUND = 1000e18;
 
+    // block.timestamp can be cached across a warp when compiled with via_ir, so the test keeps its own clock
+    uint256 clock = 1_000_000;
+    function _adv(uint256 s) internal { clock += s; vm.warp(clock); }
+
     function setUp() public {
         usdt = new MockUSDT();
         pm = new PredictionMarket(address(usdt));
@@ -38,8 +42,8 @@ contract PredictionMarketTest is Test {
             pm.deposit(FUND);
         }
         for (uint256 i = 0; i < 5; i++) panel.push(address(uint160(0x100 + i)));
-        vm.warp(1_000_000);
-        pm.create("Will it rain?", uint64(block.timestamp + 1 days), UNIT, panel);
+        vm.warp(clock);
+        pm.create("Will it rain?", uint64(clock + 1 days), UNIT, panel);
     }
 
     function _conserved() internal view {
@@ -126,13 +130,13 @@ contract PredictionMarketTest is Test {
 
     function test_panelResolvesYes() public {
         _pair();
-        vm.warp(block.timestamp + 1 days);
+        _adv(1 days);
         vm.expectRevert("only the panel can vote"); pm.vote(0, 0);
         for (uint256 i = 0; i < 2; i++) { vm.prank(panel[i]); pm.vote(0, 0); }
         vm.expectRevert("the panel has not agreed yet"); pm.finalize(0);
         vm.prank(panel[2]); pm.vote(0, 0);
         vm.expectRevert("the objection window is still open"); pm.finalize(0);
-        vm.warp(block.timestamp + 1 days);
+        _adv(1 days);
         pm.finalize(0);
         vm.prank(a); assertEq(pm.claim(0), 10 * UNIT);
         vm.prank(b); assertEq(pm.claim(0), 0);
@@ -143,24 +147,24 @@ contract PredictionMarketTest is Test {
 
     function test_changedVoteRestartsWindow() public {
         _pair();
-        vm.warp(block.timestamp + 1 days);
+        _adv(1 days);
         for (uint256 i = 0; i < 3; i++) { vm.prank(panel[i]); pm.vote(0, 0); }
-        vm.warp(block.timestamp + 12 hours);
+        _adv(12 hours);
         vm.prank(panel[2]); pm.vote(0, 1); // majority gone
-        vm.warp(block.timestamp + 2 days);
+        _adv(2 days);
         vm.expectRevert("the panel has not agreed yet"); pm.finalize(0);
         vm.prank(panel[3]); pm.vote(0, 1);
         vm.prank(panel[4]); pm.vote(0, 1);
-        vm.warp(block.timestamp + 1 days);
+        _adv(1 days);
         pm.finalize(0);
         vm.prank(b); assertEq(pm.claim(0), 10 * UNIT);
     }
 
     function test_expireAndInvalidPaysHalf() public {
         _pair();
-        vm.warp(block.timestamp + 1 days + 30 days - 1);
+        _adv(1 days + 30 days - 1);
         vm.expectRevert("not yet: the panel still has time"); pm.expire(0);
-        vm.warp(block.timestamp + 1);
+        _adv(1);
         pm.expire(0);
         vm.prank(a); assertEq(pm.claim(0), 5 * UNIT);
         vm.prank(b); assertEq(pm.claim(0), 5 * UNIT);
@@ -171,7 +175,7 @@ contract PredictionMarketTest is Test {
         _pair();
         vm.prank(c); pm.place(0, 0, 0, 10, 5);
         vm.prank(a); pm.place(0, 0, 1, 99, 10);
-        vm.warp(block.timestamp + 1 days + 30 days);
+        _adv(1 days + 30 days);
         pm.expire(0);
         vm.prank(c); pm.claim(0);
         vm.prank(a); pm.claim(0);
@@ -189,12 +193,12 @@ contract PredictionMarketTest is Test {
 
     function test_createValidation() public {
         vm.expectRevert("the share value must be a multiple of 100 base units");
-        pm.create("x", uint64(block.timestamp + 1 days), 150, panel);
+        pm.create("x", uint64(clock + 1 days), 150, panel);
         vm.expectRevert("close at least an hour from now");
-        pm.create("x", uint64(block.timestamp + 10), UNIT, panel);
+        pm.create("x", uint64(clock + 10), UNIT, panel);
         address[] memory two = new address[](2);
         vm.expectRevert("the panel needs between 3 and 9 people");
-        pm.create("x", uint64(block.timestamp + 1 days), UNIT, two);
+        pm.create("x", uint64(clock + 1 days), UNIT, two);
     }
 
     function testFuzz_booksStayBalanced(uint256 seed) public {
