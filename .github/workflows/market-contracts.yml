@@ -1,0 +1,54 @@
+name: market-contracts
+
+# The prediction market: the rules engine (native tests), the LOKYX contract (built to WebAssembly), and the
+# BNB Chain contract (Foundry tests). The wasm is uploaded as base64 so it can be pasted into
+# wallet/src/lib/contracts-wallet.ts.
+on:
+  push:
+    paths:
+      - "wallet/contracts/**"
+      - ".github/workflows/market-contracts.yml"
+  pull_request:
+    paths:
+      - "wallet/contracts/**"
+
+jobs:
+  lokyx:
+    name: LOKYX market (engine tests, wasm build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wallet/contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: wallet/contracts
+      - run: cargo test -p market-engine
+      - run: cargo build -p market --release --target wasm32-unknown-unknown
+      - run: |
+          ls -l target/wasm32-unknown-unknown/release/market.wasm
+          base64 -w0 target/wasm32-unknown-unknown/release/market.wasm > market.wasm.b64
+          wc -c market.wasm.b64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: market-wasm
+          path: |
+            wallet/contracts/market.wasm.b64
+            wallet/contracts/market/abi.json
+
+  bnb:
+    name: BNB market (Foundry)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wallet/contracts/evm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: git clone --depth 1 https://github.com/foundry-rs/forge-std lib/forge-std
+      - run: forge build --sizes
+      - run: forge test -vv

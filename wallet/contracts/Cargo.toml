@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["sdk", "multisig", "board", "tokenlock"]
+members = ["sdk", "multisig", "board", "tokenlock", "market-engine", "market"]
 
 [profile.release]
 opt-level = "z"

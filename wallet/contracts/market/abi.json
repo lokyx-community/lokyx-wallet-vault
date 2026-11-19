@@ -1,0 +1,28 @@
+{
+  "name": "Market",
+  "deploy": [],
+  "methods": [
+    { "name": "deposit", "args": [], "payable": true },
+    { "name": "withdraw", "args": [["amount", "u128"]] },
+    { "name": "create", "args": [["title", "string"], ["close", "u64"], ["unit", "u128"], ["panel", "address[]"]], "returns": "u64" },
+    { "name": "place", "args": [["id", "u64"], ["outcome", "u8"], ["side", "u8"], ["price", "u8"], ["qty", "u64"]], "returns": "u64" },
+    { "name": "cancel", "args": [["id", "u64"], ["order", "u64"]] },
+    { "name": "vote", "args": [["id", "u64"], ["vote", "u8"]] },
+    { "name": "finalize", "args": [["id", "u64"]] },
+    { "name": "expire", "args": [["id", "u64"]] },
+    { "name": "claim", "args": [["id", "u64"]], "returns": "u128" },
+    { "name": "count", "args": [], "returns": "u64", "view": true },
+    { "name": "free", "args": [["who", "address"]], "returns": "u128", "view": true },
+    { "name": "market", "args": [["id", "u64"]], "returns": ["string", "address", "u64", "u128", "u8", "u64", "u128", "address[]", "u8[]"], "view": true },
+    { "name": "book", "args": [["id", "u64"]], "returns": "(u64,address,u8,u8,u8,u64)[]", "view": true },
+    { "name": "shares", "args": [["id", "u64"], ["who", "address"]], "returns": ["u64", "u64"], "view": true }
+  ],
+  "events": [
+    { "name": "Deposit", "fields": [["who", "address"], ["amount", "u128"]] },
+    { "name": "Withdraw", "fields": [["who", "address"], ["amount", "u128"]] },
+    { "name": "Created", "fields": [["id", "u64"], ["creator", "address"], ["close", "u64"]] },
+    { "name": "Order", "fields": [["id", "u64"], ["order", "u64"], ["who", "address"]] },
+    { "name": "Voted", "fields": [["id", "u64"], ["who", "address"], ["vote", "u8"]] },
+    { "name": "Decided", "fields": [["id", "u64"], ["state", "u8"]] }
+  ]
+}
