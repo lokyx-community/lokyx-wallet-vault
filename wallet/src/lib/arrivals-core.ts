@@ -11,3 +11,9 @@ export function arrivals(prev: Record<string, bigint> | null, now: Record<string
   }
   return out;
 }
+
+/**
+ * True when the balance on hand was read from this network. After a switch the hook still holds the previous network's
+ * number until the new one loads; filing that under the new network would show a deposit that never happened.
+ */
+export const readFrom = (loaded: Record<string, string>, coin: string, net: string): boolean => loaded[coin] === net;

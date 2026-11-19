@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { usePoll, type Account } from './rpc';
 import { useAccountRef, wallet } from './wallet';
 import { useStore } from './store';
+import { readFrom } from './arrivals-core';
 import { addrs as addrStore, activeNets, btcBalance, ensureAddresses, ethBalance, tokenBalance, tokensFor, useAsync, useChainSettings, useTokensStore } from './multichain';
 import { BTC_NETS, ETH_NETS, EVM_FAMILIES, EVM_ORDER, evmNet, evmOf, formatBtc, formatUnits, type EvmFamily } from './multichain-core';
 import { SOL_NETS, SOL_DECIMALS } from './sol-core';
@@ -49,8 +50,21 @@ export function useCoins(): Coins {
   const addrs = useAsync(async () => (wallet.get().exists ? ensureAddresses() : null), []);
   const btcAddr = addrs.data?.btc[nets.btc] ?? '';
   const ethAddr = addrs.data?.eth ?? '';
-  const btcBal = useAsync(async () => (btcAddr ? btcBalance(nets.btc, btcAddr) : null), [btcAddr, nets.btc], 30_000);
-  const ethBal = useAsync(async () => (ethAddr ? ethBalance(nets.eth, ethAddr) : null), [ethAddr, nets.eth], 30_000);
+  // A balance that is still the old network's while a new one loads must never be filed under the new network:
+  // it would look like money arriving when the real number lands. So each read notes which network it came from.
+  const loaded = useRef<Record<string, string>>({});
+  const btcBal = useAsync(async () => {
+    if (!btcAddr) return null;
+    const v = await btcBalance(nets.btc, btcAddr);
+    loaded.current.btc = nets.btc;
+    return v;
+  }, [btcAddr, nets.btc], 30_000);
+  const ethBal = useAsync(async () => {
+    if (!ethAddr) return null;
+    const v = await ethBalance(nets.eth, ethAddr);
+    loaded.current.eth = nets.eth;
+    return v;
+  }, [ethAddr, nets.eth], 30_000);
   const cfg = useChainSettings();
   const extra = cfg.extra ?? [];
   const evmOn = EVM_ORDER.filter((f) => (cfg.evm ?? []).includes(f));
@@ -64,25 +78,41 @@ export function useCoins(): Coins {
   const live = useStore(addrStore);
   const solAddr = extra.includes('sol') ? live?.sol ?? addrs.data?.sol ?? '' : '';
   const trxAddr = extra.includes('trx') ? live?.trx ?? addrs.data?.trx ?? '' : '';
-  const solBal = useAsync(async () => (solAddr ? solBalance(nets.sol, solAddr) : null), [solAddr, nets.sol], 30_000);
-  const trxBal = useAsync(async () => (trxAddr ? trxBalance(nets.trx, trxAddr) : null), [trxAddr, nets.trx], 30_000);
+  const solBal = useAsync(async () => {
+    if (!solAddr) return null;
+    const v = await solBalance(nets.sol, solAddr);
+    loaded.current.sol = nets.sol;
+    return v;
+  }, [solAddr, nets.sol], 30_000);
+  const trxBal = useAsync(async () => {
+    if (!trxAddr) return null;
+    const v = await trxBalance(nets.trx, trxAddr);
+    loaded.current.trx = nets.trx;
+    return v;
+  }, [trxAddr, nets.trx], 30_000);
   const watched = useWatchedX();
   const wkey = watched.map((w) => w.id).join(',');
   const solTok = useAsync(async () => (solAddr ? solTokens(nets.sol, solAddr).catch(() => []) : []), [solAddr, nets.sol, wkey], 60_000);
   const trxTok = useAsync(async () => (trxAddr ? tronTokens(nets.trx, trxAddr).catch(() => []) : []), [trxAddr, nets.trx, wkey], 60_000);
   const tokenList = tokensFor(nets.eth);
   const tokBal = useAsync(
-    async () => (ethAddr ? Promise.all(tokenList.map(async (t) => ({ t, v: await tokenBalance(nets.eth, t, ethAddr).catch(() => null) }))) : []),
+    async () => {
+      if (!ethAddr) return [];
+      const net = nets.eth;
+      const r = await Promise.all(tokenList.map(async (t) => ({ t, v: await tokenBalance(net, t, ethAddr).catch(() => null) })));
+      loaded.current.erc20 = net;
+      return r;
+    },
     [ethAddr, nets.eth, tokenList.map((t) => t.contract).join(',')],
     30_000,
   );
 
   const raw: Record<string, bigint> = {};
-  if (btcAddr && btcBal.data) raw[`btc:${nets.btc}:${btcAddr}`] = btcBal.data.confirmed + btcBal.data.pending;
-  if (ethAddr && ethBal.data != null) raw[`eth:${nets.eth}:${ethAddr}`] = ethBal.data;
-  if (solAddr && solBal.data != null) raw[`sol:${nets.sol}:${solAddr}`] = solBal.data;
-  if (trxAddr && trxBal.data != null) raw[`trx:${nets.trx}:${trxAddr}`] = trxBal.data;
-  for (const r of tokBal.data ?? []) if (r.v != null && ethAddr) raw[`erc20:${nets.eth}:${r.t.contract.toLowerCase()}`] = r.v;
+  if (btcAddr && btcBal.data && readFrom(loaded.current, 'btc', nets.btc)) raw[`btc:${nets.btc}:${btcAddr}`] = btcBal.data.confirmed + btcBal.data.pending;
+  if (ethAddr && ethBal.data != null && readFrom(loaded.current, 'eth', nets.eth)) raw[`eth:${nets.eth}:${ethAddr}`] = ethBal.data;
+  if (solAddr && solBal.data != null && readFrom(loaded.current, 'sol', nets.sol)) raw[`sol:${nets.sol}:${solAddr}`] = solBal.data;
+  if (trxAddr && trxBal.data != null && readFrom(loaded.current, 'trx', nets.trx)) raw[`trx:${nets.trx}:${trxAddr}`] = trxBal.data;
+  for (const r of readFrom(loaded.current, 'erc20', nets.eth) ? tokBal.data ?? [] : []) if (r.v != null && ethAddr) raw[`erc20:${nets.eth}:${r.t.contract.toLowerCase()}`] = r.v;
   const rawKey = Object.entries(raw).map(([k, v]) => `${k}=${v}`).join('|');
 
   return useMemo<Coins>(
