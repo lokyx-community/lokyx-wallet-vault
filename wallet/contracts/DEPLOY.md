@@ -3,8 +3,9 @@
 Nothing here is deployed yet. Deploying needs your keys and test coins, so it is done by you.
 
 ## BNB testnet (USDT)
-1. Get test BNB for gas from the BNB Chain testnet faucet, and pick the USDT contract on testnet (chain 97)
-   you want to use. Check its address and that it has 18 decimals before using it.
+1. Get test BNB for gas from the BNB Chain testnet faucet. There is no dependable USDT on testnet, so deploy our play one first:
+   `forge script script/DeployToken.s.sol --rpc-url <rpc> --broadcast --private-key $KEY` and note the `TestUSDT:` address.
+   Then mint yourself some: `cast send <TestUSDT> "mint(address,uint256)" <your address> 1000000000000000000000 --rpc-url <rpc> --private-key $KEY`.
 2. `cd wallet/contracts/evm && git clone --depth 1 https://github.com/foundry-rs/forge-std lib/forge-std`
 3. `TOKEN=<usdt address> forge script script/Deploy.s.sol --rpc-url https://data-seed-prebsc-1-s1.bnbchain.org:8545 --broadcast --private-key $KEY`
 4. Note the printed `PredictionMarket:` address. The app will read it from a setting.
