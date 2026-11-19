@@ -17,12 +17,13 @@ import { sign } from 'viem/accounts';
 
 // ---------- networks and the exact audited deployments ----------
 
-export type VaultNet = 'base-sepolia' | 'arbitrum-sepolia' | 'sepolia' | 'op-sepolia';
+export type VaultNet = 'base-sepolia' | 'arbitrum-sepolia' | 'sepolia' | 'op-sepolia' | 'bnb-testnet';
 
 export const VAULT_NETS: Record<VaultNet, { label: string; chainId: number; rpc: string; explorer: string; real: false }> = {
   'base-sepolia': { label: 'Base Sepolia', chainId: 84532, rpc: 'https://sepolia.base.org', explorer: 'https://sepolia.basescan.org', real: false },
   'arbitrum-sepolia': { label: 'Arbitrum Sepolia', chainId: 421614, rpc: 'https://sepolia-rollup.arbitrum.io/rpc', explorer: 'https://sepolia.arbiscan.io', real: false },
   sepolia: { label: 'Ethereum Sepolia', chainId: 11155111, rpc: 'https://ethereum-sepolia-rpc.publicnode.com', explorer: 'https://sepolia.etherscan.io', real: false },
+  'bnb-testnet': { label: 'BNB Chain testnet', chainId: 97, rpc: 'https://bsc-testnet-rpc.publicnode.com', explorer: 'https://testnet.bscscan.com', real: false },
   'op-sepolia': { label: 'Optimism Sepolia', chainId: 11155420, rpc: 'https://sepolia.optimism.io', explorer: 'https://sepolia-optimism.etherscan.io', real: false },
 };
 

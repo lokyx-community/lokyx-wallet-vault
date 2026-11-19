@@ -58,7 +58,7 @@ export default function EthVaultSetup() {
     try {
       const allowances: TokenAllowance[] = [
         { token: ETH, symbol: 'ETH', decimals: 18, amount: parseUnits(ethAllow || '0', 18) },
-        { token: USDC[net], symbol: 'USDC', decimals: 6, amount: parseUnits(usdcAllow || '0', 6) },
+        ...(USDC[net] ? [{ token: USDC[net] as Hex, symbol: 'USDC', decimals: 6, amount: parseUnits(usdcAllow || '0', 6) }] : []),
       ];
       const settings = { wait: WAITS[wait][1], allowances };
       const bad = checkSettings(settings);

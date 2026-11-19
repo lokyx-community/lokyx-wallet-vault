@@ -65,16 +65,18 @@ import { ethAlerts, startedKey, type EthAlert } from "./ethvault-watch-core";
 export const NETS = Object.keys(VAULT_NETS) as VaultNet[];
 
 /** Circle's test USDC (from Circle's developer docs; the app checks symbol and decimals on chain before using it). */
-export const USDC: Record<VaultNet, Hex> = {
+/** A network without a known test USDC has no entry; its vault holds the coin only until one is added. */
+export const USDC: Partial<Record<VaultNet, Hex>> = {
   "base-sepolia": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
   "arbitrum-sepolia": "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
   sepolia: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
   // Circle's test USDC on Optimism Sepolia. The app checks symbol and decimals on chain before relying on it.
   "op-sepolia": "0x5fd84259d66Cd46123540766Be93DFE6D43130D7",
 };
-export const tokensOn = (net: VaultNet): KnownToken[] => [
-  { address: USDC[net], symbol: "USDC", decimals: 6 },
-];
+export const tokensOn = (net: VaultNet): KnownToken[] => {
+  const a = USDC[net];
+  return a ? [{ address: a, symbol: "USDC", decimals: 6 }] : [];
+};
 
 // ---------- RPC ----------
 

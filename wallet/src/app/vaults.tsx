@@ -23,6 +23,7 @@ const MARK: Record<VaultNet, { logo: LogoId; name: string }> = {
   'arbitrum-sepolia': { logo: 'arb', name: 'Arbitrum' },
   sepolia: { logo: 'eth', name: 'Ethereum' },
   'op-sepolia': { logo: 'op', name: 'Optimism' },
+  'bnb-testnet': { logo: 'bnb', name: 'BNB Chain' },
 };
 const eth4 = (w: bigint) => {
   const s = w.toString().padStart(19, '0');

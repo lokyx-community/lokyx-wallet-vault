@@ -30,7 +30,7 @@ export default function EthVaultSend() {
   const [review, setReview] = useState(false);
   const snap = useAsync<Snapshot | null>(async () => { if (!v) await loadVaults(); const x = vaults.get()[net]; return x ? snapshot(x) : null; }, [net, !!v]);
   const s = snap.data;
-  const token: Hex = coin === 'ETH' ? ETH : USDC[net];
+  const token: Hex = coin === 'ETH' ? ETH : (USDC[net] ?? ETH);
   const dec = coin === 'ETH' ? 18 : 6;
   let raw: bigint | null = null;
   try { raw = amount ? parseUnits(amount, dec) : null; } catch { raw = null; }

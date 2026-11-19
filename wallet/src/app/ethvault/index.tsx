@@ -57,6 +57,7 @@ const CARD: Record<VaultNet, { kind: CardKind; logo: LogoId; name: string }> = {
   "arbitrum-sepolia": { kind: "arb", logo: "arb", name: "Arbitrum" },
   sepolia: { kind: "eth", logo: "eth", name: "Ethereum" },
   "op-sepolia": { kind: "op", logo: "op", name: "Optimism" },
+  "bnb-testnet": { kind: "bnb", logo: "bnb", name: "BNB Chain" },
 };
 const left = (t: number) => {
   const s = Math.max(0, t - Math.floor(Date.now() / 1000));
