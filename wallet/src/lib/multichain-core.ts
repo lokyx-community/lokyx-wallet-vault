@@ -238,6 +238,19 @@ const DUST = 294n; // P2WPKH dust limit in sats
 // P2WPKH virtual sizes: 10.5 overhead, 68 per input, 31 per output.
 const vsize = (ins: number, outs: number) => Math.ceil(10.5 + 68 * ins + 31 * outs);
 
+/** The most Bitcoin that can be sent from these coins at `rate`: everything, minus the fee for a payment with no change. 0 if nothing is left. */
+export function maxBtc(utxos: Utxo[], rate: number): bigint {
+  const sum = utxos.reduce((a, u) => a + u.value, 0n);
+  const fee = BigInt(Math.ceil(vsize(utxos.length, 1) * rate));
+  return sum - fee >= DUST ? sum - fee : 0n;
+}
+
+/** The most of the native coin that can be sent on an Ethereum-style chain: the balance minus the most a plain transfer can cost. */
+export function maxEth(balance: bigint, maxFeePerGas: bigint, gas = 21_000n): bigint {
+  const fee = gas * maxFeePerGas;
+  return balance > fee ? balance - fee : 0n;
+}
+
 export interface Plan {
   inputs: Utxo[];
   amount: bigint;

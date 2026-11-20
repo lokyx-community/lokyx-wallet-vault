@@ -17,9 +17,9 @@ import { ApproveButton } from '../../ui/ApproveButton';
 import { C, F } from '../../ui/theme';
 import { confirmIt } from '../../lib/auth';
 import {
-  activeNets, broadcastBtc, broadcastEth, btcBalance, btcTxBlock, ethBalance, tokenBalance, ensureAddresses, ethTxBlock, knownDestinations, prepareBtc, prepareEth, rememberDestination, tokensFor, useChainSettings,
+  activeNets, broadcastBtc, broadcastEth, btcBalance, btcRates, btcTxBlock, btcUtxos, ethFees, ethBalance, tokenBalance, ensureAddresses, ethTxBlock, knownDestinations, prepareBtc, prepareEth, rememberDestination, tokensFor, useChainSettings,
 } from '../../lib/multichain';
-import { BTC_NETS, ETH_NETS, KNOWN_TOKENS, btcAddressOk, describeBtc, describeEth, ethAddressOk, formatBtc, formatUnits, parseBtc, parseUnits, tokenId, type Speed } from '../../lib/multichain-core';
+import { BTC_NETS, ETH_NETS, KNOWN_TOKENS, btcAddressOk, describeBtc, describeEth, ethAddressOk, formatBtc, formatUnits, maxBtc, maxEth, parseBtc, parseUnits, tokenId, type Speed } from '../../lib/multichain-core';
 import { ChainRing } from '../../ui/ChainRing';
 import { CoinLaunch } from '../../ui/CoinLaunch';
 import { Slip, shareSlip, useReveal } from '../../ui/Slip';
@@ -230,7 +230,27 @@ export default function ChainSend() {
         badTo={badTo}
         guard={dest && valid ? <DestGuard dest={dest} known={allKnown} onOk={setGuardOk} /> : null}
         have={held?.text}
-        onMax={tok && held ? () => { setAmt(formatUnits(held.raw, tok.decimals, tok.decimals).replace(/,/g, '')); setPrep(null); } : undefined}
+        onMax={held ? async () => {
+          setErr('');
+          try {
+            if (tok) setAmt(formatUnits(held.raw, tok.decimals, tok.decimals).replace(/,/g, ''));
+            else if (isBtc) {
+              const a = await ensureAddresses();
+              const [utxos, rates] = await Promise.all([btcUtxos(nets.btc, a.btc[nets.btc]), btcRates(nets.btc)]);
+              const m = maxBtc(utxos, rates[speed]);
+              if (m <= 0n) return setErr('There is not enough Bitcoin here to cover the network fee.');
+              setAmt(formatBtc(m).replace(/,/g, ''));
+            } else {
+              const f = (await ethFees(nets.eth))[speed];
+              const m = maxEth(held.raw, f.maxFeePerGas);
+              if (m <= 0n) return setErr(`There is not enough ${unit} here to cover the network fee.`);
+              setAmt(formatUnits(m, 18, 18).replace(/,/g, ''));
+            }
+            setPrep(null);
+          } catch (e) {
+            setErr(plainError(e));
+          }
+        } : undefined}
         below={<Segmented value={speed} options={[['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']]} onChange={setSpeed} />}
         feeNote={`${speed === 'slow' ? 'Lowest fee, slower' : speed === 'fast' ? 'Higher fee, quicker' : 'Usual fee'} · ${isBtc ? (speed === 'fast' ? 'next block or two' : speed === 'slow' ? 'an hour or more' : 'about 30 minutes') : speed === 'fast' ? 'seconds' : speed === 'slow' ? 'a few minutes' : 'about a minute'}`}
         err={err}

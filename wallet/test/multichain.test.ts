@@ -210,3 +210,15 @@ test('Token history reads the amount in the token\'s own decimals', () => {
   assert.equal(rows[0].decimals, 6);
   assert.equal(rows[0].symbol, 'USDC');
 });
+
+test('Max leaves exactly the fee: Bitcoin plans the whole amount with no change, Ethereum keeps the transfer fee', async () => {
+  const { maxBtc, maxEth, planBtc } = await import('../src/lib/multichain-core.ts');
+  const utxos = [{ txid: 'a'.repeat(64), vout: 0, value: 50_000n }, { txid: 'b'.repeat(64), vout: 1, value: 30_000n }];
+  const m = maxBtc(utxos, 5);
+  const p = planBtc(utxos, m, 5);
+  assert.equal(p.change, 0n);
+  assert.equal(p.amount + p.fee, 80_000n);
+  assert.equal(maxBtc([{ txid: 'c'.repeat(64), vout: 0, value: 400n }], 5), 0n);
+  assert.equal(maxEth(1_000_000_000_000_000_000n, 2_000_000_000n), 1_000_000_000_000_000_000n - 21_000n * 2_000_000_000n);
+  assert.equal(maxEth(1000n, 2_000_000_000n), 0n);
+});

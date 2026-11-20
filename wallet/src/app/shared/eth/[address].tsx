@@ -223,7 +223,7 @@ export default function EthSharedScreen() {
                 ? { amount: formatUnits(view.amount, tokMeta.decimals), unit: tokMeta.symbol, to: view.to, network: ETH_NETS[net].label, from: s.address, fromName: s.name, at: Date.now(), hash: txh, testnet: !ETH_NETS[net].real, url: `${ETH_NETS[net].explorer}/tx/${txh}` }
                 : null;
             await dismissPay(payHash(pay!)); success(); setCode(''); info.refresh(); toks.refresh();
-            if (slipFor) { setRcpt(slipFor); setSheet('receipt'); flyCoin('out', netLogoId(net) ?? 'eth'); } else { toast(`Sent on ${ETH_NETS[net].label}`, 'send'); setSheet(''); }
+            if (slipFor) { setSheet(''); flyCoin('out', netLogoId(net) ?? 'eth'); setTimeout(() => { setRcpt(slipFor); setSheet('receipt'); }, 1400); } else { toast(`Sent on ${ETH_NETS[net].label}`, 'send'); setSheet(''); }
           })} /> : null}
           {pay && view && view.kind !== 'other' && !ready && !iSigned ? <Button title="Approve" busy={busy} onPress={() => run(`Approve a payment of ${headline}`, async () => { const next = encodePay(await signEthPay(s, pay!)); setCode(next); success(); if (await sendToGroup(s.relay, next)) toast('Sent to the others', 'send'); })} /> : null}
           {pay && !ready && iSigned ? <Button title="Share it with the next person" kind="line" onPress={() => Share.share({ message: code })} /> : null}

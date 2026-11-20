@@ -3,7 +3,7 @@ import { AccessibilityInfo, Share, View } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
-import Animated, { Easing, FadeIn, FadeInDown, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { T } from './Text';
 import { Press, tick } from './controls';
@@ -25,9 +25,12 @@ const PAPER = '#121214';
 function Seal({ done }: { done: boolean }) {
   const ring = useSharedValue(0);
   const mark = useSharedValue(0);
+  const born = useRef(Date.now());
   useEffect(() => {
-    ring.value = withDelay(250, withTiming(1, { duration: 600, easing: EASE_OUT }));
-    mark.value = done ? withDelay(750, withTiming(1, { duration: 350, easing: EASE_OUT })) : withTiming(0, { duration: 150 });
+    // while the slip is still printing the seal waits for it; a later change to "done" ticks at once
+    const printing = Date.now() - born.current < 600;
+    ring.value = withDelay(printing ? 1500 : 0, withTiming(1, { duration: 600, easing: EASE_OUT }));
+    mark.value = done ? withDelay(printing ? 2100 : 0, withTiming(1, { duration: 350, easing: EASE_OUT })) : withTiming(0, { duration: 150 });
   }, [done, ring, mark]);
   const ringProps = useAnimatedProps(() => ({ strokeDashoffset: 151 * (1 - ring.value) }));
   const markProps = useAnimatedProps(() => ({ strokeDashoffset: 30 * (1 - mark.value) }));
@@ -78,13 +81,32 @@ export function Slip({ slip, done, caption }: { slip: SlipInput; done: boolean; 
   const [copied, setCopied] = useState(false);
   const rows = slipRows(slip);
   const big = slip.amount.length > 9;
+  // The slip prints: it slides out of a slot at the top in one continuous move, torn edge first, and the sheet grows
+  // under it. One value drives the clip, the slide and the opening of the paper, so nothing steps.
+  const [full, setFull] = useState(0);
+  const feed = useSharedValue(0);
+  useEffect(() => {
+    if (full <= 0) return;
+    let live = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .catch(() => false)
+      .then((still) => {
+        if (!live) return;
+        feed.value = still ? 1 : withTiming(1, { duration: 2400, easing: Easing.bezier(0.33, 0, 0.2, 1) });
+      });
+    return () => { live = false; };
+  }, [full > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  const clip = useAnimatedStyle(() => (full > 0 ? { height: full * feed.value, overflow: 'hidden' as const } : { opacity: 0 }));
+  const slide = useAnimatedStyle(() => ({ transform: [{ translateY: -(1 - feed.value) * full }] }));
   useEffect(() => {
     if (!copied) return;
     const t = setTimeout(() => setCopied(false), 1500);
     return () => clearTimeout(t);
   }, [copied]);
   return (
-    <Animated.View entering={FadeInDown.duration(760).easing(EASE_OUT)} style={{ paddingHorizontal: 4 }}>
+    <Animated.View style={[{ paddingHorizontal: 4 }, clip]}>
+     <Animated.View style={slide}>
+      <View onLayout={(e) => setFull(e.nativeEvent.layout.height)}>
       <View onLayout={(e) => { setW(e.nativeEvent.layout.width); setH(e.nativeEvent.layout.height); }} style={{ backgroundColor: PAPER, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 0.5, borderBottomWidth: 0, borderColor: 'rgba(255,255,255,0.14)', overflow: 'hidden', paddingHorizontal: 22, paddingTop: 24, paddingBottom: 18 }}>
         <Shine w={w} h={h} run={done} />
         <View style={{ alignItems: 'center' }}>
@@ -102,14 +124,14 @@ export function Slip({ slip, done, caption }: { slip: SlipInput; done: boolean; 
         </View>
         <Dash />
         {rows.map((r, i) => (
-          <Animated.View key={r.label} entering={FadeIn.delay(450 + i * 90).duration(320)}>
+          <View key={r.label}>
             <Leader label={r.label}>
               <T style={{ fontFamily: F.mono, fontSize: 13, color: C.text, flexShrink: 1, textAlign: 'right' }} numberOfLines={1}>{r.value}</T>
             </Leader>
-          </Animated.View>
+          </View>
         ))}
         <Dash />
-        <Animated.View entering={FadeIn.delay(450 + rows.length * 90).duration(320)}>
+        <View>
           <Press
             onPress={() => {
               Clipboard.setStringAsync(slip.hash).catch(() => {});
@@ -126,15 +148,17 @@ export function Slip({ slip, done, caption }: { slip: SlipInput; done: boolean; 
               <Icon name={copied ? 'check' : 'copy'} size={15} color={copied ? C.good : C.faint} />
             </View>
           </Press>
-        </Animated.View>
-        {slip.noQr ? null : <Animated.View entering={FadeIn.delay(600 + rows.length * 90).duration(360)} style={{ alignItems: 'center', paddingTop: 14, paddingBottom: 4 }}>
+        </View>
+        {slip.noQr ? null : <View style={{ alignItems: 'center', paddingTop: 14, paddingBottom: 4 }}>
           <View style={{ borderRadius: 10, overflow: 'hidden' }}>
             <Qr value={slipQrValue(slip)} size={92} />
           </View>
           <T v="caption" dim style={{ marginTop: 8 }}>Scan to look this payment up</T>
-        </Animated.View>}
+        </View>}
       </View>
       {w > 0 ? <Torn width={w} /> : null}
+      </View>
+     </Animated.View>
     </Animated.View>
   );
 }
@@ -147,7 +171,7 @@ function Shine({ w, h, run }: { w: number; h: number; run: boolean }) {
     let live = true;
     AccessibilityInfo.isReduceMotionEnabled()
       .catch(() => false)
-      .then((still) => live && !still && (x.value = withDelay(900, withTiming(w + 120, { duration: 1100, easing: EASE_OUT }))));
+      .then((still) => live && !still && (x.value = withDelay(2700, withTiming(w + 120, { duration: 1100, easing: EASE_OUT }))));
     return () => {
       live = false;
     };
