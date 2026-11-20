@@ -126,12 +126,17 @@ contract Handler is Test {
     /// Shares are ERC-1155 tokens, so they can be sent between people at any time, in any state of the market.
     function shareTransfer(uint256 s, uint256 to, uint256 mid, uint8 outcome, uint256 amt) external {
         steps++;
-        address from = _actor(s);
-        address dest = _actor(to);
         mid = mid % MARKETS;
-        uint256 tid = mid * 2 + (outcome % 2);
-        uint256 have = pm.balanceOf(from, tid);
+        address from;
+        uint256 tid;
+        uint256 have;
+        for (uint256 i = 0; i < actors.length * 2 && have == 0; i++) {
+            from = actors[(s + i) % actors.length];
+            tid = mid * 2 + ((outcome + i / actors.length) % 2);
+            have = pm.balanceOf(from, tid);
+        }
         if (have == 0) return;
+        address dest = _actor(to);
         amt = bound(amt, 1, have);
         vm.prank(from);
         try pm.safeTransferFrom(from, dest, tid, amt, "") { shareTransfers++; } catch {}

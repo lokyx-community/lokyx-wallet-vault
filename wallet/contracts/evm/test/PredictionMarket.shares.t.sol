@@ -161,6 +161,7 @@ contract SharesTest is Test {
         vm.prank(a); pm.safeTransferFrom(a, address(r), 0, 3, "");
         assertTrue(r.triedAndFailed(), "the nested transfer was refused");
         assertEq(pm.balanceOf(address(r), 0), 3, "and the outer transfer still completed once");
+        assertEq(pm.balanceOf(address(0xBEEF), 0), 0, "nothing moved in the nested call");
     }
 
     function test_interfaceIds() public view {

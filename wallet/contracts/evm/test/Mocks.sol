@@ -97,7 +97,7 @@ contract ReentrantReceiver {
     bool public triedAndFailed;
     constructor(address m) { market = IMarketLike(m); }
     function onERC1155Received(address, address, uint256 id, uint256, bytes calldata) external returns (bytes4) {
-        try market.safeTransferFrom(address(this), msg.sender, id, 1, "") { triedAndFailed = false; } catch { triedAndFailed = true; }
+        try market.safeTransferFrom(address(this), address(0xBEEF), id, 1, "") { triedAndFailed = false; } catch { triedAndFailed = true; }
         return this.onERC1155Received.selector;
     }
     function onERC1155BatchReceived(address, address, uint256[] calldata, uint256[] calldata, bytes calldata) external pure returns (bytes4) {

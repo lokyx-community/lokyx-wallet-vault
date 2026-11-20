@@ -43,6 +43,12 @@ M = [
  ("propose before close", 'require(block.timestamp >= m.close, "answers open when the market closes");', ""),
 ]
 
+if len(sys.argv) > 1 and sys.argv[1] == "--count":
+    print(len(M)); sys.exit(0)
+only = int(sys.argv[1]) if len(sys.argv) > 1 else None
+if only is not None:
+    M = [M[only]]
+
 orig = open(SRC).read()
 shutil.copy(SRC, SRC + ".orig")
 survived, killed, broken = [], [], []
