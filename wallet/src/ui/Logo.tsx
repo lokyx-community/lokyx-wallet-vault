@@ -14,5 +14,5 @@ export function Logo({ id, size, grey }: { id: LogoId; size: number; grey?: bool
   return <SvgXml xml={xml} width={size} height={size} opacity={grey ? 0.7 : 1} />;
 }
 
-const BY_SYMBOL: Record<string, LogoId> = { USDT: 'usdt', USDC: 'usdc', BTC: 'btc', ETH: 'eth', SOL: 'sol', TRX: 'trx', DOGE: 'doge', LTC: 'ltc', BNB: 'bnb', POL: 'pol', MATIC: 'pol' };
+const BY_SYMBOL: Record<string, LogoId> = { USDT: 'usdt', USDC: 'usdc', BTC: 'btc', ETH: 'eth', SOL: 'sol', TRX: 'trx', DOGE: 'doge', LTC: 'ltc', BNB: 'bnb', POL: 'pol', MATIC: 'pol', XRP: 'xrp', ADA: 'ada', TON: 'ton', LINK: 'link', UNI: 'uni', AAVE: 'aave', DAI: 'dai', WBTC: 'wbtc', SHIB: 'shib', ZEC: 'zec', HYPE: 'hype', LINEA: 'linea', MNT: 'mantle', XDAI: 'gnosis', CELO: 'celo' };
 export const logoFor = (symbol: string): LogoId | null => BY_SYMBOL[symbol.toUpperCase()] ?? null;
