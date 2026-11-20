@@ -102,6 +102,9 @@ function MarketOn() {
         <YesNo
           yes={buyPrice(l, 'yes')}
           no={buyPrice(l, 'no')}
+          unit={m.unit}
+          decimals={d.decimals}
+          symbol={d.symbol}
           onYes={() => router.push({ pathname: '/predict/trade', params: { id: String(mid), outcome: 'yes', side: 'buy' } })}
           onNo={() => router.push({ pathname: '/predict/trade', params: { id: String(mid), outcome: 'no', side: 'buy' } })}
         />

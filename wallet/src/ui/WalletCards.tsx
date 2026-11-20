@@ -41,7 +41,7 @@ export const kindFor = (logo: LogoId | null | undefined): CardKind => (logo && C
 export const inkOf = (k: CardKind) => SURFACE[k].ink;
 
 /** The LOKYX mark as a small badge: a black disc with the white ring, like the other coins' round logos. */
-function LyxBadge({ size }: { size: number }) {
+export function LyxBadge({ size }: { size: number }) {
   const ring = 'M50 16A34 34 0 1 0 84 50';
   return (
     <Svg width={size} height={size} viewBox="0 0 100 100">

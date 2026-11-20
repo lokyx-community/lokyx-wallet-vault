@@ -8,7 +8,7 @@ import { Press } from './controls';
 import { Spark } from './Spark';
 import { C, F } from './theme';
 import { EASE_OUT } from './motion';
-import { amountText, bestAsk, bestBid, chance, type Ladder, type Point } from '../lib/predict-core';
+import { amountText, bestAsk, bestBid, chance, shareMath, type Ladder, type Point } from '../lib/predict-core';
 import type { Market } from '../lib/predict';
 
 const APath = Animated.createAnimatedComponent(Path);
@@ -118,23 +118,42 @@ export function ChanceChart({ points, height = 176, onScrub }: { points: Point[]
 }
 
 /** The two big choices on a market: Yes and No, each with what a share costs right now. */
-export function YesNo({ yes, no, onYes, onNo, disabled }: { yes: number | null; no: number | null; onYes: () => void; onNo: () => void; disabled?: boolean }) {
-  const btn = (label: string, price: number | null, color: string, tint: string, on: () => void) => (
-    <Press
-      onPress={on}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityLabel={`Buy ${label} at ${centsText(price)}`}
-      style={{ flex: 1, height: 72, borderRadius: 24, backgroundColor: tint, borderWidth: 1, borderColor: color + '55', alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1 }}
-    >
-      <T style={{ fontFamily: F.semibold, fontSize: 13, letterSpacing: 1.4, color }}>{`BUY ${label.toUpperCase()}`}</T>
-      <T style={{ fontFamily: F.semibold, fontSize: 24, letterSpacing: -0.6, color: C.text }}>{centsText(price)}</T>
-    </Press>
-  );
+export function YesNo({ yes, no, unit, decimals, symbol, onYes, onNo, disabled }: { yes: number | null; no: number | null; unit: bigint; decimals: number; symbol: string; onYes: () => void; onNo: () => void; disabled?: boolean }) {
+  const side = (label: string, price: number | null, color: string, tint: string, on: () => void) => {
+    const m = price === null ? null : shareMath(price, unit);
+    const off = disabled || price === null;
+    return (
+      <Press
+        onPress={on}
+        disabled={off}
+        accessibilityRole="button"
+        accessibilityLabel={m ? `Bet ${label}: ${coinText(m.cost, decimals, symbol)} a share, wins ${coinText(unit, decimals, symbol)} if ${label} is right` : `Bet ${label}: no offers yet`}
+        style={{ flex: 1, borderRadius: 26, backgroundColor: tint, borderWidth: 1, borderColor: color + '55', padding: 16, gap: 4, opacity: off ? 0.45 : 1 }}
+      >
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <T style={{ fontFamily: F.semibold, fontSize: 20, letterSpacing: -0.3, color }}>{label}</T>
+          <T v="caption" dim>{price === null ? 'no offers' : `${Math.round(price)}% chance`}</T>
+        </View>
+        <T style={{ fontFamily: F.semibold, fontSize: 26, letterSpacing: -0.8, paddingTop: 6 }}>{m ? amountText(m.cost, decimals, 2) : '—'}</T>
+        <T v="caption" dim>{m ? `${symbol} a share` : 'Nobody is offering this yet'}</T>
+        {m ? <T v="caption" style={{ paddingTop: 6, lineHeight: 17, color: C.sub }}>{`Win ${coinText(unit, decimals, symbol)} if ${label === 'Yes' ? 'it happens' : 'it does not'}. Profit ${coinText(m.profit, decimals, symbol)} a share.`}</T> : null}
+        <View style={{ marginTop: 10, height: 40, borderRadius: 20, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
+          <T style={{ fontFamily: F.semibold, fontSize: 14.5, color: '#04110a' }}>{`Bet ${label}`}</T>
+        </View>
+      </Press>
+    );
+  };
   return (
-    <View style={{ flexDirection: 'row', gap: 12 }}>
-      {btn('Yes', yes, GREEN, 'rgba(61,214,140,0.10)', onYes)}
-      {btn('No', no, RED, 'rgba(255,92,92,0.10)', onNo)}
+    <View style={{ gap: 12 }}>
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        {side('Yes', yes, GREEN, 'rgba(61,214,140,0.10)', onYes)}
+        {side('No', no, RED, 'rgba(255,92,92,0.10)', onNo)}
+      </View>
+      <View style={{ borderRadius: 20, backgroundColor: C.fill, padding: 14 }}>
+        <T v="caption" dim style={{ lineHeight: 18 }}>
+          {`How it works: a share pays ${coinText(unit, decimals, symbol)} if you are right and nothing if you are wrong. The price is what everyone together thinks the chance is. You can sell your shares before it closes.`}
+        </T>
+      </View>
     </View>
   );
 }

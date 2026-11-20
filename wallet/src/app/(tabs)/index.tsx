@@ -424,7 +424,7 @@ export default function Home() {
         <ActionRow
           items={[
             { icon: "send", label: "Send", onPress: () => router.push(actId === "lyx" ? "/send" : actId === "sol" || actId === "trx" ? (coins[actId].address ? `/xsend?chain=${actId}` : `/xcoin/${actId}`) : `/chain/send?chain=${actId}`) },
-            { icon: "receive", label: "Receive", onPress: () => router.push(actId === "lyx" ? "/ring" : `/receive?coin=${actId}`) },
+            { icon: "receive", label: "Receive", onPress: () => router.push(`/receive?coin=${actId}`) },
             { icon: "scan", label: "Scan", onPress: () => router.push("/ring?mode=scan") },
             { icon: "swap", label: "Swap", onPress: () => router.push("/swap") },
           ]}

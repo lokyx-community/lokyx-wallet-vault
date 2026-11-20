@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseBook, yesTerms, ladder, bestAsk, bestBid, gap, buyPrice, chance, quote, takerFee, feeSplit, payoff, amountText, cents,
   stageOf, challengeLeft, challengeUsed, clockText, closesText, bondOf, series, change, positionValue, canSellNow,
-  WINDOW_SECS, EXPIRE_SECS,
+  WINDOW_SECS, EXPIRE_SECS, shareMath,
   type BookOrder,
 } from '../src/lib/predict-core.ts';
 
@@ -184,4 +184,12 @@ test('positions are valued at what you could sell for', () => {
   assert.equal(canSellNow({ outcome: 'yes', qty: 1n }, l), true);
   assert.equal(canSellNow({ outcome: 'yes', qty: 0n }, l), false);
   assert.equal(canSellNow({ outcome: 'no', qty: 1n }, ladder([])), false);
+});
+
+test('shareMath: what a share costs and what it makes when right', () => {
+  assert.deepEqual(shareMath(40, UNIT), { cost: 40n * cu, profit: 60n * cu });
+  assert.deepEqual(shareMath(100, UNIT), { cost: UNIT, profit: 0n });
+  assert.deepEqual(shareMath(0, UNIT), { cost: 0n, profit: UNIT });
+  assert.deepEqual(shareMath(150, UNIT), { cost: UNIT, profit: 0n }); // never past the payout
+  assert.deepEqual(shareMath(33.4, UNIT), { cost: 33n * cu, profit: 67n * cu });
 });

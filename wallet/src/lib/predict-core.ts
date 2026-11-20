@@ -96,6 +96,12 @@ export function buyPrice(l: Ladder, outcome: Outcome): number | null {
   const b = bestBid(l);
   return b === null ? null : 100 - b;
 }
+/** What one share costs and what it makes when right, from its price in cents of the payout. */
+export function shareMath(price: number, unit: bigint): { cost: bigint; profit: bigint } {
+  const cents = BigInt(Math.max(0, Math.min(100, Math.round(price))));
+  const cost = (unit * cents) / 100n;
+  return { cost, profit: unit - cost };
+}
 /** The market's "chance of Yes": the midpoint of the best bid and ask, or the one side that exists, or null for an empty book. */
 export function chance(l: Ladder): number | null {
   const a = bestAsk(l);

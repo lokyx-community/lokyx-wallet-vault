@@ -128,7 +128,7 @@ export default function CoinScreen() {
 
   const receive = () => {
     if (!card.address) return toast(coins.addressError || 'Your address is still being made', 'info');
-    router.push(coin === 'lyx' ? '/ring' : tok ? `/receive?coin=eth&token=${tok.contract}` : `/receive?coin=${coin}`);
+    router.push(tok ? `/receive?coin=eth&token=${tok.contract}` : `/receive?coin=${coin}`);
   };
   const send = () => router.push(coin === 'lyx' ? '/send' : tok ? `/chain/send?chain=eth&token=${tok.contract}` : `/chain/send?chain=${coin}`);
   const copyContract = async () => {
