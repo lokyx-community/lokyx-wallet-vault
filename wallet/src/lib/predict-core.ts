@@ -132,11 +132,18 @@ export interface Quote {
   avgPrice: number | null;
 }
 
-/** Fee on a trade, in whole base units, rounded up so a trade can never be fee-free by splitting it. */
+/** Fee on a trade, in base units, rounded down exactly as the contract does (the contract's per-trade check relies on it). */
 export function takerFee(tradeValue: bigint, feeBps: number): bigint {
   if (feeBps <= 0 || tradeValue <= 0n) return 0n;
   const bps = BigInt(feeBps);
-  return (tradeValue * bps + 9_999n) / 10_000n;
+  return (tradeValue * bps) / 10_000n;
+}
+
+/** How a fee splits: the waiting order's owner gets 20%, 20% waits for the right answer, the collector gets the rest. */
+export function feeSplit(fee: bigint): { maker: bigint; answer: bigint; collector: bigint } {
+  const maker = (fee * 20n) / 100n;
+  const answer = (fee * 20n) / 100n;
+  return { maker, answer, collector: fee - maker - answer };
 }
 
 /**

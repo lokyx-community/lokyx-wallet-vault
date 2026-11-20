@@ -22,7 +22,7 @@ contract PredictionMarketTest is Test {
 
     function setUp() public {
         usdt = new MockUSDT();
-        pm = new PredictionMarket(address(usdt));
+        pm = new PredictionMarket(address(usdt), address(0xFEE), 0);
         address[3] memory who = [a, b, c];
         for (uint256 i = 0; i < 3; i++) {
             usdt.mint(who[i], FUND);

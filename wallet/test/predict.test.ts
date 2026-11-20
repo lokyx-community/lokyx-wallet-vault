@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseBook, yesTerms, ladder, bestAsk, bestBid, gap, buyPrice, chance, quote, takerFee, payoff, amountText, cents,
+  parseBook, yesTerms, ladder, bestAsk, bestBid, gap, buyPrice, chance, quote, takerFee, feeSplit, payoff, amountText, cents,
   stageOf, challengeLeft, challengeUsed, clockText, closesText, bondOf, series, change, positionValue, canSellNow,
   WINDOW_SECS, EXPIRE_SECS,
   type BookOrder,
@@ -96,13 +96,19 @@ test('fee: zero by default, rounded up, taken off a sale and added to a buy', ()
   assert.equal(takerFee(1000n, 0), 0n);
   assert.equal(takerFee(0n, 100), 0n);
   assert.equal(takerFee(1000n, 100), 10n);
-  assert.equal(takerFee(1001n, 100), 11n);
+  assert.equal(takerFee(1099n, 100), 10n); // rounds down, as the contract does
   const l = ladder(book);
   const buy = quote(l, 'yes', 'buy', 62, 10n, UNIT, 100);
   assert.equal(buy.fee, takerFee(62n * 10n * cu, 100));
   assert.equal(buy.total, buy.tradeValue + buy.fee);
   const sell = quote(l, 'yes', 'sell', 58, 5n, UNIT, 100);
   assert.equal(sell.total, sell.tradeValue - sell.fee);
+});
+
+test('fee split adds up and matches the 20/20/60 rule', () => {
+  assert.deepEqual(feeSplit(1000n), { maker: 200n, answer: 200n, collector: 600n });
+  const f = feeSplit(7n);
+  assert.equal(f.maker + f.answer + f.collector, 7n);
 });
 
 test('payoff', () => {

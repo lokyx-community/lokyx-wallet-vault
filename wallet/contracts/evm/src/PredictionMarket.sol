@@ -42,6 +42,15 @@ contract PredictionMarket {
 
     IERC20 public immutable token;
 
+    /// Taker fee, in basis points of the taker's side of each trade, fixed when the market contract is deployed. It can
+    /// never be raised afterwards (there is no setter) and can never exceed MAX_FEE_BPS. Of each fee: 20% goes to the
+    /// order that was waiting (the maker), 20% is held for whoever ends up giving the right answer, 60% to the collector.
+    uint256 public immutable feeBps;
+    address public immutable feeCollector;
+    uint256 public constant MAX_FEE_BPS = 100;
+    uint256 public constant MAKER_SHARE = 20; // percent of each fee
+    uint256 public constant ANSWER_SHARE = 20; // percent of each fee
+
     /// The owner can only pause NEW activity (deposits, new markets, new orders). It can never touch anyone's coins,
     /// and withdrawals, cancels, votes, finalizing, expiring and claims keep working while paused.
     address public owner;
@@ -84,6 +93,7 @@ contract PredictionMarket {
         address disputer;
         uint64 disputedAt;
         uint256 bonds; // coins held as bonds for this market
+        uint256 answerFees; // the answer share of fees, held until the market is decided
     }
 
     uint256 public count;
@@ -104,6 +114,8 @@ contract PredictionMarket {
     event Proposed(uint256 indexed id, address indexed who, uint8 outcome);
     event Disputed(uint256 indexed id, address indexed who);
     event Evicted(uint256 indexed id, uint64 order);
+    /// One per match. `price` is in Yes terms, 1 to 99; `fee` is what the taker paid on this match.
+    event Traded(uint256 indexed id, uint8 price, uint64 qty, address indexed taker, address indexed maker, uint256 fee);
     event TransferSingle(address indexed operator, address indexed from, address indexed to, uint256 id, uint256 value);
     event TransferBatch(address indexed operator, address indexed from, address indexed to, uint256[] ids, uint256[] values);
     event ApprovalForAll(address indexed account, address indexed operator, bool approved);
@@ -130,9 +142,13 @@ contract PredictionMarket {
     event Paused(bool paused);
     event OwnershipTransferred(address indexed from, address indexed to);
 
-    constructor(address token_) {
+    constructor(address token_, address collector_, uint256 feeBps_) {
         require(token_ != address(0) && token_.code.length > 0, "the token must be a contract");
+        require(feeBps_ <= MAX_FEE_BPS, "the fee is above the maximum");
+        require(feeBps_ == 0 || collector_ != address(0), "a fee needs a collector");
         token = IERC20(token_);
+        feeBps = feeBps_;
+        feeCollector = collector_;
         owner = msg.sender;
         emit OwnershipTransferred(address(0), msg.sender);
     }
@@ -213,7 +229,8 @@ contract PredictionMarket {
         uint256 locked = 0;
         if (kind == Kind.Buy || kind == Kind.MintNo) {
             locked = uint256(price) * uint256(qty) * cu;
-            require(free[msg.sender] >= locked, "not enough coins deposited");
+            // the taker fee, if this order trades, is paid from free coins on top of what is locked
+            require(free[msg.sender] >= locked + locked * feeBps / 10_000, "not enough coins deposited");
             free[msg.sender] -= locked;
         } else if (kind == Kind.Sell) {
             require(_bal[id * 2][msg.sender] >= qty, "you don't hold that many Yes shares");
@@ -329,12 +346,33 @@ contract PredictionMarket {
             bid.qty -= q;
             ask.qty -= q;
 
+            _takeFee(id, m, inc, rest, t, qq, cu, q);
+
             if (rest.qty == 0) {
                 _removeAt(id, i);
             } else {
                 books[id][i] = rest;
             }
         }
+    }
+
+    /// The taker (the incoming order) pays the fee on its own side of the trade, rounded down so the up-front check in
+    /// place() always covers it. The maker gets its share at once; the answer share waits in the market.
+    function _takeFee(uint256 id, Market storage m, Order memory inc, Order memory rest, uint256 t, uint256 qq, uint256 cu, uint64 q) internal {
+        uint256 fee = 0;
+        if (feeBps > 0) {
+            uint256 side = (inc.kind == Kind.Buy || inc.kind == Kind.Sell) ? t : 100 - t;
+            fee = side * qq * cu * feeBps / 10_000;
+            if (fee > 0) {
+                free[inc.owner] -= fee;
+                uint256 maker = fee * MAKER_SHARE / 100;
+                uint256 answer = fee * ANSWER_SHARE / 100;
+                free[rest.owner] += maker;
+                m.answerFees += answer;
+                free[feeCollector] += fee - maker - answer;
+            }
+        }
+        emit Traded(id, uint8(t), q, inc.owner, rest.owner, fee);
     }
 
     function _removeAt(uint256 id, uint256 i) internal {
@@ -368,6 +406,18 @@ contract PredictionMarket {
 
     function bondOf(uint256 id) public view returns (uint256) {
         return _market(id).unit * BOND_SHARES;
+    }
+
+    /// Pays the market's held answer share to `to`, or to the collector when nobody earned it.
+    function _payAnswerFees(Market storage m, address to) internal {
+        uint256 a = m.answerFees;
+        if (a == 0) return;
+        m.answerFees = 0;
+        free[to == address(0) ? feeCollector : to] += a;
+    }
+
+    function answerFees(uint256 id) external view returns (uint256) {
+        return _market(id).answerFees;
     }
 
     function _settle(uint256 id, Market storage m, uint8 outcome) internal {
@@ -419,6 +469,7 @@ contract PredictionMarket {
         uint256 b = m.unit * BOND_SHARES;
         m.bonds -= b;
         free[m.proposer] += b;
+        _payAnswerFees(m, m.proposer);
         _settle(id, m, m.proposed);
     }
 
@@ -442,7 +493,9 @@ contract PredictionMarket {
             if (tally[k] >= need) {
                 uint256 b = m.unit * BOND_SHARES;
                 m.bonds -= 2 * b;
-                free[k == m.proposed ? m.proposer : m.disputer] += 2 * b;
+                address winner = k == m.proposed ? m.proposer : m.disputer;
+                free[winner] += 2 * b;
+                _payAnswerFees(m, winner);
                 _settle(id, m, k);
                 return;
             }
@@ -465,6 +518,7 @@ contract PredictionMarket {
             require(m.proposed == 255, "an answer is waiting: finalize it or dispute it");
             require(block.timestamp >= uint256(m.close) + EXPIRE_AFTER, "not yet: there is still time to propose");
         }
+        _payAnswerFees(m, address(0));
         _settle(id, m, 2);
     }
 

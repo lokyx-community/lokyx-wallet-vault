@@ -244,7 +244,7 @@ contract InvariantTest is StdInvariant, Test {
 
     function setUp() public {
         usdt = new MockUSDT();
-        pm = new PredictionMarket(address(usdt));
+        pm = new PredictionMarket(address(usdt), address(0xFEE), 0);
         h = new Handler(pm, usdt);
         targetContract(address(h));
         bytes4[] memory sel = new bytes4[](25);
@@ -282,7 +282,7 @@ contract InvariantTest is StdInvariant, Test {
         uint256 owed = h.totalFree();
         for (uint256 m = 0; m < h.MARKETS(); m++) {
             (, , , , , , uint256 pool, , ) = pm.info(m);
-            owed += pool + h.lockedInBook(m) + h.bondsOf(m);
+            owed += pool + h.lockedInBook(m) + h.bondsOf(m) + pm.answerFees(m);
         }
         assertEq(usdt.balanceOf(address(pm)), owed);
         assertEq(usdt.balanceOf(address(pm)), h.deposited() - h.withdrawn());

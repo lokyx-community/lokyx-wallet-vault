@@ -22,7 +22,7 @@ contract SecurityTest is Test {
 
     function setUp() public {
         usdt = new MockUSDT();
-        pm = new PredictionMarket(address(usdt));
+        pm = new PredictionMarket(address(usdt), address(0xFEE), 0);
         address[3] memory who = [a, b, c];
         for (uint256 i = 0; i < 3; i++) {
             usdt.mint(who[i], FUND);
@@ -208,14 +208,14 @@ contract SecurityTest is Test {
     // ---- 5. token safety ----
     function test_constructorRejectsZeroAndNonContractTokens() public {
         vm.expectRevert("the token must be a contract");
-        new PredictionMarket(address(0));
+        new PredictionMarket(address(0), address(0xFEE), 0);
         vm.expectRevert("the token must be a contract");
-        new PredictionMarket(address(0xdead));
+        new PredictionMarket(address(0xdead), address(0xFEE), 0);
     }
 
     function test_feeOnTransferTokenIsRefused() public {
         FeeToken f = new FeeToken();
-        PredictionMarket p = new PredictionMarket(address(f));
+        PredictionMarket p = new PredictionMarket(address(f), address(0xFEE), 0);
         f.mint(a, 1000e18);
         vm.prank(a); f.approve(address(p), type(uint256).max);
         vm.prank(a);
@@ -226,7 +226,7 @@ contract SecurityTest is Test {
 
     function test_tokenThatSaysFalseIsRefused() public {
         FalseToken f = new FalseToken();
-        PredictionMarket p = new PredictionMarket(address(f));
+        PredictionMarket p = new PredictionMarket(address(f), address(0xFEE), 0);
         vm.prank(a);
         vm.expectRevert("token transfer failed");
         p.deposit(1e18);
@@ -234,7 +234,7 @@ contract SecurityTest is Test {
 
     function test_tokenThatReturnsNothingWorks() public {
         NoReturnToken n = new NoReturnToken();
-        PredictionMarket p = new PredictionMarket(address(n));
+        PredictionMarket p = new PredictionMarket(address(n), address(0xFEE), 0);
         n.mint(a, 100e18);
         vm.startPrank(a);
         n.approve(address(p), type(uint256).max);
@@ -248,7 +248,7 @@ contract SecurityTest is Test {
     // ---- 7. reentrancy ----
     function test_cannotReenterDepositFromATokenCallback() public {
         ReentrantToken r = new ReentrantToken();
-        PredictionMarket p = new PredictionMarket(address(r));
+        PredictionMarket p = new PredictionMarket(address(r), address(0xFEE), 0);
         r.mint(a, 100e18);
         vm.prank(a); r.approve(address(p), type(uint256).max);
         r.arm(address(p), abi.encodeCall(PredictionMarket.deposit, (1)));
@@ -259,7 +259,7 @@ contract SecurityTest is Test {
 
     function test_cannotReenterWithdrawFromATokenCallback() public {
         ReentrantToken r = new ReentrantToken();
-        PredictionMarket p = new PredictionMarket(address(r));
+        PredictionMarket p = new PredictionMarket(address(r), address(0xFEE), 0);
         r.mint(a, 100e18);
         vm.startPrank(a); r.approve(address(p), type(uint256).max); p.deposit(50e18); vm.stopPrank();
         r.arm(address(p), abi.encodeCall(PredictionMarket.withdraw, (1)));
