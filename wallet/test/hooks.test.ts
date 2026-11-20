@@ -5,7 +5,7 @@ import { swapProvider, onRampProvider, registerSwapProvider, registerOnRampProvi
 import { DEFAULT_USAGE, buildReport, bucketValue, isoWeek, mayReport, maybeSend } from '../src/lib/usage-core.ts';
 
 test('every business flag is off in this build', () => {
-  assert.deepEqual(Object.values(FEATURES), [false, false, false]);
+  assert.deepEqual(Object.values(FEATURES), [false, false, false, false]);
 });
 
 test('a registered swap or on-ramp provider stays hidden while the flag is off', () => {
