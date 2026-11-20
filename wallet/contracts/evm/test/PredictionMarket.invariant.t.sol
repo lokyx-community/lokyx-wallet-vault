@@ -229,6 +229,7 @@ contract Handler is Test {
     }
     function totalFree() public view returns (uint256 sum) {
         for (uint256 i = 0; i < actors.length; i++) sum += pm.free(actors[i]);
+        sum += pm.free(pm.feeCollector()); // fees collected stay inside the contract until withdrawn
     }
     function sharesHeld(uint256 mid) public view returns (uint256 yes, uint256 no) {
         for (uint256 i = 0; i < actors.length; i++) { yes += pm.yesOf(mid, actors[i]); no += pm.noOf(mid, actors[i]); }
@@ -242,9 +243,12 @@ contract InvariantTest is StdInvariant, Test {
     PredictionMarket pm;
     Handler h;
 
+    /// The plain run has no fee; InvariantFeeTest below repeats every invariant with the real 1% fee switched on.
+    function _fee() internal view virtual returns (uint256) { return 0; }
+
     function setUp() public {
         usdt = new MockUSDT();
-        pm = new PredictionMarket(address(usdt), address(0xFEE), 0);
+        pm = new PredictionMarket(address(usdt), address(0xFEE), _fee());
         h = new Handler(pm, usdt);
         targetContract(address(h));
         bytes4[] memory sel = new bytes4[](25);
@@ -345,6 +349,14 @@ contract InvariantTest is StdInvariant, Test {
         }
     }
 
+    /// Once a market is decided its held answer share has been paid out: none of it is left behind.
+    function invariant_decidedMarketsHoldNoAnswerFees() public view {
+        for (uint256 m = 0; m < h.MARKETS(); m++) {
+            (, , , , PredictionMarket.State st, , , , ) = pm.info(m);
+            if (st != PredictionMarket.State.Open) assertEq(pm.answerFees(m), 0);
+        }
+    }
+
     /// One line per run is appended to a file, so the totals over all runs can be added up afterwards.
     function afterInvariant() public {
         string memory line = string.concat(
@@ -355,4 +367,9 @@ contract InvariantTest is StdInvariant, Test {
         );
         vm.writeLine("coverage-out/counters.csv", line);
     }
+}
+
+/// Everything above, again, with the 1% taker fee on: coins must still add up exactly, to the last unit.
+contract InvariantFeeTest is InvariantTest {
+    function _fee() internal pure override returns (uint256) { return 100; }
 }
