@@ -118,14 +118,10 @@ contract PredictionMarketTest is Test {
         vm.prank(b); pm.place(0, 1, 0, 40, 10);
     }
 
-    function test_panelResolvesYes() public {
+    function test_proposalStandsWhenNobodyDisputes() public {
         _pair();
         _adv(1 days);
-        vm.expectRevert("only the panel can vote"); pm.vote(0, 0);
-        for (uint256 i = 0; i < 2; i++) { vm.prank(panel[i]); pm.vote(0, 0); }
-        vm.expectRevert("the panel has not agreed yet"); pm.finalize(0);
-        vm.prank(panel[2]); pm.vote(0, 0);
-        vm.expectRevert("the objection window is still open"); pm.finalize(0);
+        vm.prank(c); pm.propose(0, 0);
         _adv(1 days);
         pm.finalize(0);
         vm.prank(a); assertEq(pm.claim(0), 10 * UNIT);
@@ -135,25 +131,24 @@ contract PredictionMarketTest is Test {
         assertEq(pm.free(a) + pm.free(b) + pm.free(c), 3 * FUND);
     }
 
-    function test_changedVoteRestartsWindow() public {
+    function test_disputeGoesToThePanel() public {
         _pair();
         _adv(1 days);
-        for (uint256 i = 0; i < 3; i++) { vm.prank(panel[i]); pm.vote(0, 0); }
-        _adv(12 hours);
-        vm.prank(panel[2]); pm.vote(0, 1); // majority gone
-        _adv(2 days);
-        vm.expectRevert("the panel has not agreed yet"); pm.finalize(0);
-        vm.prank(panel[3]); pm.vote(0, 1);
-        vm.prank(panel[4]); pm.vote(0, 1);
-        _adv(1 days);
-        pm.finalize(0);
+        vm.prank(c); pm.propose(0, 0);       // c claims Yes
+        vm.prank(b); pm.dispute(0);          // b says it is wrong
+        for (uint256 i = 0; i < 2; i++) { vm.prank(panel[i]); pm.vote(0, 1); }
+        vm.prank(panel[2]); pm.vote(0, 0);   // 2 No, 1 Yes: no majority yet
+        (, , , , PredictionMarket.State st, , , , ) = pm.info(0);
+        assertEq(uint8(st), uint8(PredictionMarket.State.Open));
+        vm.prank(panel[2]); pm.vote(0, 1);   // a changed vote reaches the majority
         vm.prank(b); assertEq(pm.claim(0), 10 * UNIT);
+        assertEq(pm.free(a) + pm.free(b) + pm.free(c), 3 * FUND);
     }
 
     function test_expireAndInvalidPaysHalf() public {
         _pair();
         _adv(1 days + 30 days - 1);
-        vm.expectRevert("not yet: the panel still has time"); pm.expire(0);
+        vm.expectRevert("not yet: there is still time to propose"); pm.expire(0);
         _adv(1);
         pm.expire(0);
         vm.prank(a); assertEq(pm.claim(0), 5 * UNIT);

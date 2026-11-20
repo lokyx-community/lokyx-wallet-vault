@@ -34,45 +34,139 @@ contract SecurityTest is Test {
         pm.create("Q?", uint64(clock + 1 days), UNIT, panel);
     }
 
-    // ---- 3. expire() must not override a pending majority ----
-    function test_expireCannotOverrideAPendingMajority() public {
+    // ---- resolution: propose, dispute, panel as the last judge ----
+    function _bond() internal view returns (uint256) { return pm.bondOf(0); }
+    function _state() internal view returns (uint8) {
+        (, , , , PredictionMarket.State st, , , , ) = pm.info(0);
+        return uint8(st);
+    }
+    function _bonds() internal view returns (uint256 x) { (, , , , , , x) = pm.resolution(0); }
+
+    function test_expireCannotOverrideAPendingAnswer() public {
         vm.prank(a); pm.place(0, 0, 0, 60, 10);
         vm.prank(b); pm.place(0, 1, 0, 40, 10);
         _adv(1 days + 30 days - 1 hours);
-        for (uint256 i = 0; i < 3; i++) { vm.prank(panel[i]); pm.vote(0, 0); } // Yes majority, window runs 24h
-        _adv(2 hours); // now past close + 30 days, but the decision is still pending
-        vm.expectRevert("the panel has agreed: finalize it instead");
+        vm.prank(c); pm.propose(0, 0);
+        _adv(2 hours); // past close + 30 days, the answer is still inside its challenge window
+        vm.expectRevert("an answer is waiting: finalize it or dispute it");
         pm.expire(0);
         _adv(1 days);
         pm.finalize(0);
         vm.prank(a); assertEq(pm.claim(0), 10 * UNIT);
     }
 
-    function test_expireStillWorksWhenNobodyAgrees() public {
-        _adv(1 days + 30 days);
+    function test_expireStillWorksWhenNobodyAnswers() public {
+        _adv(1 days + 30 days - 1);
+        vm.expectRevert("not yet: there is still time to propose"); pm.expire(0);
+        _adv(1);
         pm.expire(0);
-        (, , , , PredictionMarket.State st, , , , ) = pm.info(0);
-        assertEq(uint8(st), uint8(PredictionMarket.State.Invalid));
+        assertEq(_state(), uint8(PredictionMarket.State.Invalid));
     }
 
-    // ---- 6. a vote after the objection window cannot undo the decision ----
-    function test_lateVoteCannotUndoAFinalizableDecision() public {
+    function test_proposeRules() public {
+        vm.prank(c); vm.expectRevert("answers open when the market closes"); pm.propose(0, 0);
         _adv(1 days);
-        for (uint256 i = 0; i < 3; i++) { vm.prank(panel[i]); pm.vote(0, 0); }
-        _adv(1 days); // the window is over, nobody has finalized yet
-        vm.prank(panel[0]);
-        vm.expectRevert("the objection window is over: finalize it");
-        pm.vote(0, 1);
-        pm.finalize(0);
+        vm.prank(c); vm.expectRevert("answer is 0 (Yes), 1 (No) or 2 (Invalid)"); pm.propose(0, 3);
+        address broke = address(0xBEEF);
+        vm.prank(broke); vm.expectRevert("not enough free coins for the bond"); pm.propose(0, 0);
+        uint256 before = pm.free(c);
+        vm.prank(c); pm.propose(0, 1);
+        assertEq(pm.free(c), before - _bond());
+        assertEq(_bonds(), _bond());
+        vm.prank(a); vm.expectRevert("an answer has already been proposed"); pm.propose(0, 0);
     }
 
-    function test_voteInsideTheWindowStillChangesTheDecision() public {
+    function test_undisputedAnswerStandsAndTheBondComesBack() public {
+        vm.prank(a); pm.place(0, 0, 0, 60, 10);
+        vm.prank(b); pm.place(0, 1, 0, 40, 10);
         _adv(1 days);
-        for (uint256 i = 0; i < 3; i++) { vm.prank(panel[i]); pm.vote(0, 0); }
-        _adv(1 hours);
-        vm.prank(panel[0]); pm.vote(0, 1); // allowed: still inside the window
-        vm.expectRevert("the panel has not agreed yet");
+        uint256 before = pm.free(c);
+        vm.prank(c); pm.propose(0, 1);
+        vm.expectRevert("the challenge window is still open"); pm.finalize(0);
+        vm.prank(panel[0]); vm.expectRevert("the panel only decides disputed answers"); pm.vote(0, 0);
+        _adv(1 days);
         pm.finalize(0);
+        assertEq(pm.free(c), before, "the proposer got the bond back");
+        assertEq(_bonds(), 0);
+        vm.prank(b); assertEq(pm.claim(0), 10 * UNIT);
+    }
+
+    function test_disputeNeedsTheWindowAndAnotherPerson() public {
+        _adv(1 days);
+        vm.prank(a); vm.expectRevert("there is no answer to dispute"); pm.dispute(0);
+        vm.prank(c); pm.propose(0, 0);
+        vm.prank(c); vm.expectRevert("you can't dispute your own answer"); pm.dispute(0);
+        _adv(1 days);
+        vm.prank(a); vm.expectRevert("the challenge window is over: finalize it"); pm.dispute(0);
+    }
+
+    function test_aDisputedAnswerCannotBeFinalizedAroundThePanel() public {
+        _adv(1 days);
+        vm.prank(c); pm.propose(0, 0);
+        vm.prank(a); pm.dispute(0);
+        vm.prank(a); vm.expectRevert("already disputed"); pm.dispute(0);
+        _adv(1 days);
+        vm.expectRevert("there is no undisputed answer"); pm.finalize(0); // a dispute can't be finalized around the panel
+    }
+
+    function test_panelOverrulesTheProposalAndDisputerTakesBothBonds() public {
+        _adv(1 days);
+        uint256 cb = pm.free(c); uint256 ab = pm.free(a);
+        vm.prank(c); pm.propose(0, 0);
+        vm.prank(a); pm.dispute(0);
+        vm.prank(address(0x999)); vm.expectRevert("only the panel can vote"); pm.vote(0, 1);
+        for (uint256 i = 0; i < 2; i++) { vm.prank(panel[i]); pm.vote(0, 1); }
+        assertEq(_state(), uint8(PredictionMarket.State.Open), "two of five is not a majority");
+        vm.prank(panel[2]); pm.vote(0, 1);
+        assertEq(_state(), uint8(PredictionMarket.State.No));
+        assertEq(pm.free(c), cb - _bond());
+        assertEq(pm.free(a), ab + _bond());
+        assertEq(_bonds(), 0);
+    }
+
+    function test_panelUpholdingTheProposalPaysTheProposer() public {
+        _adv(1 days);
+        uint256 cb = pm.free(c); uint256 ab = pm.free(a);
+        vm.prank(c); pm.propose(0, 0);
+        vm.prank(a); pm.dispute(0);
+        for (uint256 i = 0; i < 3; i++) { vm.prank(panel[i]); pm.vote(0, 0); }
+        assertEq(_state(), uint8(PredictionMarket.State.Yes));
+        assertEq(pm.free(c), cb + _bond());
+        assertEq(pm.free(a), ab - _bond());
+        assertEq(_bonds(), 0);
+    }
+
+    function test_aDecidedDisputeCannotBeVotedOnAgain() public {
+        _adv(1 days);
+        vm.prank(c); pm.propose(0, 0);
+        vm.prank(a); pm.dispute(0);
+        for (uint256 i = 0; i < 3; i++) { vm.prank(panel[i]); pm.vote(0, 0); }
+        vm.prank(panel[3]); vm.expectRevert("this market is already decided"); pm.vote(0, 1);
+        vm.expectRevert("this market is already decided"); pm.expire(0);
+    }
+
+    function test_aPanelThatNeverDecidesEndsInvalidAndBothGetTheirBondBack() public {
+        _adv(1 days);
+        uint256 cb = pm.free(c); uint256 ab = pm.free(a);
+        vm.prank(c); pm.propose(0, 0);
+        vm.prank(a); pm.dispute(0);
+        _adv(30 days - 1);
+        vm.expectRevert("not yet: the panel still has time"); pm.expire(0);
+        _adv(1);
+        pm.expire(0);
+        assertEq(_state(), uint8(PredictionMarket.State.Invalid));
+        assertEq(pm.free(c), cb);
+        assertEq(pm.free(a), ab);
+        assertEq(_bonds(), 0);
+    }
+
+    function test_resolutionStepsKeepWorkingWhilePaused() public {
+        pm.setPaused(true);
+        _adv(1 days);
+        vm.prank(c); pm.propose(0, 0);
+        vm.prank(a); pm.dispute(0);
+        for (uint256 i = 0; i < 3; i++) { vm.prank(panel[i]); pm.vote(0, 0); }
+        assertEq(_state(), uint8(PredictionMarket.State.Yes));
     }
 
     // ---- 4. a full book never stops an order that can trade ----
@@ -189,6 +283,37 @@ contract SecurityTest is Test {
         pm.create("x", uint64(clock + 1 days), UNIT, p3);
     }
 
+    // ---- 4b. a full book makes room for a better-priced order and refunds the one pushed out ----
+    function test_fullBookEvictsTheWorstBidForABetterOne() public {
+        _fillBook(); // 100 Yes bids at 1 by c
+        uint256 cFree = pm.free(c);
+        vm.prank(a); pm.place(0, 0, 0, 5, 1); // better: takes a slot
+        (uint64[] memory ids, , , , uint8[] memory prices, ) = pm.book(0);
+        assertEq(ids.length, pm.MAX_ORDERS());
+        bool has5;
+        for (uint256 i = 0; i < prices.length; i++) if (prices[i] == 5) has5 = true;
+        assertTrue(has5);
+        assertEq(pm.free(c), cFree + CENT, "the pushed-out order's coins came back in full");
+        _solvent();
+    }
+
+    function test_fullBookTurnsAwayAnOrderThatIsNotBetter() public {
+        _fillBook();
+        vm.prank(a); vm.expectRevert("the book is full of better-priced orders"); pm.place(0, 0, 0, 1, 1);
+    }
+
+    function test_fullBookEvictionReturnsTheSharesOfAWaitingSale() public {
+        vm.prank(a); pm.place(0, 0, 0, 50, 100);
+        vm.prank(b); pm.place(0, 1, 0, 50, 100); // a ends up holding 100 Yes, b 100 No
+        for (uint256 i = 0; i < 100; i++) { vm.prank(a); pm.place(0, 0, 1, 90, 1); } // 100 Yes asks at 90
+        assertEq(pm.yesOf(0, a), 0);
+        vm.prank(c); pm.place(0, 1, 0, 30, 1); // buy No at 30 = a Yes ask at 70: better than 90, so it takes a slot
+        assertEq(pm.yesOf(0, a), 1, "the pushed-out sale gave its share back");
+        (uint64[] memory ids, , , , , ) = pm.book(0);
+        assertEq(ids.length, pm.MAX_ORDERS());
+        _solvent();
+    }
+
     // ---- 7. emergency pause: stops new activity, never exits ----
     function test_pauseStopsNewActivityButNeverExits() public {
         vm.prank(a); pm.place(0, 0, 0, 60, 10);
@@ -235,9 +360,11 @@ contract SecurityTest is Test {
         _solvent();
 
         _adv(1 days);
-        for (uint256 i = 0; i < 3; i++) { vm.prank(panel[i]); pm.vote(0, 1); } // No wins
-        _adv(1 days);
-        pm.finalize(0);
+        vm.prank(c); pm.propose(0, 1); // No, with a bond
+        _solvent();
+        vm.prank(a); pm.dispute(0);    // a thinks otherwise
+        _solvent();
+        for (uint256 i = 0; i < 3; i++) { vm.prank(panel[i]); pm.vote(0, 1); } // the panel says No: c wins both bonds
         _solvent();
         vm.prank(a); pm.claim(0);
         vm.prank(b); pm.claim(0);
@@ -245,7 +372,7 @@ contract SecurityTest is Test {
         (, , , , , , uint256 pool, , ) = pm.info(0);
         assertEq(pool, 0, "every share has been paid out and nothing is left over or missing");
         assertEq(usdt.balanceOf(address(pm)), pm.free(a) + pm.free(b) + pm.free(c));
-        assertEq(pm.free(a) + pm.free(b) + pm.free(c), 3 * FUND);
+        assertEq(pm.free(a) + pm.free(b) + pm.free(c), 3 * FUND, "bonds only moved from the loser to the winner");
     }
 
     function _solvent() internal view {
@@ -254,6 +381,7 @@ contract SecurityTest is Test {
         uint256 locked;
         (, address[] memory owners, , uint8[] memory sides, uint8[] memory prices, uint64[] memory qtys) = pm.book(0);
         for (uint256 i = 0; i < owners.length; i++) if (sides[i] == 0) locked += uint256(prices[i]) * qtys[i] * CENT;
-        assertEq(usdt.balanceOf(address(pm)), pm.free(a) + pm.free(b) + pm.free(c) + pool + locked);
+        (, , , , , , uint256 bonds) = pm.resolution(0);
+        assertEq(usdt.balanceOf(address(pm)), pm.free(a) + pm.free(b) + pm.free(c) + pool + locked + bonds);
     }
 }

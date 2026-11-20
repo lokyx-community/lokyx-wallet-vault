@@ -19,7 +19,17 @@ contract Handler is Test {
     uint256 public constant MARKETS = 2;
     uint256 public deposited;
     uint256 public withdrawn;
-    uint256 public trades; // how many orders actually went through, so a "passing" run is known not to be empty
+    // coverage counters: printed after each run so a green result can be checked to have reached the hard cases
+    uint256 public trades;
+    uint256 public fullBookPlaces;
+    uint256 public proposals;
+    uint256 public disputes;
+    uint256 public finalized;
+    uint256 public panelDecided;
+    uint256 public expiredNoAnswer;
+    uint256 public expiredStuckDispute;
+    uint256 public cancels;
+    uint256 public claims;
 
     constructor(PredictionMarket p, MockUSDT u) {
         pm = p;
@@ -62,7 +72,8 @@ contract Handler is Test {
         price = uint8(bound(price, 1, 99));
         qty = uint64(bound(qty, 1, 40));
         vm.prank(a);
-        try pm.place(mid, outcome, side, price, qty) { trades++; } catch {}
+        uint256 len = _len(mid);
+        try pm.place(mid, outcome, side, price, qty) { trades++; if (len >= pm.MAX_ORDERS()) fullBookPlaces++; } catch {}
     }
 
     function cancel(uint256 s, uint256 mid) external {
@@ -72,33 +83,79 @@ contract Handler is Test {
         uint256 i = s % ids.length;
         vm.prank(owners[i]);
         pm.cancel(mid, ids[i]);
+        cancels++;
     }
 
-    /// Time moves on to the close, the panel votes (or nobody does and the market expires), the market is finalized.
-    function settle(uint256 mid, uint8 v, bool expireInstead, bool flip) external {
+    function _len(uint256 mid) internal view returns (uint256) {
+        (uint64[] memory ids, , , , , ) = pm.book(mid);
+        return ids.length;
+    }
+
+    function _fund(address a, uint256 amt) internal {
+        uint256 have = pm.free(a);
+        if (have >= amt) return;
+        uint256 need = amt - have;
+        usdt.mint(a, need);
+        vm.startPrank(a);
+        usdt.approve(address(pm), type(uint256).max);
+        pm.deposit(need);
+        vm.stopPrank();
+        deposited += need;
+    }
+
+    /// Fills a book with waiting bids at the lowest price so the next better order has to push one out.
+    function flood(uint256 s, uint256 mid) external {
+        address a = _actor(s);
         mid = mid % MARKETS;
-        (, , , , PredictionMarket.State st, , , , ) = pm.info(mid);
+        _fund(a, 100e18);
+        for (uint256 i = _len(mid); i < pm.MAX_ORDERS(); i++) {
+            vm.prank(a);
+            try pm.place(mid, 0, 0, 1, 1) { trades++; } catch { break; }
+        }
+    }
+
+    /// The market closes and is settled by one of four routes: nobody answers (expiry), an answer nobody disputes,
+    /// a dispute the panel decides (with votes that change on the way), or a dispute the panel never decides.
+    function settle(uint256 mid, uint8 v, uint8 route) external {
+        mid = mid % MARKETS;
+        (, , , uint256 unit, PredictionMarket.State st, , , , ) = pm.info(mid);
         if (st != PredictionMarket.State.Open) return;
         if (clock < closeAt) { clock = closeAt; vm.warp(clock); }
-        if (expireInstead) {
-            clock += 30 days;
-            vm.warp(clock);
-            try pm.expire(mid) {} catch {}
+        route = route % 4;
+        if (route == 0) {
+            clock += 30 days; vm.warp(clock);
+            try pm.expire(mid) { expiredNoAnswer++; } catch {}
             return;
         }
-        for (uint256 i = 0; i < 3; i++) {
-            vm.prank(panel[i]);
-            try pm.vote(mid, v % 3) {} catch {}
+        address prop = actors[v % actors.length];
+        address disp = actors[(v + 1) % actors.length];
+        uint256 bond = unit * pm.BOND_SHARES();
+        _fund(prop, bond);
+        vm.prank(prop);
+        try pm.propose(mid, (v / 3) % 3) { proposals++; } catch { return; }
+        if (route == 1) {
+            clock += 1 days; vm.warp(clock);
+            try pm.finalize(mid) { finalized++; } catch {}
+            return;
         }
-        if (flip) { vm.prank(panel[0]); try pm.vote(mid, (v + 1) % 3) {} catch {} } // an objection inside the window
-        clock += 1 days + 1;
-        vm.warp(clock);
-        try pm.finalize(mid) {} catch {}
+        _fund(disp, bond);
+        vm.prank(disp);
+        try pm.dispute(mid) { disputes++; } catch { return; }
+        if (route == 3) {
+            clock += 30 days; vm.warp(clock);
+            try pm.expire(mid) { expiredStuckDispute++; } catch {}
+            return;
+        }
+        // three different answers (no majority), then the others settle it
+        for (uint256 i = 0; i < 3; i++) { vm.prank(panel[i]); try pm.vote(mid, uint8((v + i) % 3)) {} catch {} }
+        for (uint256 i = 3; i < 5; i++) { vm.prank(panel[i]); try pm.vote(mid, v % 3) {} catch {} }
+        (, , , , PredictionMarket.State after_, , , , ) = pm.info(mid);
+        if (after_ != PredictionMarket.State.Open) panelDecided++;
     }
 
     function claim(uint256 s, uint256 mid) external {
         vm.prank(_actor(s));
-        try pm.claim(mid % MARKETS) {} catch {}
+        try pm.claim(mid % MARKETS) { claims++; } catch {}
     }
 
     // ---- views the invariants use ----
@@ -106,6 +163,9 @@ contract Handler is Test {
         (, , , uint256 unit, , , , , ) = pm.info(mid);
         (, , , uint8[] memory sides, uint8[] memory prices, uint64[] memory qtys) = pm.book(mid);
         for (uint256 i = 0; i < sides.length; i++) if (sides[i] == 0) sum += uint256(prices[i]) * qtys[i] * (unit / 100);
+    }
+    function bondsOf(uint256 mid) public view returns (uint256 x) {
+        (, , , , , , x) = pm.resolution(mid);
     }
     function totalFree() public view returns (uint256 sum) {
         for (uint256 i = 0; i < actors.length; i++) sum += pm.free(actors[i]);
@@ -127,13 +187,17 @@ contract InvariantTest is StdInvariant, Test {
         pm = new PredictionMarket(address(usdt));
         h = new Handler(pm, usdt);
         targetContract(address(h));
-        bytes4[] memory sel = new bytes4[](6);
+        bytes4[] memory sel = new bytes4[](10);
         sel[0] = Handler.deposit.selector;
         sel[1] = Handler.withdraw.selector;
         sel[2] = Handler.place.selector;
         sel[3] = Handler.cancel.selector;
         sel[4] = Handler.settle.selector;
         sel[5] = Handler.claim.selector;
+        sel[6] = Handler.flood.selector;
+        sel[7] = Handler.place.selector; // trading is weighted 3x so settling doesn't end the run too early
+        sel[8] = Handler.place.selector;
+        sel[9] = Handler.deposit.selector;
         targetSelector(FuzzSelector({ addr: address(h), selectors: sel }));
     }
 
@@ -143,10 +207,23 @@ contract InvariantTest is StdInvariant, Test {
         uint256 owed = h.totalFree();
         for (uint256 m = 0; m < h.MARKETS(); m++) {
             (, , , , , , uint256 pool, , ) = pm.info(m);
-            owed += pool + h.lockedInBook(m);
+            owed += pool + h.lockedInBook(m) + h.bondsOf(m);
         }
         assertEq(usdt.balanceOf(address(pm)), owed);
         assertEq(usdt.balanceOf(address(pm)), h.deposited() - h.withdrawn());
+    }
+
+    /// Bonds are held only while an answer is pending: none before an answer, one after a proposal, two after a dispute,
+    /// and none at all once the market is decided (the winner or both parties have been paid back).
+    function invariant_bondsAreHeldOnlyWhileTheAnswerIsPending() public view {
+        for (uint256 m = 0; m < h.MARKETS(); m++) {
+            (, , , uint256 unit, PredictionMarket.State st, , , , ) = pm.info(m);
+            (uint8 proposed, , , address disputer, , uint256 bond, uint256 held) = pm.resolution(m);
+            assertEq(bond, unit * pm.BOND_SHARES());
+            if (st != PredictionMarket.State.Open || proposed == 255) assertEq(held, 0);
+            else if (disputer == address(0)) assertEq(held, bond);
+            else assertEq(held, 2 * bond);
+        }
     }
 
     /// While a market is open the pool is exactly what pays one coin-unit for every pair of shares.
@@ -183,5 +260,18 @@ contract InvariantTest is StdInvariant, Test {
             uint256 owes = st == PredictionMarket.State.Yes ? y * unit : st == PredictionMarket.State.No ? n * unit : (y + n) * (unit / 2);
             assertEq(pool, owes, "the pool is exactly what the remaining shares are owed");
         }
+    }
+
+    function afterInvariant() public view {
+        console.log("trades", h.trades());
+        console.log("fullBookPlaces", h.fullBookPlaces());
+        console.log("cancels", h.cancels());
+        console.log("proposals", h.proposals());
+        console.log("disputes", h.disputes());
+        console.log("finalized", h.finalized());
+        console.log("panelDecided", h.panelDecided());
+        console.log("expiredNoAnswer", h.expiredNoAnswer());
+        console.log("expiredStuckDispute", h.expiredStuckDispute());
+        console.log("claims", h.claims());
     }
 }

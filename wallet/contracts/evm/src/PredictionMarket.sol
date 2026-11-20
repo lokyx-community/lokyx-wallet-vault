@@ -3,7 +3,9 @@ pragma solidity ^0.8.24;
 
 /// Yes/no prediction markets with an order book, paid in one ERC-20 (USDT on BNB Chain). Same rules as the
 /// LOKYX contract (wallet/contracts/market-engine): shares are backed by `unit` coins per pair, every order is
-/// a limit order on one book priced in Yes terms, and a panel chosen at creation decides the result.
+/// a limit order on one book priced in Yes terms. Results are settled the way Polymarket's optimistic oracle does it:
+/// after the close anyone proposes an answer with a bond, anyone can dispute it inside a challenge window with an equal
+/// bond, and only a dispute reaches the panel chosen at creation, which then acts as the final judge.
 /// People deposit into a free balance, trade with it, and withdraw. Coins leave only on `withdraw`.
 interface IERC20 {
     function transfer(address to, uint256 amount) external returns (bool);
@@ -45,6 +47,8 @@ contract PredictionMarket {
     uint256 public constant WINDOW = 1 days;
     uint256 public constant EXPIRE_AFTER = 30 days;
     uint256 public constant MAX_TITLE = 140;
+    /// Both the proposer and a disputer put up this many shares' worth of coins. The loser of a dispute forfeits it.
+    uint256 public constant BOND_SHARES = 20;
 
     enum Kind { Buy, Sell, MintNo, BurnNo }
     enum State { Open, Yes, No, Invalid }
@@ -68,9 +72,13 @@ contract PredictionMarket {
         uint64 supply; // pairs in existence
         uint256 pool; // coins backing them
         address[] panel;
-        uint8[] votes; // 255 = not voted, 0 Yes, 1 No, 2 Invalid
-        uint8 decidedVote; // 255 = none yet
-        uint64 decidedAt;
+        uint8[] votes; // the panel's votes once an answer is disputed: 255 = not voted, 0 Yes, 1 No, 2 Invalid
+        uint8 proposed; // 255 = nobody has proposed an answer yet
+        address proposer;
+        uint64 proposedAt;
+        address disputer;
+        uint64 disputedAt;
+        uint256 bonds; // coins held as bonds for this market
     }
 
     uint256 public count;
@@ -85,6 +93,9 @@ contract PredictionMarket {
     event Created(uint256 indexed id, address indexed creator, uint64 close);
     event OrderPlaced(uint256 indexed id, uint64 order, address indexed who);
     event Voted(uint256 indexed id, address indexed who, uint8 vote);
+    event Proposed(uint256 indexed id, address indexed who, uint8 outcome);
+    event Disputed(uint256 indexed id, address indexed who);
+    event Evicted(uint256 indexed id, uint64 order);
     event Decided(uint256 indexed id, State state);
 
     modifier nonReentrant() {
@@ -162,7 +173,7 @@ contract PredictionMarket {
         m.unit = unit;
         m.panel = panel;
         for (uint256 i = 0; i < panel.length; i++) m.votes.push(255);
-        m.decidedVote = 255;
+        m.proposed = 255;
         emit Created(id, msg.sender, close);
     }
 
@@ -204,9 +215,11 @@ contract PredictionMarket {
         Order memory inc = Order(oid, msg.sender, kind, yp, qty, locked);
         _match(id, m, inc);
         if (inc.qty > 0) {
-            // The cap limits only what can REST. If this order traded at all, at least one resting order was used up
-            // and removed, so there is room for what is left; only an order that could not trade is turned away.
-            require(books[id].length < MAX_ORDERS, "the book is full of waiting orders");
+            // The cap limits only what can REST. If this order traded at all, a resting order was used up and removed,
+            // so there is room. Otherwise, when the book is full, an order priced better than the worst waiting order
+            // on its own side takes that place and the pushed-out owner gets everything back, so spam can't lock others out.
+            if (books[id].length >= MAX_ORDERS) _evictWorseThan(id, inc);
+            require(books[id].length < MAX_ORDERS, "the book is full of better-priced orders");
             books[id].push(inc);
         }
         emit OrderPlaced(id, oid, msg.sender);
@@ -215,6 +228,30 @@ contract PredictionMarket {
 
     function _isBid(Kind k) internal pure returns (bool) {
         return k == Kind.Buy || k == Kind.BurnNo;
+    }
+
+    function _evictWorseThan(uint256 id, Order memory inc) internal {
+        Order[] storage book = books[id];
+        bool incBid = _isBid(inc.kind);
+        bool found;
+        uint256 at;
+        for (uint256 i = 0; i < book.length; i++) {
+            Order storage r = book[i];
+            if (_isBid(r.kind) != incBid) continue;
+            if (!found) { found = true; at = i; continue; }
+            Order storage cur = book[at];
+            // the worst bid has the lowest price, the worst ask the highest; among equals the newest loses
+            bool worse = incBid
+                ? (r.price < cur.price || (r.price == cur.price && r.id > cur.id))
+                : (r.price > cur.price || (r.price == cur.price && r.id > cur.id));
+            if (worse) at = i;
+        }
+        if (!found) return;
+        Order memory w = book[at];
+        if (incBid ? inc.price <= w.price : inc.price >= w.price) return; // not strictly better: turned away
+        _removeAt(id, at);
+        _refund(id, w);
+        emit Evicted(id, w.id);
     }
 
     function _best(uint256 id, Order memory inc) internal view returns (bool found, uint256 at) {
@@ -313,53 +350,108 @@ contract PredictionMarket {
         else noOf[id][o.owner] += o.qty;
     }
 
-    // ---------- the panel ----------
+    // ---------- settling a market ----------
 
-    /// vote: 0 Yes, 1 No, 2 Invalid. Can be changed until the market is final.
+    function bondOf(uint256 id) public view returns (uint256) {
+        return _market(id).unit * BOND_SHARES;
+    }
+
+    function _settle(uint256 id, Market storage m, uint8 outcome) internal {
+        m.state = outcome == 0 ? State.Yes : outcome == 1 ? State.No : State.Invalid;
+        emit Decided(id, m.state);
+    }
+
+    /// Step 1. Once the market has closed anyone can propose the answer (0 Yes, 1 No, 2 Invalid) and lock a bond.
+    /// These steps stay open while the contract is paused, so a pause can never keep a market from being settled.
+    function propose(uint256 id, uint8 outcome) external {
+        Market storage m = _market(id);
+        require(m.state == State.Open, "this market is already decided");
+        require(block.timestamp >= m.close, "answers open when the market closes");
+        require(m.proposed == 255, "an answer has already been proposed");
+        require(outcome < 3, "answer is 0 (Yes), 1 (No) or 2 (Invalid)");
+        uint256 b = m.unit * BOND_SHARES;
+        require(free[msg.sender] >= b, "not enough free coins for the bond");
+        free[msg.sender] -= b;
+        m.bonds += b;
+        m.proposer = msg.sender;
+        m.proposed = outcome;
+        m.proposedAt = uint64(block.timestamp);
+        emit Proposed(id, msg.sender, outcome);
+    }
+
+    /// Step 2 (only if someone thinks the answer is wrong). Inside the challenge window anyone can dispute it with an
+    /// equal bond. A dispute hands the decision to the panel.
+    function dispute(uint256 id) external {
+        Market storage m = _market(id);
+        require(m.state == State.Open && m.proposed != 255, "there is no answer to dispute");
+        require(m.disputer == address(0), "already disputed");
+        require(msg.sender != m.proposer, "you can't dispute your own answer");
+        require(block.timestamp < uint256(m.proposedAt) + WINDOW, "the challenge window is over: finalize it");
+        uint256 b = m.unit * BOND_SHARES;
+        require(free[msg.sender] >= b, "not enough free coins for the bond");
+        free[msg.sender] -= b;
+        m.bonds += b;
+        m.disputer = msg.sender;
+        m.disputedAt = uint64(block.timestamp);
+        emit Disputed(id, msg.sender);
+    }
+
+    /// Step 3 when nobody disputed. Anyone can call it once the window has passed; the bond goes back to the proposer.
+    function finalize(uint256 id) external {
+        Market storage m = _market(id);
+        require(m.state == State.Open, "this market is already decided");
+        require(m.proposed != 255 && m.disputer == address(0), "there is no undisputed answer");
+        require(block.timestamp >= uint256(m.proposedAt) + WINDOW, "the challenge window is still open");
+        uint256 b = m.unit * BOND_SHARES;
+        m.bonds -= b;
+        free[m.proposer] += b;
+        _settle(id, m, m.proposed);
+    }
+
+    /// Step 3 when someone disputed: the panel decides, vote 0 Yes, 1 No, 2 Invalid, changeable until a majority
+    /// agrees. That majority is final. If it matches the proposal the proposer takes both bonds, otherwise the disputer does.
     function vote(uint256 id, uint8 v) external {
         Market storage m = _market(id);
         require(m.state == State.Open, "this market is already decided");
-        require(block.timestamp >= m.close, "voting opens when the market closes");
+        require(m.disputer != address(0), "the panel only decides disputed answers");
         require(v < 3, "vote is 0 (Yes), 1 (No) or 2 (Invalid)");
-        // Once the objection window has run out the decision is final-able; a late vote must not be able to undo it.
-        if (m.decidedVote != 255) require(block.timestamp < uint256(m.decidedAt) + WINDOW, "the objection window is over: finalize it");
         uint256 idx = type(uint256).max;
         for (uint256 i = 0; i < m.panel.length; i++) if (m.panel[i] == msg.sender) idx = i;
         require(idx != type(uint256).max, "only the panel can vote");
         m.votes[idx] = v;
+        emit Voted(id, msg.sender, v);
 
         uint256 need = m.panel.length / 2 + 1;
         uint256[3] memory tally;
         for (uint256 i = 0; i < m.votes.length; i++) if (m.votes[i] < 3) tally[m.votes[i]]++;
-        uint8 winner = 255;
-        for (uint8 k = 0; k < 3; k++) if (tally[k] >= need) { winner = k; break; }
-        if (winner == 255) {
-            m.decidedVote = 255;
-        } else if (m.decidedVote != winner) {
-            m.decidedVote = winner;
-            m.decidedAt = uint64(block.timestamp);
+        for (uint8 k = 0; k < 3; k++) {
+            if (tally[k] >= need) {
+                uint256 b = m.unit * BOND_SHARES;
+                m.bonds -= 2 * b;
+                free[k == m.proposed ? m.proposer : m.disputer] += 2 * b;
+                _settle(id, m, k);
+                return;
+            }
         }
-        emit Voted(id, msg.sender, v);
     }
 
-    /// Makes the panel's decision final once the window has passed. Anyone can call it.
-    function finalize(uint256 id) external {
-        Market storage m = _market(id);
-        require(m.state == State.Open, "this market is already decided");
-        require(m.decidedVote != 255, "the panel has not agreed yet");
-        require(block.timestamp >= uint256(m.decidedAt) + WINDOW, "the objection window is still open");
-        m.state = m.decidedVote == 0 ? State.Yes : m.decidedVote == 1 ? State.No : State.Invalid;
-        emit Decided(id, m.state);
-    }
-
-    /// Ends an undecided market as Invalid long after the close, so coins are never stuck for ever.
+    /// Ends a stuck market as Invalid so coins are never held for ever: no answer 30 days after the close, or a
+    /// dispute the panel did not settle within 30 days (both bonds are given back). A pending undisputed answer
+    /// cannot be overridden: it has to be finalized or disputed.
     function expire(uint256 id) external {
         Market storage m = _market(id);
         require(m.state == State.Open, "this market is already decided");
-        require(m.decidedVote == 255, "the panel has agreed: finalize it instead");
-        require(block.timestamp >= uint256(m.close) + EXPIRE_AFTER, "not yet: the panel still has time");
-        m.state = State.Invalid;
-        emit Decided(id, State.Invalid);
+        if (m.disputer != address(0)) {
+            require(block.timestamp >= uint256(m.disputedAt) + EXPIRE_AFTER, "not yet: the panel still has time");
+            uint256 b = m.unit * BOND_SHARES;
+            m.bonds -= 2 * b;
+            free[m.proposer] += b;
+            free[m.disputer] += b;
+        } else {
+            require(m.proposed == 255, "an answer is waiting: finalize it or dispute it");
+            require(block.timestamp >= uint256(m.close) + EXPIRE_AFTER, "not yet: there is still time to propose");
+        }
+        _settle(id, m, 2);
     }
 
     /// After a market is decided: cancels your waiting orders and pays your shares into your free balance.
@@ -395,6 +487,11 @@ contract PredictionMarket {
     ) {
         Market storage m = _market(id);
         return (m.title, m.creator, m.close, m.unit, m.state, m.supply, m.pool, m.panel, m.votes);
+    }
+
+    function resolution(uint256 id) external view returns (uint8 proposed, address proposer, uint64 proposedAt, address disputer, uint64 disputedAt, uint256 bond, uint256 bonds) {
+        Market storage m = _market(id);
+        return (m.proposed, m.proposer, m.proposedAt, m.disputer, m.disputedAt, m.unit * BOND_SHARES, m.bonds);
     }
 
     /// Waiting orders: outcome 0 Yes / 1 No, side 0 buy / 1 sell, price in that outcome's own terms.
