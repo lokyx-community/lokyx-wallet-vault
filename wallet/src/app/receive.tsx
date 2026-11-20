@@ -1,4 +1,3 @@
-import { Aurora } from '../ui/Aurora';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, ScrollView, Share, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -219,7 +218,6 @@ export default function Receive() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Aurora />
-      <Aurora width={width} height={380} strength={0.6} />
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
         <View style={{ flexDirection: 'row', alignItems: 'center', height: 52, paddingHorizontal: 20 }}>
           <View style={{ flex: 1 }}>
