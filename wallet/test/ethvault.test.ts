@@ -7,6 +7,7 @@ import { Evm } from './helpers/evm.ts';
 import {
   ABI, CONTRACTS, DEAD, DEFAULT_WAIT, GATE_ROLE, RECOVERY_ROLE, gateQueueData, refuseQueue, recoveryCancelData, recoverySweepCalls, sweepable, ETH, EXPIRY, FORBIDDEN_ZODIAC, allowanceSpend, cancelData, checkSettings, decodeAction, describeCall, diffConfig, encodeAction, executeData, gasReserve, itemState,
   phoneCancelData, queueData, readLive, refuseSignRequest, refuseToBuild, safeAddress, signCancel, signSweep, submission, tokenTransferCall, unpinned, vaultAddresses, deploymentOf, signAction,
+  creationCalls, creationSteps,
   type Live, type SafeTx,
 } from '../src/lib/ethvault-core.ts';
 
@@ -624,4 +625,14 @@ test('gate: its address is its own, and the same for the same phone', async () =
   assert.notEqual(w.a.gate, w.a.delay);
   assert.equal(vaultAddresses({ recovery: ADDR.recovery, phone: ADDR.phone }).gate, w.a.gate);
   assert.notEqual(vaultAddresses({ recovery: ADDR.recovery, phone: ADDR.thief }).gate, w.a.gate);
+});
+
+test('every creation step names the address it creates, so a retry can skip each one that already exists', () => {
+  const plan = { recovery: ADDR.recovery, phone: ADDR.phone, safeAddress: ADDR.safeDest };
+  const a = vaultAddresses(plan);
+  const steps = creationSteps(plan);
+  assert.deepEqual(steps.map((s) => s.target), [a.safe, a.delay, a.roles, a.gate]);
+  assert.deepEqual(steps.map(({ to, data }) => ({ to, data })), creationCalls(plan).map(({ to, data }) => ({ to, data })));
+  assert.equal(new Set(steps.map((s) => s.target.toLowerCase())).size, 4, 'four different addresses');
+  assert.equal(creationSteps(plan, undefined, false).length, 3, 'a vault without a gate has three steps');
 });

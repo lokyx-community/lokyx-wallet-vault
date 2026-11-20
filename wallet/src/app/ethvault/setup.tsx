@@ -8,7 +8,11 @@ import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { bytesToHex, isAddress, parseUnits, type Hex } from 'viem';
-import { plainError } from '../../lib/plain-error';
+import { Linking } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import { faucetFor, problemFrom, type OptionId, type Problem } from '../../lib/problem-core';
+import { ProblemSheet } from '../../ui/ProblemSheet';
+import { toast } from '../../ui/Toast';
 import { T } from '../../ui/Text';
 import { Button, ErrorText, Field, Note, Screen, SwitchRow } from '../../ui/controls';
 import { Segmented } from '../../ui/Segmented';
@@ -55,6 +59,7 @@ export default function EthVaultSetup() {
   const [pledged, setPledged] = useState<boolean[]>(STORAGE_PLEDGES.map(() => false));
   const everyday = useAsync(async () => (await ensureAddresses()).eth, []);
   const [err, setErr] = useState('');
+  const [problem, setProblem] = useState<Problem | null>(null);
   const [saving, setSaving] = useState(false);
   const [, setMsg] = useState('');
   const [stepKey, setStepKey] = useState('');
@@ -84,7 +89,7 @@ export default function EthVaultSetup() {
 
   const create = async () => {
     setErr('');
-    if (!(await confirmIt('Create your Ethereum vault'))) return false;
+    if (!(await confirmIt('Create your Ethereum vault', { keyFollows: true }))) return false; // the phone's own prompt that follows is the approval: one prompt, not two
     // the recovery key: this setup's own words, or the words typed again when adding a second network
     let sk: Uint8Array;
     if (existing) {
@@ -103,7 +108,7 @@ export default function EthVaultSetup() {
       logEvent('vault', 'Vault created', VAULT_NETS[net].label);
       return true;
     } catch (e) {
-      setErr(plainError(e, VAULT_NETS[net].label));
+      setProblem(problemFrom(e, { where: VAULT_NETS[net].label, symbol: NATIVE[net] }));
       setStep('review');
       return false;
     } finally {
@@ -111,9 +116,27 @@ export default function EthVaultSetup() {
     }
   };
 
+  /** What the person chose on the problem sheet. Trying again runs the whole step again; every part already built is skipped. */
+  const pickProblem = async (id: OptionId) => {
+    const was = problem;
+    setProblem(null);
+    if (id === 'retry' || id === 'check-again') {
+      await create(); // on success the creating screen carries on by itself
+    } else if (id === 'faucet') {
+      const url = faucetFor(VAULT_NETS[net].label);
+      if (url) Linking.openURL(url).catch(() => {});
+    } else if (id === 'copy-address') {
+      if (everyday.data) { await Clipboard.setStringAsync(everyday.data); toast('Address copied', 'copy'); }
+    } else if (id === 'copy-details' && was) {
+      await Clipboard.setStringAsync(was.details);
+      toast('Details copied', 'copy');
+    }
+  };
+
   return (
     <Screen title={`Set up on ${VAULT_NETS[net].label}`} large>
       <ScreenGuard />
+      <ProblemSheet problem={problem} onPick={pickProblem} onClose={() => setProblem(null)} />
       {step === 'phrase' && (
         <>
           <Note>Experimental: this vault has not yet been run on a live network or a real phone. Use test coins only.</Note>

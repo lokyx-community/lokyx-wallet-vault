@@ -62,9 +62,10 @@ export default function AppsWallet() {
       </Screen>
     );
 
+  const heldLogos = [...new Set((held.data ?? []).map((h) => logoFor(h.symbol)).filter((x): x is NonNullable<typeof x> => !!x))];
   return (
     <Screen title="Apps wallet" large>
-      <AppsCard />
+      <AppsCard held={heldLogos} />
       {held.data && held.data.length > 0 ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
           <T v="caption" dim>Holds</T>

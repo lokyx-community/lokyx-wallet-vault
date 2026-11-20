@@ -47,7 +47,7 @@ export default function AppsMade() {
   useEffect(() => {
     if (still) return;
     t.value = withTiming(END, { duration: LENGTH, easing: Easing.linear });
-    // a light tap as each coin lands, and a soft one when the card says it has three coins
+    // a light tap as each coin lands, and a soft one when the card says it is ready
     const at = [0.4, 0.47, 0.54, 0.68].map((p) => (p / END) * LENGTH);
     const ids = at.map((ms, i) => setTimeout(() => (i < 3 ? Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light) : Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)).catch(() => {}), ms));
     return () => ids.forEach(clearTimeout);
@@ -109,7 +109,7 @@ export default function AppsMade() {
             <Animated.View style={[{ width: CARD_W, height: CARD_H }, deal]}>
               <AppsCardArt anim={{ eng, spec, coins: [c0, c1, c2] }} />
               <Animated.Text style={[{ position: 'absolute', left: 22, top: 100, fontFamily: F.regular, fontSize: 15, color: 'rgba(245,245,247,0.55)' }, hint]}>Any coin, on any network</Animated.Text>
-              <Animated.Text style={[{ position: 'absolute', left: 22, top: 100, fontFamily: F.medium, fontSize: 20, letterSpacing: -0.3, color: '#F5F5F7' }, cnt]}>3 coins inside</Animated.Text>
+              <Animated.Text style={[{ position: 'absolute', left: 22, top: 100, fontFamily: F.medium, fontSize: 20, letterSpacing: -0.3, color: '#F5F5F7' }, cnt]}>Room for any coin</Animated.Text>
               <Animated.View style={[{ position: 'absolute', right: 22, top: 98, width: 30, height: 30, borderRadius: 15, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }, badge]}>
                 <Icon name="check" size={17} color="#000" width={2.8} />
               </Animated.View>

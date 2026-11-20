@@ -2,10 +2,11 @@ import { useEffect } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { AppsCardArt, CARD_H, CARD_W } from './AppsCardArt';
+import type { LogoId } from './logos';
 import { DUR, EASE_OUT } from './motion';
 
 /** The Apps wallet card on its own screen: the finished card, rising gently into place each time the screen opens. */
-export function AppsCard() {
+export function AppsCard({ held }: { held?: readonly LogoId[] }) {
   const { width } = useWindowDimensions();
   const still = useReducedMotion();
   const k = Math.min(1, (width - 40) / CARD_W);
@@ -17,7 +18,7 @@ export function AppsCard() {
   return (
     <Animated.View style={[{ width: CARD_W * k, height: CARD_H * k, alignSelf: 'center' }, style]}>
       <View style={{ width: CARD_W, height: CARD_H, transform: [{ scale: k }], transformOrigin: 'top left', shadowColor: '#000', shadowOpacity: 0.75, shadowRadius: 22, shadowOffset: { width: 0, height: 20 }, elevation: 14 }}>
-        <AppsCardArt />
+        <AppsCardArt coinsShown={held ?? []} />
       </View>
     </Animated.View>
   );

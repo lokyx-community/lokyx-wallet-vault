@@ -7,6 +7,7 @@ import { Button, ErrorText, Group, Note, Screen } from '../../ui/controls';
 import { Keypad, typeAmount } from '../../ui/Keypad';
 import { LeadRow } from '../../ui/LeadRow';
 import { CoinMark } from '../../ui/CoinMark';
+import { CoinDrop } from '../../ui/CoinDrop';
 import { LogoChips, VAULT_MARK } from '../../ui/LogoChips';
 import { Icon } from '../../ui/Icon';
 import { SlideToPay } from '../../ui/SlideToPay';
@@ -102,7 +103,7 @@ export default function Refill() {
   if (done)
     return (
       <Screen title="Add money">
-        <Note>{done}</Note>
+        <CoinDrop symbol={unit} amount={amount} note={done} />
         <Button title="Back to Apps wallet" onPress={() => router.replace('/apps-wallet')} />
       </Screen>
     );

@@ -468,6 +468,16 @@ export function creationCalls(plan: VaultPlan, d: Deployment = deploymentOf(), g
   ];
 }
 
+/**
+ * The creation calls, each with the address it will create. A retry after a half-finished setup can then skip every step
+ * whose address already has code, not just the first: deploying a module twice at the same address reverts.
+ */
+export function creationSteps(plan: VaultPlan, d: Deployment = deploymentOf(), gated = true): (Call & { target: Hex })[] {
+  const a = vaultAddresses(plan, d);
+  const targets: Hex[] = [a.safe, a.delay, a.roles, ...(gated ? [a.gate] : [])];
+  return creationCalls(plan, d, gated).map((c, i) => ({ ...c, target: targets[i] }));
+}
+
 // ---------- everyday use: spend, queue, execute, cancel ----------
 
 /** Typed-data for the Allowance Module's delegate signature (its domain has no name or version). */

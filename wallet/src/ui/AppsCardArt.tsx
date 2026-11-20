@@ -5,6 +5,7 @@ import Animated, { type AnimatedStyle } from 'react-native-reanimated';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { T } from './Text';
 import { Logo } from './Logo';
+import type { LogoId } from './logos';
 import { F } from './theme';
 
 /** The card is drawn at one size and scaled to the screen, so every gap stays as designed. */
@@ -12,10 +13,11 @@ export const CARD_W = 350;
 export const CARD_H = 221;
 const GOLD = '#C9A057';
 const SLOT_X = [22, 70, 118];
-const COINS = ['eth', 'usdt', 'usdc'] as const;
+/** The coins that drop into the slots during the making animation. A card that is simply shown holds only what the wallet really holds. */
+const DEMO_COINS: readonly LogoId[] = ['eth', 'usdt', 'usdc'];
 
 type S = StyleProp<AnimatedStyle<StyleProp<ViewStyle>>>;
-/** Optional animated styles. Without them the card is simply shown finished: engraved, three coins inside. */
+/** Optional animated styles. Without them the card is simply shown finished: engraved, with a coin in a slot only for each coin held. */
 export interface CardAnim {
   eng?: S;
   spec?: S;
@@ -26,7 +28,8 @@ export interface CardAnim {
  * The Apps wallet card: satin-black metal with a hairline gold edge, a gold chip, three engraved slots for
  * coins and concentric globe lines. It carries no balance, because the wallet holds every chain.
  */
-export function AppsCardArt({ anim }: { anim?: CardAnim }) {
+export function AppsCardArt({ anim, coinsShown }: { anim?: CardAnim; coinsShown?: readonly LogoId[] }) {
+  const shown = (coinsShown ?? (anim ? DEMO_COINS : [])).slice(0, 3);
   const id = 'c' + useId().replace(/[^a-zA-Z0-9]/g, '');
   return (
     <View style={{ width: CARD_W, height: CARD_H }}>
@@ -107,7 +110,7 @@ export function AppsCardArt({ anim }: { anim?: CardAnim }) {
           </Animated.View>
         </View>
       </View>
-      {COINS.map((c, i) => (
+      {shown.map((c, i) => (
         <Animated.View key={c} style={[{ position: 'absolute', left: SLOT_X[i] + 3, top: 161, width: 34, height: 34, borderRadius: 17, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }, anim?.coins?.[i]]}>
           <Logo id={c} size={34} />
         </Animated.View>

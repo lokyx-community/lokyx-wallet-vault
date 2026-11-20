@@ -26,7 +26,7 @@ import {
   allowanceData,
   allowanceSpend,
   checkSettings,
-  creationCalls,
+  creationSteps,
   deploymentOf,
   diffConfig,
   execTransactionData,
@@ -350,24 +350,24 @@ export async function createVault(p: {
   const missing = await checkDeployments(net);
   if (missing) throw new Error(missing);
   const d = deploymentOf();
-  const a = await ensureAddresses();
+  // the phone's key is read once for the whole setup: one fingerprint, not one per step. Its address comes from the key
+  // itself, so nothing else has to ask the phone first.
+  const phrase = await readPhrase();
+  if (!phrase) throw new Error("No recovery words on this phone");
+  const phoneKey = ethKey(phrase);
+  const phone = phoneKey.address as Hex;
   const plan = {
     recovery: p.recovery,
-    phone: a.eth as Hex,
+    phone,
     safeAddress: p.sweepTo,
   };
   const ad = vaultAddresses(plan, d);
   const fromBlock = Number(BigInt(await rpc<string>(net, "eth_blockNumber")));
-  // the phone's key is read once for the whole setup: one fingerprint, not one per transaction
-  const phrase = await readPhrase();
-  if (!phrase) throw new Error("No recovery words on this phone");
-  const phoneKey = ethKey(phrase);
   try {
     p.onStep?.("deploying");
-    for (const c of creationCalls(plan, d)) {
-      // already deployed here (a retry, or created before)? skip it
-      const target = c.to === d.safeProxyFactory ? ad.safe : undefined;
-      if (target && (await reader(net).code(target)) !== "0x") continue;
+    for (const c of creationSteps(plan, d)) {
+      // already deployed here (a retry after a half-finished setup, or created before)? skip it, whichever step it is
+      if ((await reader(net).code(c.target)) !== "0x") continue;
       await waitReceipt(
         net,
         await phoneSend(net, c.to, c.data ?? "0x", 0n, phoneKey.sk),
@@ -420,8 +420,14 @@ export async function createVault(p: {
       amount: t.amount.toString(),
     })),
   };
-  const issues = await checkLive(v);
-  const danger = issues.filter((i) => i.level === "danger");
+  // A public node can answer from a block or two behind the one that just confirmed, which would look like a wrong
+  // setting. Look again a few times, a few seconds apart, before calling anything wrong.
+  let danger: Issue[] = [];
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt) await new Promise((res) => setTimeout(res, 3000));
+    danger = (await checkLive(v)).filter((i) => i.level === "danger");
+    if (!danger.length) break;
+  }
   if (danger.length)
     throw new Error(
       `The vault was created but does not look right: ${danger[0].text}. Do not put money in it.`,
