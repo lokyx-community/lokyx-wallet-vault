@@ -15,39 +15,30 @@ export function PortfolioCard({ p, cur, width, height, hide }: { p: Portfolio; c
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
   const narrow = width < 300;
   return (
-    <View style={{ width, height, borderRadius: 34, backgroundColor: '#0B0B14', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 20, shadowOffset: { width: 0, height: 12 }, elevation: 10 }}>
-      {/* a quiet foil: violet, teal and bronze light on near-black, with a soft fall of white from the top left */}
+    <View style={{ width, height, borderRadius: 34, backgroundColor: 'rgba(22,22,28,0.6)', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 20, shadowOffset: { width: 0, height: 12 }, elevation: 8 }}>
+      {/* frosted glass: a soft fall of white from the top left, a hairline light edge */}
       <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
         <Defs>
-          <RadialGradient id={`v${id}`} cx="0.25" cy="0.2" rx="0.8" ry="0.7">
-            <Stop offset="0" stopColor="#3B2A7A" stopOpacity="0.95" />
-            <Stop offset="1" stopColor="#3B2A7A" stopOpacity="0" />
-          </RadialGradient>
-          <RadialGradient id={`t${id}`} cx="0.85" cy="0.35" rx="0.7" ry="0.6">
-            <Stop offset="0" stopColor="#0E5A66" stopOpacity="0.9" />
-            <Stop offset="1" stopColor="#0E5A66" stopOpacity="0" />
-          </RadialGradient>
-          <RadialGradient id={`b${id}`} cx="0.6" cy="1" rx="0.8" ry="0.55">
-            <Stop offset="0" stopColor="#6B3D1E" stopOpacity="0.85" />
-            <Stop offset="1" stopColor="#6B3D1E" stopOpacity="0" />
-          </RadialGradient>
-          <LinearGradient id={`h${id}`} x1="0" y1="0" x2="0.55" y2="1">
-            <Stop offset="0" stopColor="#fff" stopOpacity="0.22" />
-            <Stop offset="0.55" stopColor="#fff" stopOpacity="0.03" />
-            <Stop offset="1" stopColor="#fff" stopOpacity="0" />
+          <LinearGradient id={`h${id}`} x1="0" y1="0" x2="0.7" y2="1">
+            <Stop offset="0" stopColor="#fff" stopOpacity="0.2" />
+            <Stop offset="0.5" stopColor="#fff" stopOpacity="0.05" />
+            <Stop offset="1" stopColor="#fff" stopOpacity="0.08" />
           </LinearGradient>
+          <RadialGradient id={`r${id}`} cx="0.9" cy="0.15" rx="0.7" ry="0.6">
+            <Stop offset="0" stopColor="#fff" stopOpacity="0.14" />
+            <Stop offset="1" stopColor="#fff" stopOpacity="0" />
+          </RadialGradient>
         </Defs>
-        <Rect width={width} height={height} fill={`url(#v${id})`} />
-        <Rect width={width} height={height} fill={`url(#t${id})`} />
-        <Rect width={width} height={height} fill={`url(#b${id})`} />
         <Rect width={width} height={height} fill={`url(#h${id})`} />
+        <Rect width={width} height={height} fill={`url(#r${id})`} />
+        <Rect x={0.5} y={0.5} width={width - 1} height={height - 1} rx={33.5} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth={1} />
       </Svg>
       <View style={{ position: 'absolute', left: 22, top: 22 }}>
         <T style={{ fontFamily: F.semibold, fontSize: 16, letterSpacing: -0.2, color: '#fff' }}>All coins</T>
-        <T style={{ fontSize: 10, letterSpacing: 1.8, color: 'rgba(255,255,255,0.72)', marginTop: 1 }}>PORTFOLIO</T>
+        <T style={{ fontSize: 10, letterSpacing: 1.8, color: 'rgba(255,255,255,0.6)', marginTop: 1 }}>PORTFOLIO</T>
       </View>
       <View style={{ position: 'absolute', left: 22, right: 18, bottom: 22, gap: 2 }}>
-        <T style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Total balance</T>
+        <T style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)' }}>Total balance</T>
         <T numberOfLines={1} adjustsFontSizeToFit style={{ fontFamily: F.medium, fontSize: narrow ? 31 : 40, lineHeight: narrow ? 38 : 48, letterSpacing: narrow ? -1.3 : -1.8, color: '#fff' }}>{hide ? '••••' : money(p.total, cur)}</T>
         {!hide ? <T style={{ fontFamily: F.medium, fontSize: 12.5, color: up(p) ? '#7BF0B8' : '#FF9A9A' }}>{changeText(p.change, p.pct, cur)}</T> : null}
       </View>
@@ -81,4 +72,38 @@ export function CoinsRow({ p, cur, hide, onPress }: { p: Portfolio; cur: Currenc
 
 export function LineLogo({ l, size }: { l: Line; size: number }) {
   return l.logo ? <Logo id={l.logo} size={size} /> : <TokenLogo symbol={l.symbol} seed={l.id} size={size} />;
+}
+
+const trimAmt = (n: number) => (n >= 1000 ? n.toFixed(2) : n >= 1 ? n.toFixed(3) : n.toFixed(4)).replace(/\.?0+$/, '');
+
+/** The Assets panel under the buttons on Home: each coin with its amount, its value and today's change. */
+export function AssetsPanel({ p, cur, hide, onSeeAll, onCoin }: { p: Portfolio; cur: Currency; hide: boolean; onSeeAll: () => void; onCoin?: (l: Line) => void }) {
+  const lines = [...p.lines].sort((a, b) => b.value - a.value).slice(0, 5);
+  if (!lines.length) return null;
+  return (
+    <View style={{ marginTop: 20, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 6 }}>
+        <T style={{ fontFamily: F.semibold, fontSize: 20, letterSpacing: -0.3 }}>Assets</T>
+        <Press onPress={onSeeAll} haptic={false} accessibilityLabel="See all coins" hitSlop={10}>
+          <T style={{ fontFamily: F.medium, fontSize: 14, color: C.sub }}>See all</T>
+        </Press>
+      </View>
+      {lines.map((l, i) => {
+        const gain = l.pct >= 0;
+        return (
+          <Press key={l.id + l.symbol} onPress={() => onCoin?.(l)} disabled={!onCoin} haptic={false} scaleTo={0.985} accessibilityLabel={l.name} style={{ flexDirection: 'row', alignItems: 'center', gap: 13, minHeight: 62, borderTopWidth: i ? 0.5 : 0, borderTopColor: 'rgba(255,255,255,0.08)' }}>
+            <LineLogo l={l} size={40} />
+            <View style={{ flex: 1, gap: 1 }}>
+              <T style={{ fontFamily: F.medium, fontSize: 16.5 }} numberOfLines={1}>{l.name}</T>
+              <T v="caption" dim>{hide ? '•••' : `${trimAmt(l.amount)} ${l.symbol}`}</T>
+            </View>
+            <View style={{ alignItems: 'flex-end', gap: 1 }}>
+              <T style={{ fontFamily: F.medium, fontSize: 16.5, fontVariant: ['tabular-nums'] }}>{hide ? '••••' : money(l.value, cur)}</T>
+              {!hide ? <T style={{ fontFamily: F.medium, fontSize: 12.5, color: gain ? C.good : C.bad }}>{`${gain ? '+' : '−'}${Math.abs(l.pct).toFixed(1)}%`}</T> : null}
+            </View>
+          </Press>
+        );
+      })}
+    </View>
+  );
 }

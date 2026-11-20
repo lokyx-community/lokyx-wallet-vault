@@ -45,7 +45,7 @@ import { useCoins } from "../../lib/coins";
 import { useArrivals } from "../../ui/useArrivals";
 import { usePortfolio } from "../../lib/prices";
 import { changeText, money } from "../../lib/prices-core";
-import { CoinsRow, PortfolioCard } from "../../ui/PortfolioBits";
+import { AssetsPanel, PortfolioCard } from "../../ui/PortfolioBits";
 import {
   activeNets,
   btcHistory,
@@ -398,17 +398,6 @@ export default function Home() {
           </View>
         </View>
 
-        {port ? (
-          <Press onPress={() => router.push("/portfolio")} haptic={false} accessibilityLabel="Portfolio" style={{ paddingHorizontal: 6, paddingTop: 4, gap: 2 }}>
-            <T style={{ fontFamily: F.semibold, fontSize: 26, letterSpacing: -0.8 }}>{hide ? "••••" : money(port.total, cur)}</T>
-            {!hide ? (
-              <T style={{ fontFamily: F.medium, fontSize: 13, color: port.change >= 0 ? C.good : C.bad }}>
-                {changeText(port.change, port.pct, cur)}
-                <T style={{ fontSize: 13, color: C.sub }}>{"  ·  LOKYX not counted"}</T>
-              </T>
-            ) : null}
-          </Press>
-        ) : null}
         <Animated.View style={[{ marginTop: 6, zIndex: 2 }, cardDepth]}>
           <CardCarousel
             width={tallW}
@@ -434,7 +423,7 @@ export default function Home() {
             { icon: "swap", label: "Swap", onPress: () => router.push("/swap") },
           ]}
         />
-        {port ? <CoinsRow p={port} cur={cur} hide={hide} onPress={() => router.push("/portfolio")} /> : null}
+        {port ? <AssetsPanel p={port} cur={cur} hide={hide} onSeeAll={() => router.push("/portfolio")} /> : null}
 
         {chainError ? (
           <Animated.View
