@@ -95,8 +95,7 @@ export default function VaultFirst() {
   const [pick, setPick] = useState<Id>('vault');
   const go = async () => {
     await doneVaultFirst();
-    router.replace('/');
-    if (pick === 'vault') setTimeout(() => router.push('/ethvault/setup'), 60);
+    router.replace(`/making?vault=${pick === 'vault' ? 1 : 0}` as never);
   };
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top + 18, paddingBottom: insets.bottom + 20, paddingHorizontal: 22, gap: 22 }}>

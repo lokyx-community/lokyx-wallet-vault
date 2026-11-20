@@ -386,6 +386,12 @@ export default function Home() {
           ]}
         />
         {port ? <AssetsPanel p={port} cur={cur} hide={hide} onSeeAll={() => router.push("/portfolio")} /> : null}
+        {port && port.total === 0 ? (
+          <Press onPress={() => router.push(`/receive?coin=${actId}`)} haptic={false} scaleTo={0.985} accessibilityLabel="Get started" style={{ marginTop: 20, borderRadius: 28, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.12)", padding: 20, gap: 4 }}>
+            <T style={{ fontFamily: F.semibold, fontSize: 18, letterSpacing: -0.3 }}>Get started</T>
+            <T v="caption" dim>Tap Receive to add your first coins.</T>
+          </Press>
+        ) : null}
         <Press onPress={() => setAdd(true)} haptic={false} accessibilityLabel="Add a blockchain" style={{ alignItems: "center", paddingTop: 16 }}>
           <T style={{ fontFamily: F.medium, fontSize: 14, color: C.sub }}>+ Add a blockchain</T>
         </Press>

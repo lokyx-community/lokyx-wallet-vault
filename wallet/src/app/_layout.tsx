@@ -116,6 +116,7 @@ function Gate() {
         <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
         <Stack.Screen name="unlock" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="secure" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="making" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="ring" options={{ presentation: 'fullScreenModal', animation: 'fade_from_bottom' }} />
         <Stack.Screen name="receive" options={{ presentation: 'fullScreenModal', animation: 'fade_from_bottom' }} />
         <Stack.Screen name="coins" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
