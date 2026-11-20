@@ -66,3 +66,17 @@ jobs:
         with:
           name: slither
           path: wallet/contracts/evm/slither.json
+
+  mutation:
+    name: BNB market (mutation check)
+    runs-on: ubuntu-latest
+    needs: bnb
+    defaults:
+      run:
+        working-directory: wallet/contracts/evm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: git clone --depth 1 https://github.com/foundry-rs/forge-std lib/forge-std
+      # Plants one deliberate bug at a time and checks that some test fails. A mutant that survives is a gap in the tests.
+      - run: python3 script/mutate.py

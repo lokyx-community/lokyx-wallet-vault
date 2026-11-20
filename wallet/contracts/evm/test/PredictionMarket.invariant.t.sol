@@ -16,7 +16,10 @@ contract Handler is Test {
     address[] public panel;
     uint256 public clock = 1_000_000;
     uint256 public closeAt;
-    uint256 public constant MARKETS = 2;
+    uint256 public constant MARKETS = 3;
+    uint256 public steps; // settling waits until the market has seen real trading
+    uint256 public constant WARMUP = 40;
+    uint256 public evictions;
     uint256 public deposited;
     uint256 public withdrawn;
     // coverage counters: printed after each run so a green result can be checked to have reached the hard cases
@@ -44,6 +47,7 @@ contract Handler is Test {
     function _actor(uint256 s) internal view returns (address) { return actors[s % actors.length]; }
 
     function deposit(uint256 s, uint256 amt) external {
+        steps++;
         address a = _actor(s);
         amt = bound(amt, 1, 500e18);
         usdt.mint(a, amt);
@@ -55,6 +59,7 @@ contract Handler is Test {
     }
 
     function withdraw(uint256 s, uint256 amt) external {
+        steps++;
         address a = _actor(s);
         uint256 f = pm.free(a);
         if (f == 0) return;
@@ -65,6 +70,7 @@ contract Handler is Test {
     }
 
     function place(uint256 s, uint256 mid, uint8 outcome, uint8 side, uint8 price, uint64 qty) external {
+        steps++;
         address a = _actor(s);
         mid = mid % MARKETS;
         outcome = outcome % 2;
@@ -77,6 +83,7 @@ contract Handler is Test {
     }
 
     function cancel(uint256 s, uint256 mid) external {
+        steps++;
         mid = mid % MARKETS;
         (uint64[] memory ids, address[] memory owners, , , , ) = pm.book(mid);
         if (ids.length == 0) return;
@@ -105,6 +112,7 @@ contract Handler is Test {
 
     /// Fills a book with waiting bids at the lowest price so the next better order has to push one out.
     function flood(uint256 s, uint256 mid) external {
+        steps++;
         address a = _actor(s);
         mid = mid % MARKETS;
         _fund(a, 100e18);
@@ -114,14 +122,41 @@ contract Handler is Test {
         }
     }
 
+    /// Floods a book, then places a better-priced bid: the full book must make room by pushing the worst bid out.
+    function evict(uint256 s, uint256 mid) external {
+        steps++;
+        mid = mid % MARKETS;
+        (, , , , PredictionMarket.State st, , , , ) = pm.info(mid);
+        if (st != PredictionMarket.State.Open || clock >= closeAt) return;
+        address a = _actor(s);
+        _fund(a, 200e18);
+        for (uint256 i = _len(mid); i < pm.MAX_ORDERS(); i++) {
+            vm.prank(a);
+            try pm.place(mid, 0, 0, 1, 1) {} catch { break; }
+        }
+        if (_len(mid) < pm.MAX_ORDERS()) return;
+        address b = actors[(s + 1) % actors.length];
+        _fund(b, 10e18);
+        vm.prank(b);
+        try pm.place(mid, 0, 0, 2, 1) {
+            evictions++;
+            assertEq(_len(mid), pm.MAX_ORDERS(), "a full book stays at its cap after an eviction");
+        } catch {}
+    }
+
     /// The market closes and is settled by one of four routes: nobody answers (expiry), an answer nobody disputes,
     /// a dispute the panel decides (with votes that change on the way), or a dispute the panel never decides.
-    function settle(uint256 mid, uint8 v, uint8 route) external {
+    function settleNoAnswer(uint256 mid) external { _settle(mid, 0, 0); }
+    function settleQuiet(uint256 mid, uint8 v) external { _settle(mid, v, 1); }
+    function settlePanel(uint256 mid, uint8 v) external { _settle(mid, v, 2); }
+    function settleStuck(uint256 mid, uint8 v) external { _settle(mid, v, 3); }
+
+    function _settle(uint256 mid, uint8 v, uint8 route) internal {
+        if (steps < WARMUP) return;
         mid = mid % MARKETS;
         (, , , uint256 unit, PredictionMarket.State st, , , , ) = pm.info(mid);
         if (st != PredictionMarket.State.Open) return;
         if (clock < closeAt) { clock = closeAt; vm.warp(clock); }
-        route = route % 4;
         if (route == 0) {
             clock += 30 days; vm.warp(clock);
             try pm.expire(mid) { expiredNoAnswer++; } catch {}
@@ -154,6 +189,7 @@ contract Handler is Test {
     }
 
     function claim(uint256 s, uint256 mid) external {
+        steps++;
         vm.prank(_actor(s));
         try pm.claim(mid % MARKETS) { claims++; } catch {}
     }
@@ -187,17 +223,29 @@ contract InvariantTest is StdInvariant, Test {
         pm = new PredictionMarket(address(usdt));
         h = new Handler(pm, usdt);
         targetContract(address(h));
-        bytes4[] memory sel = new bytes4[](10);
+        bytes4[] memory sel = new bytes4[](22);
         sel[0] = Handler.deposit.selector;
-        sel[1] = Handler.withdraw.selector;
-        sel[2] = Handler.place.selector;
-        sel[3] = Handler.cancel.selector;
-        sel[4] = Handler.settle.selector;
-        sel[5] = Handler.claim.selector;
-        sel[6] = Handler.flood.selector;
-        sel[7] = Handler.place.selector; // trading is weighted 3x so settling doesn't end the run too early
+        sel[1] = Handler.deposit.selector;
+        sel[2] = Handler.withdraw.selector;
+        sel[3] = Handler.place.selector;
+        sel[4] = Handler.place.selector;
+        sel[5] = Handler.place.selector;
+        sel[6] = Handler.place.selector;
+        sel[7] = Handler.place.selector;
         sel[8] = Handler.place.selector;
-        sel[9] = Handler.deposit.selector;
+        sel[9] = Handler.cancel.selector;
+        sel[10] = Handler.claim.selector;
+        sel[11] = Handler.flood.selector;
+        sel[12] = Handler.evict.selector;
+        sel[13] = Handler.evict.selector;
+        sel[14] = Handler.settleNoAnswer.selector;
+        sel[15] = Handler.settleQuiet.selector;
+        sel[16] = Handler.settleQuiet.selector;
+        sel[17] = Handler.settlePanel.selector;
+        sel[18] = Handler.settlePanel.selector;
+        sel[19] = Handler.settleStuck.selector;
+        sel[20] = Handler.claim.selector;
+        sel[21] = Handler.cancel.selector;
         targetSelector(FuzzSelector({ addr: address(h), selectors: sel }));
     }
 
@@ -265,6 +313,7 @@ contract InvariantTest is StdInvariant, Test {
     function afterInvariant() public view {
         console.log("trades", h.trades());
         console.log("fullBookPlaces", h.fullBookPlaces());
+        console.log("evictions", h.evictions());
         console.log("cancels", h.cancels());
         console.log("proposals", h.proposals());
         console.log("disputes", h.disputes());
