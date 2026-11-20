@@ -8,6 +8,8 @@ import { T } from '../../ui/Text';
 import { Icon, type IconName } from '../../ui/Icon';
 import { IconButton, Press, success } from '../../ui/controls';
 import { NeonCard } from '../../ui/NeonCard';
+import { PriceGraph } from '../../ui/PriceGraph';
+import { useCurrency } from '../../lib/prices';
 import { Logo } from '../../ui/Logo';
 import { TokenLogo } from '../../ui/CoinLogo';
 import { Qr } from '../../ui/Qr';
@@ -47,6 +49,7 @@ export default function XCoinScreen() {
   const insets = useSafeAreaInsets();
   const { width: sw } = useWindowDimensions();
   const cw = Math.min(sw - 32, 420);
+  const [cur] = useCurrency();
   const hide = useWallet().settings.hideBalance;
   useChainSettings();
   const nets = activeNets();
@@ -121,6 +124,12 @@ export default function XCoinScreen() {
           />
         </View>
 
+        {c.address ? (
+          <View style={{ paddingTop: 22 }}>
+            <PriceGraph coinId={isSol ? 'solana' : 'tron'} cur={cur} width={cw - 8} />
+          </View>
+        ) : null}
+
         {!c.address ? (
           <View style={{ paddingTop: 26, gap: 12, paddingHorizontal: 6 }}>
             <T v="sub" dim style={{ lineHeight: 21 }}>{`Your ${c.title} address comes from the same 24 words, so nothing new to write down. The phone asks for your fingerprint once to make it.`}</T>
@@ -139,7 +148,7 @@ export default function XCoinScreen() {
 
             <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
               <View style={{ flex: 1 }}><Head title={`TOKENS ON ${c.title.toUpperCase()}`} /></View>
-              <Press onPress={() => router.push(`/add-token?chain=${chain}`)} style={{ paddingBottom: 8, paddingHorizontal: 6 }}><T style={{ fontFamily: F.semibold, fontSize: 14, color: C.text }}>Add a token</T></Press>
+              <Press onPress={() => router.push(`/add-token?chain=${chain}`)} style={{ paddingBottom: 8, paddingHorizontal: 6 }}><T style={{ fontFamily: F.semibold, fontSize: 14, color: C.text }}>+ Add token</T></Press>
             </View>
             {coins.xTokens[chain].length ? (
               coins.xTokens[chain].map((t) => (

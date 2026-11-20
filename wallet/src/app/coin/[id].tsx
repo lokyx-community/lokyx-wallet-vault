@@ -27,6 +27,9 @@ import { shortAddr, niceLyx, timeAgo } from '../../lib/format';
 import { toast } from '../../ui/Toast';
 import { useCoins, type CoinId } from '../../lib/coins';
 import { DUR, EASE_OUT } from '../../ui/motion';
+import { PriceGraph } from '../../ui/PriceGraph';
+import { useCurrency } from '../../lib/prices';
+import { PRICED } from '../../lib/prices-core';
 
 function Action({ icon, label, onPress, solid }: { icon: IconName; label: string; onPress: () => void; solid?: boolean }) {
   return (
@@ -114,6 +117,9 @@ export default function CoinScreen() {
     note: card.tag && card.tag !== 'Tap to open' ? 'Testnet · no market value' : coin === 'lyx' ? 'Testnet · no market value' : '',
     mark: coin === 'lyx' ? { kind: 'lyx' } : tok && !tok.logo ? { kind: 'token', symbol: tok.symbol, seed: tok.contract } : { kind: 'logo', id: (tok?.logo ?? (coin === 'btc' ? 'btc' : (coins.eth.logo as LogoId))) as LogoId },
   };
+  const [cur] = useCurrency();
+  // the market id for the graph; LOKYX and unlisted tokens have none
+  const marketId = tok ? PRICED[tok.symbol.toUpperCase()]?.id : coin === 'btc' ? 'bitcoin' : coin === 'eth' ? PRICED[card.unit.toUpperCase()]?.id ?? 'ethereum' : undefined;
   const hist = usePoll<History>('lyx_getAddressHistory', coin === 'lyx' && address ? { address, limit: 20 } : null, 8000);
   const pend = usePending();
   const contractsOn = useContractsOn();
@@ -170,7 +176,15 @@ export default function CoinScreen() {
           <NeonCard c={neon} width={cw} hide={hide} />
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(70).duration(DUR.slow).easing(EASE_OUT)} style={{ flexDirection: 'row', paddingTop: 24 }}>
+        <Animated.View entering={FadeInDown.delay(40).duration(DUR.slow).easing(EASE_OUT)} style={{ marginTop: 22 }}>
+          {marketId ? (
+            <PriceGraph coinId={marketId} cur={cur} width={cw - 8} />
+          ) : (
+            <T v="sub" dim style={{ textAlign: 'center', paddingVertical: 14 }}>{coin === 'lyx' ? 'LOKYX is a test coin. It has no market price yet.' : 'No market price for this token'}</T>
+          )}
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(110).duration(DUR.slow).easing(EASE_OUT)} style={{ flexDirection: 'row', paddingTop: 24 }}>
           <Action icon="receive" label="Receive" solid onPress={receive} />
           <Action icon="send" label="Send" onPress={send} />
           {!tok && <Action icon="swap" label="Swap" onPress={() => router.push('/swap')} />}
@@ -193,7 +207,6 @@ export default function CoinScreen() {
           {coin === 'eth' && !tok && (
             <Panel>
               <Row icon="lock" title="Vault protection" sub="Experimental · test ETH only" onPress={() => router.push('/ethvault')} />
-              <Row icon="plus" title="Add a token" sub="Paste a contract address" onPress={() => router.push('/coins')} />
             </Panel>
           )}
           {coin === 'lyx' && contractsOn && tokens.length > 0 && (
@@ -202,6 +215,32 @@ export default function CoinScreen() {
             </Panel>
           )}
         </View>
+
+        {!tok && (coin === 'eth' || (coin === 'lyx' && contractsOn)) ? (
+          <>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 26, paddingBottom: 10, paddingHorizontal: 6 }}>
+              <T style={{ fontFamily: F.semibold, fontSize: 12, letterSpacing: 1.6, color: C.sub }}>TOKENS</T>
+              <Press onPress={() => router.push(`/add-token?chain=${coin}`)} accessibilityLabel="Add token" scaleTo={0.95} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 32, paddingHorizontal: 14, borderRadius: 16, backgroundColor: C.ink }}>
+                <Icon name="plus" size={14} color={C.inkText} width={2.4} />
+                <T style={{ fontFamily: F.semibold, fontSize: 13, color: C.inkText }}>Add token</T>
+              </Press>
+            </View>
+            {coin === 'eth' ? (
+              <Panel>
+                {coins.tokens.length ? coins.tokens.map((t) => (
+                  <Press key={t.contract} haptic={false} scaleTo={0.985} onPress={() => router.push(`/coin/${t.contract}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 }}>
+                    {t.logo ? <Logo id={t.logo as LogoId} size={34} /> : <TokenLogo symbol={t.symbol} seed={t.contract} size={34} />}
+                    <View style={{ flex: 1 }}>
+                      <T style={{ fontFamily: F.medium, fontSize: 15.5 }}>{t.name}</T>
+                      <T v="caption" dim>{t.symbol}</T>
+                    </View>
+                    <T style={{ fontFamily: F.medium, fontSize: 15.5, fontVariant: ['tabular-nums'] }}>{hide ? '•••' : t.balance}</T>
+                  </Press>
+                )) : <T v="sub" dim style={{ paddingVertical: 18, textAlign: 'center' }}>No tokens yet. Add USDC, USDT or paste a contract.</T>}
+              </Panel>
+            ) : null}
+          </>
+        ) : null}
 
         <T style={{ fontFamily: F.semibold, fontSize: 12, letterSpacing: 1.6, color: C.sub, paddingTop: 26, paddingBottom: 10, paddingHorizontal: 6 }}>ACTIVITY</T>
         <Panel>

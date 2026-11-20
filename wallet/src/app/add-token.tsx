@@ -36,6 +36,8 @@ function Body() {
   const { chain: raw, address } = useLocalSearchParams<{ chain?: string; address?: string }>();
   useChainSettings();
   const [chain, setChain] = useState<TokenChain>(asChain(raw));
+  // opened from a chain's own page: the chain is fixed, tokens are added under it
+  const locked = !!raw && !address;
   const [text, setText] = useState('');
   const [found, setFound] = useState<Looked | null>(null);
   const [busy, setBusy] = useState(false);
@@ -85,10 +87,22 @@ function Body() {
 
   return (
     <Screen title="Add a token" large>
-      <T v="callout" dim>Pick the network, then choose a popular coin or paste the token's address.</T>
+      <T v="callout" dim>{locked ? "Choose a popular token or paste its address. It joins this chain's page." : "Pick the network, then choose a popular coin or paste the token's address."}</T>
       <View style={{ alignItems: 'center', gap: 10 }}>
-        <View style={{ flexDirection: 'row', gap: 10 }}>{TOKEN_CHAINS.map((c) => <Disc key={c} chain={c} on={c === chain} onPress={() => pick(c)} />)}</View>
-        <T v="caption" dim>{`${CHAIN_NAME[chain]} · ${netLabel(chain)}`}</T>
+        {locked ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' }}>
+            {chain === 'lyx' ? <CoinLogo chain="lyx" size={30} /> : <Logo id={chain} size={30} />}
+            <View>
+              <T style={{ fontFamily: F.semibold, fontSize: 11, letterSpacing: 2.4, color: C.sub }}>ON</T>
+              <T style={{ fontFamily: F.medium, fontSize: 15.5 }}>{`${CHAIN_NAME[chain]} · ${netLabel(chain)}`}</T>
+            </View>
+          </View>
+        ) : (
+          <>
+            <View style={{ flexDirection: 'row', gap: 10 }}>{TOKEN_CHAINS.map((c) => <Disc key={c} chain={c} on={c === chain} onPress={() => pick(c)} />)}</View>
+            <T v="caption" dim>{`${CHAIN_NAME[chain]} · ${netLabel(chain)}`}</T>
+          </>
+        )}
       </View>
 
       <View style={{ alignItems: 'center', minHeight: Math.round(WIDTH / 1.586) }}>
