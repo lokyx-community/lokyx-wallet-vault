@@ -71,7 +71,12 @@ export function useCoins(): Coins {
   const homeEth = cfg.allowMainnet ? 'mainnet' : 'sepolia';
   const homeEthBal = useAsync(async () => (ethAddr ? ethBalance(homeEth, ethAddr) : null), [ethAddr, homeEth], 30_000);
   const evmBal = useAsync(
-    async () => (ethAddr ? Promise.all(evmOn.map(async (f) => ({ f, v: await ethBalance(evmNet(f, cfg.allowMainnet), ethAddr).catch(() => null) }))) : []),
+    async () => {
+      if (!ethAddr) return [];
+      const r = await Promise.all(evmOn.map(async (f) => ({ f, v: await ethBalance(evmNet(f, cfg.allowMainnet), ethAddr).catch(() => null) })));
+      loaded.current.evmAddr = ethAddr;
+      return r;
+    },
     [ethAddr, evmOn.join(','), cfg.allowMainnet],
     30_000,
   );
@@ -112,6 +117,8 @@ export function useCoins(): Coins {
   if (ethAddr && ethBal.data != null && readFrom(loaded.current, 'eth', nets.eth)) raw[`eth:${nets.eth}:${ethAddr}`] = ethBal.data;
   if (solAddr && solBal.data != null && readFrom(loaded.current, 'sol', nets.sol)) raw[`sol:${nets.sol}:${solAddr}`] = solBal.data;
   if (trxAddr && trxBal.data != null && readFrom(loaded.current, 'trx', nets.trx)) raw[`trx:${nets.trx}:${trxAddr}`] = trxBal.data;
+  // BNB, Base and the other Ethereum-style coins on Home are watched too, so a payment into any of them flies in
+  if (ethAddr && loaded.current.evmAddr === ethAddr) for (const r of evmBal.data ?? []) if (r.v != null) raw[`eth:${evmNet(r.f, cfg.allowMainnet)}:${ethAddr}`] ??= r.v;
   for (const r of readFrom(loaded.current, 'erc20', nets.eth) ? tokBal.data ?? [] : []) if (r.v != null && ethAddr) raw[`erc20:${nets.eth}:${r.t.contract.toLowerCase()}`] = r.v;
   const rawKey = Object.entries(raw).map(([k, v]) => `${k}=${v}`).join('|');
 

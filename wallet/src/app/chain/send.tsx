@@ -19,7 +19,7 @@ import { confirmIt } from '../../lib/auth';
 import {
   activeNets, broadcastBtc, broadcastEth, btcBalance, btcRates, btcTxBlock, btcUtxos, ethFees, ethBalance, tokenBalance, ensureAddresses, ethTxBlock, knownDestinations, prepareBtc, prepareEth, rememberDestination, tokensFor, useChainSettings,
 } from '../../lib/multichain';
-import { BTC_NETS, ETH_NETS, KNOWN_TOKENS, btcAddressOk, describeBtc, describeEth, ethAddressOk, formatBtc, formatUnits, maxBtc, maxEth, parseBtc, parseUnits, tokenId, type Speed } from '../../lib/multichain-core';
+import { BTC_NETS, ETH_NETS, KNOWN_TOKENS, btcAddressOk, describeBtc, describeEth, ethAddressOk, formatBtc, evmOf, EVM_FAMILIES, formatUnits, maxBtc, maxEth, parseBtc, parseUnits, tokenId, type Speed } from '../../lib/multichain-core';
 import { ChainRing } from '../../ui/ChainRing';
 import { CoinLaunch } from '../../ui/CoinLaunch';
 import { Slip, shareSlip, useReveal } from '../../ui/Slip';
@@ -137,7 +137,7 @@ export default function ChainSend() {
       await notePendingFeed({ id: prep.kind === 'btc' ? `btc:${id}` : `eth:${nets.eth}:${id}`, coin: chain, kind: 'sent', time: 0, amount: amt.replace(/\.$/, ''), unit, failed: false, other: dest, net: isBtc ? BTC_NETS[nets.btc].label.replace('Bitcoin ', '') : ETH_NETS[nets.eth].short, url: isBtc ? `${BTC_NETS[nets.btc].esplora.replace(/\/api$/, '')}/tx/${id}` : `${ETH_NETS[nets.eth].explorer}/tx/${id}` });
       await gateRef.current?.commit();
       success();
-      flyCoin('out', chain === 'btc' ? 'btc' : 'eth');
+      flyCoin('out', chain === 'btc' ? 'btc' : (evmOf(nets.eth) ? EVM_FAMILIES[evmOf(nets.eth)!].logo : 'eth'));
       setTxid(id);
       setSentAt(Date.now());
       setStage('waiting');
