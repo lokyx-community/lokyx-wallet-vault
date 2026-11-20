@@ -18,7 +18,6 @@ import { ActionRow } from "../../ui/ActionRow";
 import { T } from "../../ui/Text";
 import { Icon } from "../../ui/Icon";
 import { Field, Press, success } from "../../ui/controls";
-import { MarkDraw } from "../../ui/Intro";
 import { NeonCard, type NeonData } from "../../ui/NeonCard";
 import { CardCarousel } from "../../ui/CardCarousel";
 import { EthNets, netName } from "../../ui/ChainGroup";
@@ -235,13 +234,18 @@ export default function Home() {
     y.value = e.contentOffset.y;
   });
   const cardDepth = useAnimatedStyle(() => ({
-    opacity: interpolate(y.value, [0, 220], [1, 0.55], "clamp"),
+    opacity: interpolate(y.value, [0, 200], [1, 0], "clamp"),
     transform: [
       { translateY: interpolate(y.value, [-160, 0, 220], [-8, 0, 46], "clamp") },
       { scale: interpolate(y.value, [-160, 0, 220], [1.05, 1, 0.92], "clamp") },
     ],
   }));
 
+  // scrolled up, the All coins card folds into a slim glass pill under the greeting
+  const pill = useAnimatedStyle(() => ({
+    opacity: interpolate(y.value, [120, 230], [0, 1], "clamp"),
+    transform: [{ translateY: interpolate(y.value, [120, 230], [-14, 0], "clamp") }],
+  }));
   const refresh = useCallback(async () => {
     setPulling(true);
     await Promise.all([hist.refresh(), refreshChain(), coins.refresh()]);
@@ -298,7 +302,8 @@ export default function Home() {
     ...coins.extra.map((x) => ({ id: x, c: { rim: x, title: coins[x].title, sub: coins[x].address ? coins[x].sub : "Tap to set up", balance: coins[x].address ? coins[x].balance : "—", unit: coins[x].unit, note: note(coins[x].tag || "t"), mark: { kind: "logo" as const, id: x } } })),
     ...coins.evm.map((x) => ({ id: `evm:${x.id}`, c: { rim: x.logo, title: x.name, sub: x.sub, balance: x.balance, unit: x.unit, note: note("t"), mark: { kind: "logo", id: x.logo } } as NeonData })),
   ];
-  const cardIds = port ? [...deck.map((d) => d.id), "portfolio"] : deck.map((d) => d.id);
+  const ordered = [...deck.filter((d) => d.id !== "lyx"), ...deck.filter((d) => d.id === "lyx")].map((d) => d.id);
+  const cardIds = port ? ["portfolio", ...ordered] : ordered;
   const frontKey = cardIds[Math.min(front, cardIds.length - 1)];
   // an added chain (Base, Arbitrum…) is the Ethereum screens pointed at that network
   const frontId = frontKey.startsWith("evm:") ? "eth" : frontKey;
@@ -331,69 +336,21 @@ export default function Home() {
         }
         showsVerticalScrollIndicator={false}
       >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            height: 52,
-            paddingHorizontal: 4,
-          }}
-        >
-          <Press
-            onPress={() => router.push("/accounts")}
-            accessibilityLabel="Switch account"
-            style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
-          >
-            <MarkDraw size={34} delay={250} />
-            <View>
-              <T v="caption" dim>
-                {greeting()}
-              </T>
-              <T
-                style={{
-                  fontFamily: F.semibold,
-                  fontSize: 17,
-                  letterSpacing: -0.3,
-                }}
-              >
-                {me?.name}
-              </T>
-            </View>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", height: 52, paddingHorizontal: 4 }}>
+          <Press onPress={() => router.push("/accounts")} accessibilityLabel="Switch account" haptic={false}>
+            <T style={{ fontFamily: F.regular, fontSize: 16.5, color: C.sub, letterSpacing: -0.2 }}>
+              {greeting()}, <T style={{ fontFamily: F.regular, fontSize: 16.5, color: C.text }}>{me?.name}</T>
+            </T>
           </Press>
           <View style={{ flexDirection: "row", gap: 8 }}>
-            <Press
-              onPress={() => router.push("/(tabs)/notifications")}
-              accessibilityLabel="Notifications"
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: "rgba(255,255,255,0.08)",
-                borderWidth: 0.5,
-                borderColor: "rgba(255,255,255,0.14)",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Icon name="bell" size={19} color={C.text} width={1.9} />
-              {unread > 0 ? <View style={{ position: "absolute", top: 8, right: 9, width: 9, height: 9, borderRadius: 5, backgroundColor: C.bad, borderWidth: 1.5, borderColor: C.bg }} /> : null}
-            </Press>
-            <Press
-              onPress={() => setAdd(true)}
-              accessibilityLabel="Add a blockchain"
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: "rgba(255,255,255,0.08)",
-                borderWidth: 0.5,
-                borderColor: "rgba(255,255,255,0.14)",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Icon name="plus" size={19} color={C.text} width={1.9} />
+            {unread > 0 ? (
+              <Press onPress={() => router.push("/(tabs)/notifications")} accessibilityLabel="Notifications" style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.14)", alignItems: "center", justifyContent: "center" }}>
+                <Icon name="bell" size={19} color={C.text} width={1.9} />
+                <View style={{ position: "absolute", top: 8, right: 9, width: 9, height: 9, borderRadius: 5, backgroundColor: C.bad, borderWidth: 1.5, borderColor: C.bg }} />
+              </Press>
+            ) : null}
+            <Press onPress={() => router.push("/ring?mode=scan")} accessibilityLabel="Scan" style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.14)", alignItems: "center", justifyContent: "center" }}>
+              <Icon name="scan" size={19} color={C.text} width={1.9} />
             </Press>
           </View>
         </View>
@@ -405,12 +362,17 @@ export default function Home() {
             index={front}
             onIndex={setFront}
             cards={[
-              ...deck.map((d) => (
+              ...(port ? [<Press key="portfolio" onPress={() => open("portfolio")} scaleTo={0.985} accessibilityLabel="Portfolio card"><PortfolioCard p={port} cur={cur} width={tallW} height={tallH} hide={hide} /></Press>] : []),
+              ...deck.filter((d) => d.id !== "lyx").map((d) => (
                 <Press key={d.id} onPress={() => open(d.id)} scaleTo={0.985} accessibilityLabel={`${d.c.title} card`}>
                   <NeonCard c={d.c} width={tallW} height={tallH} hide={hide} />
                 </Press>
               )),
-              ...(port ? [<Press key="portfolio" onPress={() => open("portfolio")} scaleTo={0.985} accessibilityLabel="Portfolio card"><PortfolioCard p={port} cur={cur} width={tallW} height={tallH} hide={hide} /></Press>] : []),
+              ...deck.filter((d) => d.id === "lyx").map((d) => (
+                <Press key={d.id} onPress={() => open(d.id)} scaleTo={0.985} accessibilityLabel={`${d.c.title} card`}>
+                  <NeonCard c={d.c} width={tallW} height={tallH} hide={hide} />
+                </Press>
+              )),
             ]}
           />
         </Animated.View>
@@ -424,6 +386,9 @@ export default function Home() {
           ]}
         />
         {port ? <AssetsPanel p={port} cur={cur} hide={hide} onSeeAll={() => router.push("/portfolio")} /> : null}
+        <Press onPress={() => setAdd(true)} haptic={false} accessibilityLabel="Add a blockchain" style={{ alignItems: "center", paddingTop: 16 }}>
+          <T style={{ fontFamily: F.medium, fontSize: 14, color: C.sub }}>+ Add a blockchain</T>
+        </Press>
 
         {chainError ? (
           <Animated.View
@@ -532,6 +497,15 @@ export default function Home() {
           )
         ) : null}
       </Animated.ScrollView>
+      {port ? (
+        <Animated.View pointerEvents="none" style={[{ position: "absolute", left: 16, right: 16, top: insets.top + 60, height: 64, borderRadius: 24, overflow: "hidden", backgroundColor: "rgba(34,34,42,0.82)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.22)", flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, zIndex: 5 }, pill]}>
+          <View>
+            <T style={{ fontFamily: F.semibold, fontSize: 15, color: "#fff" }}>All coins</T>
+            <T style={{ fontSize: 9.5, letterSpacing: 1.6, color: "rgba(255,255,255,0.6)" }}>{chainCfg.allowMainnet ? "MAIN" : "MAIN · TESTNET"}</T>
+          </View>
+          <T style={{ fontFamily: F.regular, fontSize: 28, letterSpacing: -0.8, color: "#fff", fontVariant: ["tabular-nums"] }}>{hide ? "••••" : money(port.total, cur)}</T>
+        </Animated.View>
+      ) : null}
       <Sheet open={add} onClose={() => setAdd(false)}>
         <View style={{ gap: 6 }}>
           <T v="headline">Add a blockchain</T>
