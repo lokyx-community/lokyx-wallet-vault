@@ -188,7 +188,7 @@ contract SecurityTest is Test {
     function test_fullBookRefusesAnOrderThatCannotTradeAtAll() public {
         _fillBook();
         vm.prank(b);
-        vm.expectRevert("the book is full of waiting orders");
+        vm.expectRevert("the book is full of better-priced orders");
         pm.place(0, 0, 0, 1, 1);
     }
 
