@@ -362,7 +362,7 @@ function Review({ to, amount, value, token, ask, onSent }: { to: string; amount:
             <T v="sub" dim style={{ flex: 1, lineHeight: 20 }}>First time you pay this address. Check the first and last letters with them.</T>
           </View>
         )}
-        <ErrorText>{err}</ErrorText>
+        <ErrorText title="Couldn't send" note="If you're not sure it went through, check Activity before trying again.">{err}</ErrorText>
         {busy && slow ? <T v="sub" color={C.wait} style={{ textAlign: 'center' }}>The LOKYX test network is slow to answer. Nothing has left your wallet yet. If this keeps going, go back and try again in a minute.</T> : null}
         <T v="caption" dim style={{ textAlign: 'center' }}>Payments can't be taken back.</T>
       </KeyboardScroll>

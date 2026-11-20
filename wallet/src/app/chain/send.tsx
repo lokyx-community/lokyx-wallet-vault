@@ -242,7 +242,7 @@ export default function ChainSend() {
   return (
     <Screen title="Review">
       <SendReview amount={amt} unit={unit} to={dest} lines={prep.lines.slice(1)} />
-      <ErrorText>{err}</ErrorText>
+      <ErrorText title="Couldn't send" note="If you're not sure it went through, check Activity before trying again.">{err}</ErrorText>
       <ApproveButton reason="Send this payment" onApproved={send} />
       <Button title="Change" kind="plain" onPress={() => setPrep(null)} />
       <Note>Transactions on Bitcoin and Ethereum cannot be undone.</Note>

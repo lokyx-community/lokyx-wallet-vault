@@ -290,7 +290,7 @@ export default function EthVault() {
               dim
             >{`Recovery address ${shortAddr(v.recovery, 8, 6)} holds ${eth(s.recoveryGas.have, 18, 6)} ${NATIVE[net]} for fees.`}</T>
           )}
-          <ErrorText>{err}</ErrorText>
+          <ErrorText title="That didn't go through" note="Anything waiting in your vault is still waiting.">{err}</ErrorText>
           <ErrorText hint>{snap.error}</ErrorText>
           <Button
             title="Use my recovery key"

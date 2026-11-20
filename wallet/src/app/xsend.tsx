@@ -196,7 +196,7 @@ export default function XSend() {
   return (
     <Screen title="Review">
       <SendReview amount={amt} unit={unit} to={dest} lines={prep.lines.slice(1).filter((l) => !l.startsWith('To ') && !l.startsWith('From '))} />
-      <ErrorText>{err}</ErrorText>
+      <ErrorText title="Couldn't send" note="If you're not sure it went through, check Activity before trying again.">{err}</ErrorText>
       <ApproveButton reason="Send this payment" onApproved={send} />
       <Button title="Change" kind="plain" onPress={() => setPrep(null)} />
       <Note>Payments on Solana and Tron cannot be undone.</Note>

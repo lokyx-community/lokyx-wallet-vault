@@ -91,7 +91,7 @@ export default function EthVaultSend() {
             {info}
           </SendReview>
         )}
-        <ErrorText>{err}</ErrorText>
+        <ErrorText title="Couldn't send from the vault" note="If you're not sure it went through, check Activity before trying again.">{err}</ErrorText>
         {receipt ? (
           <WithdrawReceipt slip={receipt.slip} done={receipt.done} caption={receipt.caption} onDone={() => router.replace(`/ethvault?net=${net}`)} doneLabel="Back to the vault" />
         ) : (

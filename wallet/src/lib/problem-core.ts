@@ -73,8 +73,8 @@ export function problemFrom(e: unknown, ctx: Context = {}): Problem | null {
 }
 
 /** For a sentence that is already in plain words: the title and tone of the pop-up card that carries it. */
-export function cardFor(sentence: string): { title: string; tone: 'wait' | 'bad' } {
+export function cardFor(sentence: string): { title: string; tone: 'wait' | 'bad'; generic: boolean } {
   const p = problemFrom(sentence);
-  if (!p || p.kind === 'other') return { title: "That didn't work", tone: 'bad' };
-  return { title: p.title, tone: p.kind === 'refused' ? 'bad' : 'wait' };
+  if (!p || p.kind === 'other') return { title: "That didn't work", tone: 'bad', generic: true };
+  return { title: p.title, tone: p.kind === 'refused' ? 'bad' : 'wait', generic: false };
 }

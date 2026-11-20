@@ -130,7 +130,7 @@ function Withdraw({ me, bt, delay, done }: { me: string; bt: number; delay: numb
     <View style={{ gap: 12 }}>
       <Field value={to} onChangeText={(t) => { setTo(t); setReady(false); }} placeholder="lyx1… where to" autoCapitalize="none" autoCorrect={false} mono />
       <Field value={amt} onChangeText={(t) => { setAmt(t); setReady(false); }} placeholder="Amount in LYX" keyboardType="decimal-pad" />
-      <ErrorText>{err}</ErrorText>
+      <ErrorText hint>{err}</ErrorText>
       {ready && ok ? (
         <ConfirmOp op={{ kind: 'vaultWithdraw', to: to.trim().toLowerCase(), amount }} me={me} blockTime={bt} delayBlocks={delay} label="Slide to start" onDone={done} />
       ) : (

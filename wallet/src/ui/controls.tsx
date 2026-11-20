@@ -12,6 +12,7 @@ import { Icon, type IconName } from './Icon';
 import { Glow } from './Glow';
 import { PopCard } from './PopCard';
 import { cardFor } from '../lib/problem-core';
+import { plainError } from '../lib/plain-error';
 
 const native = Platform.OS !== 'web';
 export const tap = (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light) => {
@@ -212,7 +213,7 @@ export function Note({ children, center }: { children: ReactNode; center?: boole
  * is and the sentence you pass as the body. Pass `hint` for a quiet note that sits in the page, such as "That isn't an
  * address" while someone is still typing; those never pop up.
  */
-export function ErrorText({ children, hint }: { children: ReactNode; hint?: boolean }) {
+export function ErrorText({ children, hint, title, note }: { children: ReactNode; hint?: boolean; title?: string; note?: string }) {
   const text = typeof children === 'string' ? children : '';
   const [seen, setSeen] = useState('');
   // When the message clears, forget it, so the same message popping up again is shown again.
@@ -233,8 +234,11 @@ export function ErrorText({ children, hint }: { children: ReactNode; hint?: bool
     );
   }
   // The sentence passed in is already in plain words; the classifier only chooses the title.
-  const { title, tone } = cardFor(text);
-  return <PopCard open={seen !== text} tone={tone} title={title} body={text} options={[{ label: 'OK', main: true, onPress: () => setSeen(text) }]} onClose={() => setSeen(text)} />;
+  const card = cardFor(text);
+  // A screen can say what it was doing ("Couldn't send") and add one reassurance; a clear cause like "No connection" keeps its own title.
+  const shownTitle = card.generic && title ? title : card.title;
+  const body = plainError(text, 'the network');
+  return <PopCard open={seen !== text} tone={card.tone} title={shownTitle} body={note ? `${body} ${note}` : body} options={[{ label: 'OK', main: true, onPress: () => setSeen(text) }]} onClose={() => setSeen(text)} />;
 }
 
 export function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
