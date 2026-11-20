@@ -89,7 +89,7 @@ export interface ChainSettings {
   evm: EvmFamily[];
 }
 
-export const DEFAULT_CHAIN_SETTINGS: ChainSettings = { allowMainnet: false, btcNet: 'signet', ethNet: 'sepolia', esplora: {}, ethRpc: {}, solNet: 'devnet', tronNet: 'nile', extra: ['sol', 'trx'], evm: [] };
+export const DEFAULT_CHAIN_SETTINGS: ChainSettings = { allowMainnet: false, btcNet: 'signet', ethNet: 'sepolia', esplora: {}, ethRpc: {}, solNet: 'devnet', tronNet: 'nile', extra: ['trx'], evm: [] };
 
 /** The networks in effect: a real-money one is ignored unless mainnet is allowed. */
 export function effective(s: ChainSettings): { btc: BtcNet; eth: EthNet; sol: SolNet; trx: TronNet } {
