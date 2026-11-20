@@ -8,6 +8,8 @@ export const FEATURES = {
   buy: false,
   /** Anonymous usage counts (see usage-core.ts). Designed, off, and sends nothing. */
   usageCounts: false,
+  /** Prediction markets (BNB Chain with USDT, LOKYX chain with LYX). Testnet only; no screen is reachable while this is false. */
+  predict: false,
 } as const;
 
 export type Feature = keyof typeof FEATURES;
