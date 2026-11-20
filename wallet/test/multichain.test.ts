@@ -5,7 +5,7 @@ import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { recoverTransactionAddress, parseTransaction, decodeFunctionData } from 'viem';
 import {
-  btcKey, ethKey, btcPath, ethPath, planBtc, signBtc, pickFeeRates, lookalike, parseBtc, formatBtc, effective, assertAllowed,
+  btcKey, ethKey, btcPath, ethPath, planBtc, signBtc, pickFeeRates, lookalike, parseBtc, formatBtc, effective, assertAllowed, modeSettings, isRealMode,
   DEFAULT_CHAIN_SETTINGS, ethAddressOk, ethFeeChoices, signEth, ERC20_ABI, KNOWN_TOKENS, tokenId, describeBtc, describeEth, parseUnits, formatUnits, btcAddressOk, ETH_NETS,
 } from '../src/lib/multichain-core.ts';
 
@@ -221,4 +221,16 @@ test('Max leaves exactly the fee: Bitcoin plans the whole amount with no change,
   assert.equal(maxBtc([{ txid: 'c'.repeat(64), vout: 0, value: 400n }], 5), 0n);
   assert.equal(maxEth(1_000_000_000_000_000_000n, 2_000_000_000n), 1_000_000_000_000_000_000n - 21_000n * 2_000_000_000n);
   assert.equal(maxEth(1000n, 2_000_000_000n), 0n);
+});
+
+test('one switch moves every coin to real money and back', () => {
+  const real = { ...DEFAULT_CHAIN_SETTINGS, ...modeSettings(true) };
+  assert.equal(isRealMode(real), true);
+  assert.deepEqual(effective(real), { btc: 'mainnet', eth: 'mainnet', sol: 'mainnet', trx: 'mainnet' });
+  const test = { ...real, ...modeSettings(false) };
+  assert.equal(isRealMode(test), false);
+  assert.deepEqual(effective(test), { btc: 'signet', eth: 'sepolia', sol: 'devnet', trx: 'nile' });
+  assert.equal(isRealMode(DEFAULT_CHAIN_SETTINGS), false);
+  // allowing real money alone, with the coins still on test networks, is not real mode
+  assert.equal(isRealMode({ ...DEFAULT_CHAIN_SETTINGS, allowMainnet: true }), false);
 });

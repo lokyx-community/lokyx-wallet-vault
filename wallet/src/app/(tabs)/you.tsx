@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Aurora } from '../../ui/Aurora';
+import { useChainSettings } from '../../lib/multichain';
 import { Alert, Platform, ScrollView, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,6 +26,7 @@ export default function You() {
   const insets = useSafeAreaInsets();
   const me = useAccountRef();
   const w = useWallet();
+  const chain = useChainSettings();
   const people = useContacts();
   const node = useNodeUrl();
 
@@ -125,7 +127,7 @@ export default function You() {
 
       {tab === 'advanced' && (
         <Group>
-          <Row icon="globe" title="Networks" sub="Bitcoin, Ethereum, Solana and Tron" onPress={() => router.push('/chains-settings')} />
+          <Row icon="globe" title="Networks" sub="Test or real money, per coin" detail={chain.allowMainnet ? "Real money" : "Test"} onPress={() => router.push('/chains-settings')} />
           <Row icon="server" title="Network" detail={node.replace(/^https?:\/\//, '').replace(/\/rpc$/, '')} onPress={() => router.push('/node')} />
           <Row icon="key" title="Developer" sub="Private keys, networks, app details" onPress={() => router.push('/developer')} />
         </Group>

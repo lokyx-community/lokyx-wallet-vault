@@ -101,6 +101,13 @@ export function effective(s: ChainSettings): { btc: BtcNet; eth: EthNet; sol: So
   };
 }
 
+/** True when every coin is pointed at its real-money network. */
+export const isRealMode = (s: ChainSettings): boolean => s.allowMainnet && !!BTC_NETS[s.btcNet]?.real && !!ETH_NETS[s.ethNet]?.real && s.solNet === 'mainnet' && s.tronNet === 'mainnet';
+
+/** The settings that move Bitcoin, Ethereum, Solana and Tron together: all to real money, or all back to the test networks. */
+export const modeSettings = (real: boolean): Pick<ChainSettings, 'allowMainnet' | 'btcNet' | 'ethNet' | 'solNet' | 'tronNet'> =>
+  real ? { allowMainnet: true, btcNet: 'mainnet', ethNet: 'mainnet', solNet: 'mainnet', tronNet: 'mainnet' } : { allowMainnet: false, btcNet: 'signet', ethNet: 'sepolia', solNet: 'devnet', tronNet: 'nile' };
+
 /** Throws if a send would touch real money while that setting is off. A last guard in front of signing. */
 export function assertAllowed(s: ChainSettings, chain: 'btc' | 'eth', net: BtcNet | EthNet) {
   const real = chain === 'btc' ? BTC_NETS[net as BtcNet].real : ETH_NETS[net as EthNet].real;

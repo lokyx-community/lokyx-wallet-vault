@@ -7,7 +7,7 @@ import { Logo } from '../ui/Logo';
 import { Sheet } from '../ui/Sheet';
 import { C, F } from '../ui/theme';
 import { updateChains, useChainSettings } from '../lib/multichain';
-import { BTC_NETS, ETH_NETS, ethNetChoices, type BtcNet, type EthNet } from '../lib/multichain-core';
+import { BTC_NETS, ETH_NETS, ethNetChoices, isRealMode, modeSettings, type BtcNet, type EthNet } from '../lib/multichain-core';
 import { SOL_NETS } from '../lib/sol-core';
 import { TRON_NETS } from '../lib/tron-core';
 
@@ -22,6 +22,8 @@ export default function ChainsSettings() {
   const [open, setOpen] = useState<Coin | null>(null);
   const [custom, setCustom] = useState('');
   const main = s.allowMainnet;
+  const real = isRealMode(s);
+  const [ask, setAsk] = useState(false);
 
   const current: Record<Coin, string> = {
     btc: BTC_NETS[s.btcNet].label.replace('Bitcoin ', ''),
@@ -46,6 +48,18 @@ export default function ChainsSettings() {
   return (
     <Screen title="Networks" large>
       <T v="sub" dim style={{ marginTop: -8, lineHeight: 20 }}>Each coin uses a test network in this beta, with coins that have no value. The same address works on all of a coin's networks.</T>
+      <View style={{ borderRadius: 28, padding: 20, gap: 14, backgroundColor: real ? 'rgba(255,196,80,0.10)' : 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: real ? 'rgba(255,196,80,0.45)' : 'rgba(255,255,255,0.14)' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: real ? '#F5B83D' : '#9BE5BD' }} />
+          <T style={{ fontFamily: F.semibold, fontSize: 20, letterSpacing: -0.4 }}>{real ? 'Real money' : 'Test networks'}</T>
+        </View>
+        <T v="sub" dim style={{ lineHeight: 20 }}>
+          {real ? 'Bitcoin, Ethereum, Solana and Tron are on their real networks. Sends move real money and cannot be undone.' : 'Bitcoin, Ethereum, Solana and Tron are on test networks, with coins that have no value.'}
+        </T>
+        <Press onPress={() => (real ? updateChains(modeSettings(false)) : setAsk(true))} accessibilityLabel={real ? 'Go back to test networks' : 'Switch to real money'} style={{ height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: real ? 'rgba(255,255,255,0.1)' : C.ink }}>
+          <T style={{ fontFamily: F.semibold, fontSize: 16, color: real ? C.text : C.inkText }}>{real ? 'Back to test networks' : 'Switch to real money'}</T>
+        </Press>
+      </View>
       <Group>
         {(['btc', 'eth', 'sol', 'trx'] as Coin[]).map((c) => (
           <Row key={c} title={NAME[c]} detail={current[c]} right={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><Dot on /><T v="callout" dim>{current[c]}</T><Icon name="chevron" size={14} color={C.faint} width={2.2} /></View>} onPress={() => openCoin(c)} icon={undefined} />
@@ -54,7 +68,20 @@ export default function ChainsSettings() {
       <Group title="Advanced">
         <Row title="Real-money networks" sub="Bitcoin, Ethereum, Solana and Tron mainnet. Off in this beta." right={<Switch on={main} label="Real-money networks" onChange={(v) => updateChains({ allowMainnet: v, ...(v ? {} : { btcNet: s.btcNet === 'mainnet' ? 'signet' : s.btcNet, ethNet: ETH_NETS[s.ethNet].real ? ('sepolia' as EthNet) : s.ethNet, solNet: SOL_NETS[s.solNet].real ? 'devnet' : s.solNet, tronNet: TRON_NETS[s.tronNet].real ? 'nile' : s.tronNet }) })} />} />
       </Group>
-      <T v="caption" dim style={{ lineHeight: 18, paddingHorizontal: 6 }}>Turning this on lets the wallet send real money. Do not use it until this wallet has been reviewed and released for it.</T>
+      <T v="caption" dim style={{ lineHeight: 18, paddingHorizontal: 6 }}>Real money means real coins on the real networks. Switching back to test networks is one tap.</T>
+
+      <Sheet open={ask} onClose={() => setAsk(false)}>
+        <View style={{ gap: 14 }}>
+          <T v="title">Switch to real money?</T>
+          <T v="callout" dim style={{ lineHeight: 22 }}>Bitcoin, Ethereum, Solana and Tron will all move to their real networks. The coins you see and send are worth real money, and a payment cannot be taken back. Check every address before you send.</T>
+          <Press onPress={() => { updateChains(modeSettings(true)); setAsk(false); }} accessibilityLabel="Yes, switch to real money" style={{ height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: C.ink }}>
+            <T style={{ fontFamily: F.semibold, fontSize: 16, color: C.inkText }}>Yes, switch to real money</T>
+          </Press>
+          <Press onPress={() => setAsk(false)} accessibilityLabel="Stay on test networks" style={{ height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' }}>
+            <T style={{ fontFamily: F.medium, fontSize: 16 }}>Stay on test networks</T>
+          </Press>
+        </View>
+      </Sheet>
 
       <Sheet open={open !== null} onClose={() => setOpen(null)}>
         {open ? (
