@@ -1,0 +1,18 @@
+name: market-trace
+
+# Manual diagnostic: reruns the invariant suite with "fail on revert" switched on so the first reverting handler call
+# is printed with its reason, instead of being counted silently.
+on:
+  workflow_dispatch:
+
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wallet/contracts/evm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: git clone --depth 1 https://github.com/foundry-rs/forge-std lib/forge-std
+      - run: FOUNDRY_INVARIANT_FAIL_ON_REVERT=true FOUNDRY_INVARIANT_RUNS=64 forge test --match-contract InvariantTest -vvv || true
