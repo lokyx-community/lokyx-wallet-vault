@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, RadialGradient as RG, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
+import { Aurora } from '../../ui/Aurora';
 import Animated, { Easing, interpolate, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { T } from '../../ui/Text';
@@ -31,7 +32,7 @@ function useCoin(t: SharedValue<number>, a: number, b: number) {
     const x = t.value;
     const land = seg(x, a, b);
     const bump = x > b ? interpolate(x, [b, b + 0.015, b + 0.03], [0, 1, 0], 'clamp') : 0;
-    return { opacity: land, transform: [{ translateY: mix(land, 60, 0) + bump * 2 }, { scale: mix(land, 0.7, 1) - bump * 0.03 }] };
+    return { opacity: Math.min(1, land * 3), transform: [{ translateY: mix(land, -120, 0) + bump * 3 }, { scale: mix(land, 1.25, 1) - bump * 0.04 }] };
   });
 }
 
@@ -90,28 +91,22 @@ export default function AppsMade() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <Svg width={width} height={640} style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Defs>
-          <RG id="glow" cx={width / 2} cy={0} rx={width * 0.75} ry={420} gradientUnits="userSpaceOnUse">
-            <Stop offset="0" stopColor="rgb(165,168,186)" stopOpacity={0.34} />
-            <Stop offset="0.55" stopColor="rgb(165,168,186)" stopOpacity={0.09} />
-            <Stop offset="1" stopColor="rgb(165,168,186)" stopOpacity={0} />
-          </RG>
-        </Defs>
-        <Rect x={0} y={0} width={width} height={640} fill="url(#glow)" />
-      </Svg>
+      <Aurora />
 
       <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 20, top, width: CARD_W * k, height: CARD_H * k, borderRadius: 26 * k, borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.16)' }, slot]} />
 
       <Animated.View style={[StyleSheet.absoluteFill, stage]} pointerEvents="box-none">
         <View style={{ position: 'absolute', left: (width - CARD_W * k) / 2, top, width: CARD_W * k, height: CARD_H * k }}>
-          <Animated.View style={[{ width: CARD_W, height: CARD_H, transformOrigin: 'top left', shadowColor: '#000', shadowOpacity: 0.75, shadowRadius: 24, shadowOffset: { width: 0, height: 24 }, elevation: 16 }, { transform: [{ scale: k }] }]}>
+          <Animated.View style={[{ width: CARD_W, height: CARD_H, transformOrigin: 'top left', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 24 }, elevation: 16 }, { transform: [{ scale: k }] }]}>
             <Animated.View style={[{ width: CARD_W, height: CARD_H }, deal]}>
               <AppsCardArt anim={{ eng, spec, coins: [c0, c1, c2] }} />
               <Animated.Text style={[{ position: 'absolute', left: 22, top: 100, fontFamily: F.regular, fontSize: 15, color: 'rgba(245,245,247,0.55)' }, hint]}>Any coin, on any network</Animated.Text>
               <Animated.Text style={[{ position: 'absolute', left: 22, top: 100, fontFamily: F.medium, fontSize: 20, letterSpacing: -0.3, color: '#F5F5F7' }, cnt]}>Room for any coin</Animated.Text>
-              <Animated.View style={[{ position: 'absolute', right: 22, top: 98, width: 30, height: 30, borderRadius: 15, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }, badge]}>
-                <Icon name="check" size={17} color="#000" width={2.8} />
+              <Animated.View style={[{ position: 'absolute', right: 22, top: 94, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.35)', alignItems: 'center', justifyContent: 'center' }, badge]}>
+                <Svg width={24} height={24} viewBox="0 0 32 32">
+                  <Path d="M16.74 7.53 A8.5 8.5 0 1 0 24.47 16.74" stroke="#fff" strokeWidth={3.2} strokeLinecap="round" fill="none" />
+                  <Circle cx={22.5} cy={10.5} r={1.8} fill="#fff" />
+                </Svg>
               </Animated.View>
             </Animated.View>
           </Animated.View>
@@ -130,7 +125,7 @@ export default function AppsMade() {
       </Animated.View>
 
       <Animated.View style={[{ position: 'absolute', left: 20, right: 20, top: top + 290, gap: 16 }, rows]}>
-        <View style={{ borderRadius: 24, backgroundColor: C.fill, overflow: 'hidden' }}>
+        <View style={{ borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.14)', overflow: 'hidden' }}>
           <Line icon="shield" tint={C.good} bg="rgba(61,214,140,0.14)" title="Sites reach only what’s inside" sub="Never your main wallet or your vault" />
           <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: C.line2, marginLeft: 64 }} />
           <Line icon="globe" tint={C.text} bg={C.fill2} title="Your vault stays hidden" sub="Sites can’t see it or ask for it" />

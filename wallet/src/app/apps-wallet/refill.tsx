@@ -156,7 +156,7 @@ export default function Refill() {
           </View>
           <Keypad round extra="." onKey={(k) => setAmount((a) => typeAmount(a, k, dec))} />
           {plan ? (
-            <View style={{ gap: 4, padding: 16, borderRadius: 20, backgroundColor: C.fill }}>
+            <View style={{ gap: 4, padding: 16, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' }}>
               <T v="callout">{plan.instant ? 'No wait' : `This one waits ${Math.round(plan.waitSecs / 3600)} hours`}</T>
               <T v="sub" dim>{plan.instant ? "Within today's allowance." : `Above today's allowance. ${arrivalText(plan.arrivesAt, Date.now())}. You can cancel it until then.`}</T>
             </View>

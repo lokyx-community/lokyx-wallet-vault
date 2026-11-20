@@ -10,6 +10,8 @@ import { Button, ErrorText, Group, Note, Press, Row, Screen } from '../../ui/con
 import { AppsCard } from '../../ui/AppsCard';
 import { CoinMark } from '../../ui/CoinMark';
 import { toast } from '../../ui/Toast';
+import { Icon } from '../../ui/Icon';
+import { shortAddr } from '../../lib/format';
 import { C, F } from '../../ui/theme';
 import { confirmIt } from '../../lib/auth';
 import { plainError } from '../../lib/plain-error';
@@ -73,21 +75,13 @@ export default function AppsWallet() {
     <Screen title="Apps wallet" large>
       <Tutorial id="apps" open={tut.open} onClose={tut.close} />
       <AppsCard held={heldLogos} />
-      {held.data && held.data.length > 0 ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-          <T v="caption" dim>Holds</T>
-          <View style={{ flexDirection: 'row' }}>
-            {[...new Set(held.data.map((h) => h.symbol))].slice(0, 6).map((sym, i) => (
-              <View key={sym} style={{ marginLeft: i ? -8 : 0, borderRadius: 99, borderWidth: 2, borderColor: C.bg }}>
-                <CoinMark symbol={sym} seed={sym} logo={logoFor(sym)} size={26} />
-              </View>
-            ))}
-          </View>
-        </View>
-      ) : null}
+      <Press onPress={async () => { await Clipboard.setStringAsync(address); toast('Address copied', 'copy'); }} style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, height: 34, paddingHorizontal: 14, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.16)' }}>
+        <T style={{ fontFamily: F.medium, fontSize: 13, color: C.sub }}>{shortAddr(address, 6, 4)}</T>
+        <Icon name="copy" size={13} color={C.sub} width={2} />
+      </Press>
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Button title="Add money" onPress={() => router.push('/apps-wallet/refill')} style={{ flex: 1 }} />
-        <Button title="Copy address" kind="line" onPress={async () => { await Clipboard.setStringAsync(address); toast('Address copied', 'copy'); }} style={{ flex: 1 }} />
+        <Button title="Open a website" kind="line" onPress={() => router.push('/browser')} style={{ flex: 1 }} />
       </View>
       <Note>Sites can only reach what's here. Worst case, you lose what's in this wallet.</Note>
 

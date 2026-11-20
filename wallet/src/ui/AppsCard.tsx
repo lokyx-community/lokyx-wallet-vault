@@ -17,7 +17,7 @@ export function AppsCard({ held }: { held?: readonly LogoId[] }) {
   const style = useAnimatedStyle(() => ({ opacity: rise.value, transform: [{ translateY: (1 - rise.value) * 26 }] }));
   return (
     <Animated.View style={[{ width: CARD_W * k, height: CARD_H * k, alignSelf: 'center' }, style]}>
-      <View style={{ width: CARD_W, height: CARD_H, transform: [{ scale: k }], transformOrigin: 'top left', shadowColor: '#000', shadowOpacity: 0.75, shadowRadius: 22, shadowOffset: { width: 0, height: 20 }, elevation: 14 }}>
+      <View style={{ width: CARD_W, height: CARD_H, transform: [{ scale: k }], transformOrigin: 'top left', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 22, shadowOffset: { width: 0, height: 20 }, elevation: 14 }}>
         <AppsCardArt coinsShown={held ?? []} />
       </View>
     </Animated.View>

@@ -5,11 +5,11 @@ import Animated, {
   Easing, interpolate, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming,
 } from 'react-native-reanimated';
 import { T } from './Text';
-import { Icon } from './Icon';
+import { DoneMark } from './DoneMark';
 import { Logo, logoFor } from './Logo';
 import { CoinMark } from './CoinMark';
 import { AppsCardArt, CARD_H, CARD_W } from './AppsCardArt';
-import { C, F } from './theme';
+import { F } from './theme';
 import { EASE_OUT } from './motion';
 
 /** Where the first engraved slot sits on the card, in the card's own units (see AppsCardArt). */
@@ -48,24 +48,21 @@ export function CoinDrop({ symbol, amount, note }: { symbol: string; amount: str
     transform: [{ scale: interpolate(ripple.value, [0, 1], [1, 3.4]) }],
   }));
   const words = useAnimatedStyle(() => ({ opacity: text.value, transform: [{ translateY: (1 - text.value) * 10 }] }));
-  const badge = useAnimatedStyle(() => ({ transform: [{ scale: interpolate(text.value, [0, 0.6, 1], [0.4, 1.15, 1]) }], opacity: text.value }));
 
   const logo = logoFor(symbol);
   return (
     <View style={{ alignItems: 'center', gap: 22, paddingTop: 12 }}>
       <Animated.View style={[{ width: CARD_W * k, height: CARD_H * k }, card]}>
-        <View style={{ width: CARD_W, height: CARD_H, transform: [{ scale: k }], transformOrigin: 'top left', shadowColor: '#000', shadowOpacity: 0.75, shadowRadius: 22, shadowOffset: { width: 0, height: 22 }, elevation: 14 }}>
+        <View style={{ width: CARD_W, height: CARD_H, transform: [{ scale: k }], transformOrigin: 'top left', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 22, shadowOffset: { width: 0, height: 22 }, elevation: 14 }}>
           <AppsCardArt coinsShown={[]} />
-          <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: SLOT.left, top: SLOT.top, width: SLOT.size, height: SLOT.size, borderRadius: SLOT.size / 2, borderWidth: 1.5, borderColor: 'rgba(201,160,87,0.9)' }, ring]} />
+          <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: SLOT.left, top: SLOT.top, width: SLOT.size, height: SLOT.size, borderRadius: SLOT.size / 2, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.8)' }, ring]} />
           <Animated.View style={[{ position: 'absolute', left: SLOT.left, top: SLOT.top, width: SLOT.size, height: SLOT.size, borderRadius: SLOT.size / 2, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }, coin]}>
             {logo ? <Logo id={logo} size={SLOT.size} /> : <CoinMark symbol={symbol} seed={symbol} size={SLOT.size} />}
           </Animated.View>
         </View>
       </Animated.View>
       <Animated.View style={[{ alignItems: 'center', gap: 6 }, words]}>
-        <Animated.View style={[{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.good, alignItems: 'center', justifyContent: 'center' }, badge]}>
-          <Icon name="check" size={20} color="#000" width={3} />
-        </Animated.View>
+        <DoneMark label="Added" />
         <T style={{ fontFamily: F.semibold, fontSize: 28, letterSpacing: -0.8 }}>+{amount} {symbol}</T>
         <T v="callout" dim style={{ textAlign: 'center', lineHeight: 21 }}>{note}</T>
       </Animated.View>
