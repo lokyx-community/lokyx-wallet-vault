@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, Ellipse, G, RadialGradient, Stop } from 'react-native-svg';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
 
-// The one place the wallet uses colour: a deep blue planet that capsules circle while they wait.
+// The one place the wallet uses colour: Neptune, a deep blue planet that capsules circle while they wait.
 export const PLANET = { light: '#8FA8FF', mid: '#4A6CF0', deep: '#1B2A78', edge: '#0A1036', glow: 'rgba(84,118,250,0.30)' };
 
 export function Planet({ size }: { size: number }) {
@@ -11,6 +11,11 @@ export function Planet({ size }: { size: number }) {
   useEffect(() => {
     breathe.value = withRepeat(withSequence(withTiming(1, { duration: 3200, easing: Easing.inOut(Easing.sin) }), withTiming(0, { duration: 3200, easing: Easing.inOut(Easing.sin) })), -1);
   }, [breathe]);
+  const slide = useSharedValue(0);
+  useEffect(() => {
+    slide.value = withRepeat(withTiming(1, { duration: 70000, easing: Easing.linear }), -1, false);
+  }, [slide]);
+  const drift = useAnimatedStyle(() => ({ transform: [{ translateX: slide.value * size }] }));
   const glow = useAnimatedStyle(() => ({ opacity: 0.65 + 0.35 * breathe.value, transform: [{ scale: 1 + 0.04 * breathe.value }] }));
   const g = size * 1.9;
   const r = size / 2;
@@ -43,12 +48,32 @@ export function Planet({ size }: { size: number }) {
           </ClipPath>
         </Defs>
         <Circle cx={r} cy={r} r={r} fill={`url(#body${id})`} />
-        <G clipPath={`url(#disc${id})`} opacity={0.18}>
-          <Ellipse cx={r} cy={r * 0.62} rx={r * 1.3} ry={r * 0.07} fill="#fff" />
-          <Ellipse cx={r} cy={r * 0.98} rx={r * 1.3} ry={r * 0.05} fill="#fff" />
-          <Ellipse cx={r * 1.15} cy={r * 1.36} rx={r * 0.4} ry={r * 0.09} fill={PLANET.edge} opacity={1} />
-        </G>
       </Svg>
+      {/* Neptune's bands drift across the disc, and its storm goes with them; a soft shade on the right keeps it round */}
+      <View style={{ position: 'absolute', left: 0, top: 0, width: size, height: size, borderRadius: r, overflow: 'hidden' }}>
+        <Animated.View style={[{ position: 'absolute', left: -size, top: 0, width: size * 2, height: size }, drift]}>
+          <Svg width={size * 2} height={size}>
+            {[0, 1].map((k) => (
+              <G key={k} opacity={0.2}>
+                <Ellipse cx={size * (k + 0.5)} cy={r * 0.55} rx={size * 0.62} ry={r * 0.06} fill="#fff" />
+                <Ellipse cx={size * (k + 0.5)} cy={r * 0.92} rx={size * 0.62} ry={r * 0.045} fill="#fff" />
+                <Ellipse cx={size * (k + 0.5)} cy={r * 1.25} rx={size * 0.62} ry={r * 0.07} fill={PLANET.edge} />
+                <Ellipse cx={size * (k + 0.5)} cy={r * 1.5} rx={size * 0.62} ry={r * 0.04} fill="#fff" />
+                <Ellipse cx={size * (k + 0.28)} cy={r * 1.1} rx={r * 0.26} ry={r * 0.13} fill={PLANET.edge} opacity={1.6} />
+              </G>
+            ))}
+          </Svg>
+        </Animated.View>
+        <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+          <Defs>
+            <RadialGradient id={`shade${id}`} cx="30%" cy="28%" r="85%">
+              <Stop offset="0.55" stopColor="#000" stopOpacity={0} />
+              <Stop offset="1" stopColor="#000" stopOpacity={0.5} />
+            </RadialGradient>
+          </Defs>
+          <Circle cx={r} cy={r} r={r} fill={`url(#shade${id})`} />
+        </Svg>
+      </View>
     </View>
   );
 }
@@ -91,8 +116,8 @@ function Rider({ angle, rx, ry, cx, cy, offset }: { angle: SharedValue<number>; 
 
 function Moon({ angle, rx, ry, cx, cy }: { angle: SharedValue<number>; rx: number; ry: number; cx: number; cy: number }) {
   // the little moon goes round the other way
-  const a = useOrbitStyle(angle, rx, ry, cx, cy, 7, 7, 1.2, -2);
-  return <Animated.View style={[{ position: 'absolute', left: 0, top: 0, width: 7, height: 7, borderRadius: 4, backgroundColor: '#B9BCC8' }, a]} />;
+  const a = useOrbitStyle(angle, rx, ry, cx, cy, 8, 8, 1.2, -2);
+  return <Animated.View style={[{ position: 'absolute', left: 0, top: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#D8DAE4', shadowColor: '#fff', shadowOpacity: 0.5, shadowRadius: 4, shadowOffset: { width: 0, height: 0 } }, a]} />;
 }
 
 /**

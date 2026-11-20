@@ -56,13 +56,13 @@ function Capsules() {
           <OrbitScene size={Math.min(width, 440)} riders={waiting.length ? waiting.map((c) => progress(c)) : [0.18]} />
         </Animated.View>
         <View style={{ paddingHorizontal: 20, gap: 8, marginTop: -8 }}>
-          <T v="display">Time capsules</T>
+          <T v="display">Neptune Time capsule</T>
           <T v="body" dim>
-            Seal LYX and a note for someone, or for yourself, and pick the day it opens. Until then it stays in orbit. Nobody can open it early, not even you.
+            Seal LYX and a note for someone, or for yourself, and pick the day it opens. Until then it circles Neptune. Nobody can open it early, not even you.
           </T>
         </View>
 
-        <View style={{ paddingHorizontal: 20, paddingTop: 22, gap: 4 }}>
+        <View style={{ marginHorizontal: 20, marginTop: 22, paddingHorizontal: 16, paddingVertical: 6, gap: 2, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)' }}>
           {waiting.map((c, i) => {
             const ready = Date.now() / 1000 >= c.opens;
             return (
