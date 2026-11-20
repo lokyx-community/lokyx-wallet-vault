@@ -12,10 +12,12 @@
 //! Coins never leave the market during trading: people deposit into a free balance, orders lock from it, and
 //! the contract pays out only on a withdrawal. A [`Ledger`] is that free balance.
 //!
-//! Who decides: a panel chosen when the market is made. After the close, each member votes Yes, No or Invalid.
-//! When a majority agrees, a window starts (members may still change their votes); when it ends, anyone can
-//! finalize. If nothing is decided 30 days after the close, anyone can expire the market as Invalid. On
-//! Invalid every share is worth half a unit.
+//! Who decides, the way an optimistic oracle does it. After the close anyone can propose the answer (Yes, No or
+//! Invalid) and lock a bond. For a day anyone can dispute it by locking an equal bond. If nobody does, anyone can
+//! finalize and the proposer gets the bond back. A dispute goes to the panel chosen when the market was made: when
+//! a majority of the panel agrees, that is final, and whoever the panel sided with takes both bonds. If nobody
+//! proposes, or the panel never settles a dispute, anyone can expire the market as Invalid 30 days later (bonds
+//! are returned). On Invalid every share is worth half a unit.
 
 #![no_std]
 
@@ -33,6 +35,8 @@ pub const EXPIRE_AFTER: u64 = 30 * 24 * 3600;
 /// Keeps one market's stored bytes under the chain's 16 KiB value limit: a new order may add at most two
 /// holders per order it can fill, so a market must stay clear of this bound to take one.
 pub const HOLDER_BOUND: usize = 250;
+/// How many shares' worth of coins the proposer, and a disputer, must lock as a bond.
+pub const BOND_SHARES: u128 = 20;
 pub const MIN_PANEL: usize = 3;
 pub const MAX_PANEL: usize = 9;
 
@@ -124,7 +128,12 @@ pub struct Market<K: Key> {
     pub unit: u128,
     pub panel: Vec<K>,
     pub votes: Vec<Option<Vote>>,
-    decided: Option<(Vote, u64)>,
+    /// the proposed answer, who proposed it and when
+    proposed: Option<(Vote, K, u64)>,
+    /// who disputed it and when
+    disputer: Option<(K, u64)>,
+    /// coins held as bonds
+    pub bonds: u128,
     pub state: State,
     next_id: u64,
     pub orders: Vec<Order<K>>,
@@ -152,7 +161,7 @@ impl<K: Key> Market<K> {
             }
         }
         let n = panel.len();
-        Ok(Market { creator, close, unit, panel, votes: alloc::vec![None; n], decided: None, state: State::Open, next_id: 0, orders: Vec::new(), holdings: BTreeMap::new(), supply: 0, pool: 0 })
+        Ok(Market { creator, close, unit, panel, votes: alloc::vec![None; n], proposed: None, disputer: None, bonds: 0, state: State::Open, next_id: 0, orders: Vec::new(), holdings: BTreeMap::new(), supply: 0, pool: 0 })
     }
 
     pub fn threshold(&self) -> usize {
@@ -160,6 +169,15 @@ impl<K: Key> Market<K> {
     }
     fn cu(&self) -> u128 {
         self.unit / 100
+    }
+    pub fn bond(&self) -> u128 {
+        self.unit * BOND_SHARES
+    }
+    pub fn proposed(&self) -> Option<(Vote, K, u64)> {
+        self.proposed
+    }
+    pub fn disputer(&self) -> Option<(K, u64)> {
+        self.disputer
     }
     pub fn shares(&self, who: &K) -> (u64, u64) {
         self.holdings.get(who).copied().unwrap_or((0, 0))
@@ -201,9 +219,6 @@ impl<K: Key> Market<K> {
         if qty == 0 {
             return Err("buy or sell at least one share");
         }
-        if self.orders.len() >= MAX_ORDERS {
-            return Err("too many orders are waiting in this market");
-        }
         if self.holdings.len() + 2 * (self.orders.len() + 1) > HOLDER_BOUND {
             return Err("this market is full of traders; no new orders");
         }
@@ -214,6 +229,12 @@ impl<K: Key> Market<K> {
             (Outcome::No, Side::Buy) => (Kind::MintNo, 100 - price),
             (Outcome::No, Side::Sell) => (Kind::BurnNo, 100 - price),
         };
+        // A full book still takes an order that can trade. One that can't must be priced better than the worst order
+        // waiting on its own side, which it then pushes out. This is settled before anything is changed.
+        let probe = Order { id: self.next_id, owner, kind, price: yp, qty, locked: 0 };
+        if self.orders.len() >= MAX_ORDERS && self.best_resting(&probe).is_none() && self.worse_waiting(&probe).is_none() {
+            return Err("the book is full of better-priced orders");
+        }
         let mut locked = 0u128;
         match kind {
             Kind::Buy | Kind::MintNo => {
@@ -238,9 +259,80 @@ impl<K: Key> Market<K> {
         let mut o = Order { id, owner, kind, price: yp, qty, locked };
         self.match_order(led, &mut o);
         if o.qty > 0 {
+            if self.orders.len() >= MAX_ORDERS {
+                // A trade always frees a slot, so this only happens to an order that could not trade at all.
+                match self.worse_waiting(&o) {
+                    Some(w) => {
+                        let pushed_out = self.orders.remove(w);
+                        self.refund(led, pushed_out);
+                    }
+                    None => {
+                        // not reachable after the check above; if it ever were, give everything back
+                        self.refund(led, o);
+                        return Ok(id);
+                    }
+                }
+            }
             self.orders.push(o);
         }
         Ok(id)
+    }
+
+    /// The worst order waiting on the same side as `inc`, if `inc` is strictly better priced than it.
+    /// The worst bid has the lowest price and the worst ask the highest; among equals the newest is the worst.
+    fn worse_waiting(&self, inc: &Order<K>) -> Option<usize> {
+        let mut worst: Option<usize> = None;
+        for (i, r) in self.orders.iter().enumerate() {
+            if r.kind.is_bid() != inc.kind.is_bid() {
+                continue;
+            }
+            worst = match worst {
+                None => Some(i),
+                Some(w) => {
+                    let cur = &self.orders[w];
+                    let worse = if inc.kind.is_bid() {
+                        r.price < cur.price || (r.price == cur.price && r.id > cur.id)
+                    } else {
+                        r.price > cur.price || (r.price == cur.price && r.id > cur.id)
+                    };
+                    if worse { Some(i) } else { Some(w) }
+                }
+            };
+        }
+        let w = worst?;
+        let better = if inc.kind.is_bid() { inc.price > self.orders[w].price } else { inc.price < self.orders[w].price };
+        if better { Some(w) } else { None }
+    }
+
+    /// Sends some of your shares to someone else. Shares waiting in a sell order can't be sent: cancel first.
+    pub fn send(&mut self, from: K, to: K, outcome: Outcome, n: u64) -> Result<(), &'static str> {
+        if from == to {
+            return Err("you can't send shares to yourself");
+        }
+        if n == 0 {
+            return Err("send at least one share");
+        }
+        let have = match outcome {
+            Outcome::Yes => self.shares(&from).0,
+            Outcome::No => self.shares(&from).1,
+        };
+        if have < n {
+            return Err("you don't hold that many shares");
+        }
+        if !self.holdings.contains_key(&to) && self.holdings.len() + 2 * self.orders.len() + 2 > HOLDER_BOUND {
+            return Err("this market is full of traders; no new holders");
+        }
+        match outcome {
+            Outcome::Yes => {
+                self.take_yes(from, n);
+                self.add_yes(to, n);
+            }
+            Outcome::No => {
+                self.take_no(from, n);
+                self.add_no(to, n);
+            }
+        }
+        Ok(())
     }
 
     fn best_resting(&self, incoming: &Order<K>) -> Option<usize> {
@@ -350,51 +442,123 @@ impl<K: Key> Market<K> {
         }
     }
 
-    /// A panel member's vote, after the close. Can be changed until the market is final.
-    pub fn vote(&mut self, who: K, v: Vote, now: u64) -> Result<(), &'static str> {
+    fn state_of(v: Vote) -> State {
+        match v {
+            Vote::Yes => State::Yes,
+            Vote::No => State::No,
+            Vote::Invalid => State::Invalid,
+        }
+    }
+
+    /// Step 1. After the close anyone can propose the answer and lock a bond from their free coins.
+    pub fn propose<L: Ledger<K>>(&mut self, led: &mut L, who: K, v: Vote, now: u64) -> Result<(), &'static str> {
         if self.state != State::Open {
             return Err("this market is already decided");
         }
         if now < self.close {
-            return Err("voting opens when the market closes");
+            return Err("answers open when the market closes");
         }
+        if self.proposed.is_some() {
+            return Err("an answer has already been proposed");
+        }
+        let b = self.bond();
+        if !led.debit(who, b) {
+            return Err("not enough free coins for the bond");
+        }
+        self.bonds += b;
+        self.proposed = Some((v, who, now));
+        Ok(())
+    }
+
+    /// Step 2, if someone thinks the answer is wrong: inside the window, with an equal bond. The panel then decides.
+    pub fn dispute<L: Ledger<K>>(&mut self, led: &mut L, who: K, now: u64) -> Result<(), &'static str> {
+        let (_, proposer, at) = match (self.state, self.proposed) {
+            (State::Open, Some(p)) => p,
+            _ => return Err("there is no answer to dispute"),
+        };
+        if self.disputer.is_some() {
+            return Err("already disputed");
+        }
+        if who == proposer {
+            return Err("you can't dispute your own answer");
+        }
+        if now >= at + WINDOW {
+            return Err("the challenge window is over: finalize it");
+        }
+        let b = self.bond();
+        if !led.debit(who, b) {
+            return Err("not enough free coins for the bond");
+        }
+        self.bonds += b;
+        self.disputer = Some((who, now));
+        Ok(())
+    }
+
+    /// Step 3 when nobody disputed: once the window has passed anyone can call it; the proposer's bond goes back.
+    pub fn finalize<L: Ledger<K>>(&mut self, led: &mut L, now: u64) -> Result<State, &'static str> {
+        if self.state != State::Open {
+            return Err("this market is already decided");
+        }
+        let (v, proposer, at) = match (self.proposed, self.disputer) {
+            (Some(p), None) => p,
+            _ => return Err("there is no undisputed answer"),
+        };
+        if now < at + WINDOW {
+            return Err("the challenge window is still open");
+        }
+        let b = self.bond();
+        self.bonds -= b;
+        led.credit(proposer, b);
+        self.state = Self::state_of(v);
+        Ok(self.state)
+    }
+
+    /// Step 3 when someone disputed: a panel member's vote, changeable until a majority agrees. That majority is
+    /// final: whoever it sided with (the proposer if it matches the proposal, the disputer if not) takes both bonds.
+    pub fn vote<L: Ledger<K>>(&mut self, led: &mut L, who: K, v: Vote, _now: u64) -> Result<Option<State>, &'static str> {
+        if self.state != State::Open {
+            return Err("this market is already decided");
+        }
+        let ((pv, proposer, _), (disputer, _)) = match (self.proposed, self.disputer) {
+            (Some(p), Some(d)) => (p, d),
+            _ => return Err("the panel only decides disputed answers"),
+        };
         let i = self.panel.iter().position(|p| *p == who).ok_or("only the panel can vote")?;
         self.votes[i] = Some(v);
         let need = self.threshold();
         let count = |x: Vote| self.votes.iter().filter(|y| **y == Some(x)).count();
         let winner = [Vote::Yes, Vote::No, Vote::Invalid].into_iter().find(|x| count(*x) >= need);
-        self.decided = match (winner, self.decided) {
-            (Some(w), Some((d, at))) if w == d => Some((d, at)),
-            (Some(w), _) => Some((w, now)),
-            (None, _) => None,
-        };
-        Ok(())
+        let Some(w) = winner else { return Ok(None) };
+        let b = self.bond();
+        self.bonds -= 2 * b;
+        led.credit(if w == pv { proposer } else { disputer }, 2 * b);
+        self.state = Self::state_of(w);
+        Ok(Some(self.state))
     }
 
-    /// Makes the panel's decision final once the window has passed. Anyone can call it.
-    pub fn finalize(&mut self, now: u64) -> Result<State, &'static str> {
+    /// Ends a stuck market as Invalid so coins are never held for ever: no answer 30 days after the close, or a
+    /// dispute the panel did not settle within 30 days (both bonds go back). A pending undisputed answer can't be
+    /// overridden: it has to be finalized or disputed.
+    pub fn expire<L: Ledger<K>>(&mut self, led: &mut L, now: u64) -> Result<(), &'static str> {
         if self.state != State::Open {
             return Err("this market is already decided");
         }
-        let (v, at) = self.decided.ok_or("the panel has not agreed yet")?;
-        if now < at + WINDOW {
-            return Err("the objection window is still open");
-        }
-        self.state = match v {
-            Vote::Yes => State::Yes,
-            Vote::No => State::No,
-            Vote::Invalid => State::Invalid,
-        };
-        Ok(self.state)
-    }
-
-    /// Ends an undecided market as Invalid, long after the close, so coins are never stuck for ever.
-    pub fn expire(&mut self, now: u64) -> Result<(), &'static str> {
-        if self.state != State::Open {
-            return Err("this market is already decided");
-        }
-        if now < self.close + EXPIRE_AFTER {
-            return Err("not yet: the panel still has time");
+        if let Some((disputer, at)) = self.disputer {
+            if now < at + EXPIRE_AFTER {
+                return Err("not yet: the panel still has time");
+            }
+            let proposer = self.proposed.map(|p| p.1).ok_or("not yet: the panel still has time")?;
+            let b = self.bond();
+            self.bonds -= 2 * b;
+            led.credit(proposer, b);
+            led.credit(disputer, b);
+        } else {
+            if self.proposed.is_some() {
+                return Err("an answer is waiting: finalize it or dispute it");
+            }
+            if now < self.close + EXPIRE_AFTER {
+                return Err("not yet: there is still time to propose");
+            }
         }
         self.state = State::Invalid;
         Ok(())
@@ -438,17 +602,27 @@ impl<K: Key> Market<K> {
                 Some(Vote::Invalid) => 3,
             });
         }
-        match self.decided {
+        match self.proposed {
             None => o.push(0),
-            Some((v, at)) => {
+            Some((v, who, at)) => {
                 o.push(match v {
                     Vote::Yes => 1,
                     Vote::No => 2,
                     Vote::Invalid => 3,
                 });
+                who.put(&mut o);
                 o.extend_from_slice(&at.to_le_bytes());
             }
         }
+        match self.disputer {
+            None => o.push(0),
+            Some((who, at)) => {
+                o.push(1);
+                who.put(&mut o);
+                o.extend_from_slice(&at.to_le_bytes());
+            }
+        }
+        o.extend_from_slice(&self.bonds.to_le_bytes());
         o.push(match self.state {
             State::Open => 0,
             State::Yes => 1,
@@ -508,10 +682,19 @@ impl<K: Key> Market<K> {
             3 => Some(Vote::Invalid),
             _ => None,
         };
-        let decided = match r.u8()? {
+        let proposed = match r.u8()? {
             0 => None,
-            b => Some((vote_of(b)?, r.u64()?)),
+            b => Some((vote_of(b)?, K::get(&mut r)?, r.u64()?)),
         };
+        let disputer = match r.u8()? {
+            0 => None,
+            1 => Some((K::get(&mut r)?, r.u64()?)),
+            _ => return None,
+        };
+        let bonds = r.u128()?;
+        if disputer.is_some() && proposed.is_none() {
+            return None;
+        }
         let state = match r.u8()? {
             0 => State::Open,
             1 => State::Yes,
@@ -551,7 +734,12 @@ impl<K: Key> Market<K> {
         if r.p != bytes.len() {
             return None;
         }
-        Some(Market { creator, close, unit, panel, votes, decided, state, next_id, orders, holdings, supply, pool })
+        Some(Market { creator, close, unit, panel, votes, proposed, disputer, bonds, state, next_id, orders, holdings, supply, pool })
+    }
+
+    /// What the market's coins are made of, for checks: the pool, coins locked in waiting orders, and bonds.
+    pub fn held_total(&self) -> u128 {
+        self.pool + self.locked_total() + self.bonds
     }
 
     /// Sum of coins locked in waiting orders (for checks).

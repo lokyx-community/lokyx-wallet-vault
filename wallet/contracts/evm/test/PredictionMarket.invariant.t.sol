@@ -131,7 +131,7 @@ contract Handler is Test {
         uint256 tid;
         uint256 have;
         for (uint256 i = 0; i < actors.length * 2 && have == 0; i++) {
-            from = actors[(s + i) % actors.length];
+            from = actors[(s % actors.length + i) % actors.length];
             tid = mid * 2 + ((outcome + i / actors.length) % 2);
             have = pm.balanceOf(from, tid);
         }
@@ -155,7 +155,7 @@ contract Handler is Test {
             try pm.place(mid, 0, 0, 1, 1) {} catch { break; }
         }
         if (_len(mid) < pm.MAX_ORDERS()) return;
-        address b = actors[(s + 1) % actors.length];
+        address b = actors[(s % actors.length + 1) % actors.length];
         _fund(b, 10e18);
         vm.prank(b);
         try pm.place(mid, 0, 0, 2, 1) {
@@ -182,8 +182,8 @@ contract Handler is Test {
             try pm.expire(mid) { expiredNoAnswer++; } catch {}
             return;
         }
-        address prop = actors[v % actors.length];
-        address disp = actors[(v + 1) % actors.length];
+        address prop = actors[uint256(v) % actors.length];
+        address disp = actors[(uint256(v) + 1) % actors.length];
         uint256 bond = unit * pm.BOND_SHARES();
         _fund(prop, bond);
         vm.prank(prop);
@@ -202,7 +202,7 @@ contract Handler is Test {
             return;
         }
         // three different answers (no majority), then the others settle it
-        for (uint256 i = 0; i < 3; i++) { vm.prank(panel[i]); try pm.vote(mid, uint8((v + i) % 3)) {} catch {} }
+        for (uint256 i = 0; i < 3; i++) { vm.prank(panel[i]); try pm.vote(mid, uint8((uint256(v) + i) % 3)) {} catch {} }
         for (uint256 i = 3; i < 5; i++) { vm.prank(panel[i]); try pm.vote(mid, v % 3) {} catch {} }
         (, , , , PredictionMarket.State after_, , , , ) = pm.info(mid);
         if (after_ != PredictionMarket.State.Open) panelDecided++;

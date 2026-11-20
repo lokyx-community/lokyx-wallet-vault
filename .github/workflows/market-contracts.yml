@@ -28,6 +28,25 @@ jobs:
         with:
           workspaces: wallet/contracts
       - run: cargo test -p market-engine
+      # The wallet can only encode a few argument types. The ABI may use nothing else.
+      - name: ABI uses only types the wallet can encode
+        run: |
+          python3 - <<'PY'
+          import json
+          ok = {"address", "amount", "bool", "string", "u64", "list<address>"}
+          abi = json.load(open("market/abi.json"))
+          bad = []
+          def check(where, t):
+              for x in (t if isinstance(t, list) else [t]):
+                  if x not in ok: bad.append((where, x))
+          for m in abi["methods"]:
+              for _, t in m["args"]: check(m["name"], t)
+              if "returns" in m: check(m["name"], m["returns"])
+          for e in abi["events"]:
+              for _, t in e["fields"]: check(e["name"], t)
+          assert not bad, bad
+          print("ABI types ok")
+          PY
       - run: cargo build -p market --release --target wasm32-unknown-unknown
       - run: |
           ls -l target/wasm32-unknown-unknown/release/market.wasm
