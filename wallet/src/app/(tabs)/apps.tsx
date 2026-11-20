@@ -9,7 +9,9 @@ import { Field, Press } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { C, F } from '../../ui/theme';
 import { siteUrl } from '../../lib/rpc';
-import { sites, useJars, useShared, useSites } from '../../lib/data';
+import { sites, useEvmSites, useJars, useShared, useSites } from '../../lib/data';
+import { useApps } from '../../lib/appswallet';
+import { shortAddr } from '../../lib/format';
 import { currentAddress } from '../../lib/wallet';
 import { toUrl } from '../../lib/provider';
 import { Aurora } from '../../ui/Aurora';
@@ -60,66 +62,70 @@ function Heading({ children }: { children: string }) {
   return <T style={{ fontFamily: F.semibold, fontSize: 22, letterSpacing: -0.5, lineHeight: 28 }}>{children}</T>;
 }
 
-/** The one big card of the page: the Apps wallet, with the coins that sit inside it and a light that passes over it. */
+/** The Apps wallet card: what a website can see of you, shown instead of described. A slow light drifts over it and the coins float. */
 function Feature({ width, onPress }: { width: number; onPress: () => void }) {
   const still = useReducedMotion();
+  const { address } = useApps();
+  const siteCount = useEvmSites().filter((s) => !!address && s.address.toLowerCase() === address.toLowerCase()).length;
   const id = 'z' + useId().replace(/[^a-zA-Z0-9]/g, '');
   const H = 236;
-  const sheen = useSharedValue(-1);
+  const drift = useSharedValue(0);
   useEffect(() => {
     if (still) return;
-    sheen.value = withDelay(900, withRepeat(withSequence(withTiming(1.2, { duration: 1500, easing: Easing.inOut(Easing.quad) }), withDelay(4800, withTiming(-1, { duration: 0 }))), -1));
-  }, [still, sheen]);
-  const sheenStyle = useAnimatedStyle(() => ({ transform: [{ translateX: sheen.value * width * 0.9 }, { rotate: '16deg' }] }));
+    drift.value = withRepeat(withSequence(withTiming(1, { duration: 6000, easing: Easing.inOut(Easing.sin) }), withTiming(0, { duration: 6000, easing: Easing.inOut(Easing.sin) })), -1);
+  }, [still, drift]);
+  const glow = useAnimatedStyle(() => ({ transform: [{ translateX: -30 + drift.value * 60 }], opacity: 0.8 + drift.value * 0.2 }));
   const c0 = useFloat(1700, 2.5, 0);
   const c1 = useFloat(1900, 2.5, 300);
   const c2 = useFloat(2100, 2.5, 600);
   const coins = [['eth', c0], ['usdt', c1], ['usdc', c2]] as const;
   return (
-    <Press onPress={onPress} scaleTo={0.985} haptic={false} style={{ width, height: H, borderRadius: 28 }}>
-      <View style={{ flex: 1, borderRadius: 28, overflow: 'hidden', borderWidth: 0.5, borderColor: 'rgba(201,160,87,0.45)', shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 22, shadowOffset: { width: 0, height: 18 }, backgroundColor: '#0B0B0C' }}>
-        <Svg style={{ position: 'absolute' }} width={width} height={H}>
-          <Defs>
-            <LG id={id + 'b'} x1="0.1" y1="0" x2="0.9" y2="1">
-              <Stop offset="0" stopColor="#2A2A2F" />
-              <Stop offset="0.48" stopColor="#141417" />
-              <Stop offset="1" stopColor="#070708" />
-            </LG>
-            <RG id={id + 'h'} cx={width * 0.08} cy={0} r={width * 0.62} gradientUnits="userSpaceOnUse">
-              <Stop offset="0" stopColor="#fff" stopOpacity={0.17} />
-              <Stop offset="1" stopColor="#fff" stopOpacity={0} />
-            </RG>
-            <LG id={id + 'g'} x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0" stopColor="#F3D58A" />
-              <Stop offset="0.5" stopColor="#C9A057" />
-              <Stop offset="1" stopColor="#8A6424" />
-            </LG>
-          </Defs>
-          <Rect x={0} y={0} width={width} height={H} fill={`url(#${id}b)`} />
-          <Rect x={0} y={0} width={width} height={H} fill={`url(#${id}h)`} />
-          <Rect x={width - 76} y={22} width={54} height={42} rx={8} fill={`url(#${id}g)`} stroke="rgba(255,240,200,0.6)" strokeWidth={1} />
-          <Rect x={width - 76 + 16} y={31} width={22} height={24} rx={5} fill="none" stroke="rgba(107,76,27,0.55)" strokeWidth={1} />
-        </Svg>
-        <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: -40, bottom: -40, left: 0, width: 80, backgroundColor: 'rgba(255,255,255,0.09)' }, sheenStyle]} />
-        <View style={{ position: 'absolute', left: 24, top: 24, right: 90 }}>
-          <T style={{ fontFamily: F.semibold, fontSize: 11.5, letterSpacing: 2.2, color: '#C9A057' }}>FOR WEBSITES</T>
-          <T style={{ fontFamily: F.semibold, fontSize: 30, letterSpacing: -0.9, lineHeight: 36, marginTop: 6 }}>Apps wallet</T>
-          <T style={{ fontSize: 14.5, lineHeight: 20, color: 'rgba(245,245,247,0.62)', marginTop: 3 }}>The only account sites can see. Your vault stays hidden.</T>
+    <Press onPress={onPress} scaleTo={0.985} haptic={false} style={{ width, height: H, borderRadius: 34 }}>
+      <View style={[{ flex: 1, borderRadius: 34, overflow: 'hidden', padding: 20 }, glassBox]}>
+        <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: 0, left: 0, width, height: H }, glow]}>
+          <Svg width={width} height={H}>
+            <Defs>
+              <RG id={id + 'a'} cx={width * 0.5} cy={0} r={width * 0.75} gradientUnits="userSpaceOnUse">
+                <Stop offset="0" stopColor="#8296FF" stopOpacity={0.26} />
+                <Stop offset="1" stopColor="#8296FF" stopOpacity={0} />
+              </RG>
+            </Defs>
+            <Rect x={0} y={0} width={width} height={H} fill={`url(#${id}a)`} />
+          </Svg>
+        </Animated.View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <T style={{ fontFamily: F.medium, fontSize: 11.5, letterSpacing: 2, color: C.sub }}>APPS WALLET</T>
+          <View style={{ height: 26, paddingHorizontal: 11, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.1)', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: siteCount ? '#fff' : C.faint }} />
+            <T style={{ fontSize: 11.5, color: C.soft }}>{siteCount ? `${siteCount} ${siteCount === 1 ? 'site' : 'sites'}` : 'No sites'}</T>
+          </View>
         </View>
-        <View style={{ position: 'absolute', left: 24, bottom: 24, flexDirection: 'row', gap: 8 }}>
-          {coins.map(([id2, style], i) => (
-            <Animated.View key={id2} entering={still ? undefined : FadeInDown.delay(500 + i * 120).duration(DUR.slow).easing(EASE_OUT)} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 1, borderColor: 'rgba(201,160,87,0.38)', alignItems: 'center', justifyContent: 'center' }}>
-              <Animated.View style={style}><Logo id={id2} size={34} /></Animated.View>
-            </Animated.View>
-          ))}
+        <View style={{ marginTop: 16, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.14)', paddingHorizontal: 16, paddingVertical: 14 }}>
+          <T style={{ fontSize: 11.5, color: C.sub }}>{address ? 'The only address websites can see' : 'Make one to connect to websites'}</T>
+          <T style={{ fontFamily: F.mono, fontSize: 15, letterSpacing: 0.3, marginTop: 6 }}>{address ? shortAddr(address, 6, 4) : 'Not made yet'}</T>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
+            <AppGlyph name="lock" size={15} color="#fff" />
+            <T style={{ fontSize: 12.5, color: C.sub }}>Your vault stays hidden</T>
+          </View>
         </View>
-        <View style={{ position: 'absolute', right: 24, bottom: 28, height: 34, paddingHorizontal: 20, borderRadius: 17, backgroundColor: '#F5F5F7', justifyContent: 'center' }}>
-          <T style={{ fontFamily: F.semibold, fontSize: 15, letterSpacing: -0.2, color: '#000' }}>Open</T>
+        <View style={{ position: 'absolute', left: 20, right: 20, bottom: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row' }}>
+            {coins.map(([id2, style], i) => (
+              <Animated.View key={id2} entering={still ? undefined : FadeInDown.delay(400 + i * 120).duration(DUR.slow).easing(EASE_OUT)} style={{ marginLeft: i ? -10 : 0, width: 36, height: 36, borderRadius: 18, borderWidth: 2.5, borderColor: '#101219', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
+                <Animated.View style={style}><Logo id={id2} size={31} /></Animated.View>
+              </Animated.View>
+            ))}
+          </View>
+          <View style={{ height: 40, paddingHorizontal: 24, borderRadius: 20, backgroundColor: '#F5F5F7', justifyContent: 'center' }}>
+            <T style={{ fontFamily: F.semibold, fontSize: 15, letterSpacing: -0.2, color: '#000' }}>{address ? 'Open' : 'Make'}</T>
+          </View>
         </View>
       </View>
     </Press>
   );
 }
+
+const glassBox = { backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' } as const;
 
 const glass = { backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' } as const;
 

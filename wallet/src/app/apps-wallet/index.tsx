@@ -16,14 +16,15 @@ import { plainError } from '../../lib/plain-error';
 import { ensureApps, useApps } from '../../lib/appswallet';
 import { useEvmSites, evmSites } from '../../lib/data';
 import { logoFor } from '../../ui/Logo';
-import { ethBalance, tokenBalance, useAsync } from '../../lib/multichain';
+import { chainSettings, ethBalance, tokenBalance, useAsync } from '../../lib/multichain';
 import { ETH_NETS, KNOWN_TOKENS, type EthNet } from '../../lib/multichain-core';
 
 type Held = { key: string; symbol: string; net: EthNet; text: string };
-const NETS = (Object.keys(ETH_NETS) as EthNet[]).filter((n) => !ETH_NETS[n].real);
 
 async function holdings(address: string): Promise<Held[]> {
   const jobs: Promise<Held | null>[] = [];
+  // real-money networks are looked at only when real money is switched on
+  const NETS = (Object.keys(ETH_NETS) as EthNet[]).filter((n) => chainSettings.get().allowMainnet || !ETH_NETS[n].real);
   for (const net of NETS) {
     jobs.push(ethBalance(net, address).then((b) => (b > 0n ? { key: `${net}-eth`, symbol: net === 'sepolia' ? 'ETH' : ETH_NETS[net].unit, net, text: formatUnits(b, 18) } : null)).catch(() => null));
     for (const t of KNOWN_TOKENS.filter((k) => k.chainId === ETH_NETS[net].chainId))
