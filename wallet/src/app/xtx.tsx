@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { View } from 'react-native';
 import { Linking } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -9,6 +9,10 @@ import { TxView, type TxStep } from '../ui/TxView';
 import { toast } from '../ui/Toast';
 import { activeNets, btcTxMore, ethTxMore, useAsync, type MoreAboutTx } from '../lib/multichain';
 import { shortAddr } from '../lib/format';
+import { recordWorth, pricedSymbol, useNowPrice, useWorth } from '../lib/worth';
+import { thenNow } from '../lib/worth-core';
+import { amountOf, money } from '../lib/prices-core';
+import { metaId } from '../lib/txmeta';
 import { BTC_NETS, ETH_NETS } from '../lib/multichain-core';
 import { receiptText } from '../lib/slip-core';
 import { CoinLogo } from '../ui/CoinLogo';
@@ -46,6 +50,10 @@ export default function PaymentDetails() {
     }
     return {};
   }, [raw], 5000);
+  const sym = item ? pricedSymbol(item) : undefined;
+  const { price: nowPrice, cur } = useNowPrice(sym);
+  const worthMap = useWorth();
+  useEffect(() => { if (item && sym) recordWorth([item], cur).catch(() => {}); }, [item, sym, cur]);
   if (!item) return <Screen title="Payment"><T v="sub" dim>This payment can't be shown.</T></Screen>;
 
   const m = more.data;
@@ -81,9 +89,12 @@ export default function PaymentDetails() {
   const shareText = receiptText(`${verb} ${item.amount} ${item.unit}`, [...(other ? ([[out ? 'To' : 'From', other]] as [string, string][]) : []), ['Network', network], ...(m?.fee ? ([['Network fee', m.fee]] as [string, string][]) : []), ['Time', timeText]], id, item.url);
   const rows: [string, string, boolean?][] = [['Network', network], ...(m?.fee ? [['Network fee', m.fee] as [string, string]] : []), ['Time', timeText]];
   if (other) rows.push([out ? 'To' : 'From', known ? `${known} · ${shortAddr(other, 6, 4)}` : shortAddr(other, 10, 8), !known]);
+  const amt = amountOf(item.amount);
+  const tn = sym ? thenNow(amt, worthMap[metaId(id)], nowPrice, cur) : null;
+  const worth = sym ? { then: tn ? money(tn.then, cur) : undefined, now: nowPrice && amt ? money(amt * nowPrice, cur) : undefined, pct: tn?.pct } : undefined;
   return (
     <Screen title="Payment">
-      <TxView state={state} sign={out ? '−' : self ? '' : '+'} amount={item.amount} unit={item.unit} line={line} mark={mark} label={`${verb} · ${item.net}`} hash={id} qrUrl={item.url} shareText={shareText} steps={steps} rows={rows} onCopy={copyId} onAgain={again} onExplorer={item.url ? () => Linking.openURL(item.url!).catch(() => {}) : undefined} />
+      <TxView worth={worth} state={state} sign={out ? '−' : self ? '' : '+'} amount={item.amount} unit={item.unit} line={line} mark={mark} label={`${verb} · ${item.net}`} hash={id} qrUrl={item.url} shareText={shareText} steps={steps} rows={rows} onCopy={copyId} onAgain={again} onExplorer={item.url ? () => Linking.openURL(item.url!).catch(() => {}) : undefined} />
     </Screen>
   );
 }

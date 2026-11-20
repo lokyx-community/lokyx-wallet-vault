@@ -11,6 +11,10 @@ import { Icon } from '../../ui/Icon';
 import { TextInput } from 'react-native';
 import { loadTxMeta, metaId, useAllTxMeta } from '../../lib/txmeta';
 import { matches } from '../../lib/txmeta-core';
+import { money, amountOf } from '../../lib/prices-core';
+import { useCurrency } from '../../lib/prices';
+import { loadWorth, pricedSymbol, recordWorth, useWorth } from '../../lib/worth';
+import { monthTotals } from '../../lib/worth-core';
 import { C, F } from '../../ui/theme';
 import { SkeletonRows } from '../../ui/Skeleton';
 import { EmptyState } from '../../ui/EmptyState';
@@ -41,7 +45,10 @@ export default function Activity() {
   const evs = useEvents();
   const [q, setQ] = useState('');
   const metas = useAllTxMeta();
-  useEffect(() => { loadTxMeta(); }, []);
+  useEffect(() => { loadTxMeta(); loadWorth(); }, []);
+  const [cur] = useCurrency();
+  const worth = useWorth();
+  useEffect(() => { if (other.data?.length) recordWorth(other.data, cur).catch(() => {}); }, [other.data, cur]);
 
   const load = useCallback(
     async (before?: number) => {
@@ -101,7 +108,23 @@ export default function Activity() {
     const last = all.map((r) => r.time).filter(Boolean).sort((a, b) => b - a)[0];
     return { n: all.length, last };
   }, [sections]);
+  const month = useMemo(() => {
+    const rows = (other.data ?? []).map((i) => ({ id: metaId(i.id.split(':').pop() ?? ''), time: i.time, amount: amountOf(i.amount), kind: i.failed ? 'self' as const : i.kind, symbol: pricedSymbol(i) }));
+    return monthTotals(rows, worth, cur);
+  }, [other.data, worth, cur]);
   const summary = useMemo(() => {
+    if (month.sentN + month.gotN > 0) {
+      return (
+        <View style={{ paddingHorizontal: 18, paddingVertical: 16, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)', gap: 5 }}>
+          <T v="caption" dim>This month</T>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+            <T style={{ fontFamily: F.regular, fontSize: 30, letterSpacing: -1, fontVariant: ['tabular-nums'] }}>{hide ? '•••' : money(month.spent, cur)}</T>
+            <T style={{ fontFamily: F.regular, fontSize: 14, color: C.sub }}>spent</T>
+          </View>
+          <T v="caption" dim>{hide ? '' : `${month.sentN} sent · ${money(month.got, cur)} received`}{month.unpriced ? ` · ${month.unpriced} earlier without a price` : ''}</T>
+        </View>
+      );
+    }
     const week = Date.now() / 1000 - 7 * 86400;
     const all: { t: number; inn: boolean }[] = [];
     for (const it of items) all.push({ t: it.timestamp, inn: it.kind === 'received' || it.kind === 'mined' });
@@ -135,7 +158,7 @@ export default function Activity() {
         </View>
       </View>
     );
-  }, [items, other.data]);
+  }, [items, other.data, month, cur, hide]);
   const loading = busy || (!other.data && !other.error);
   const anyItems = items.length > 0 || (other.data ?? []).length > 0 || evs.length > 0;
 

@@ -25,7 +25,7 @@ export function useCurrency(): [Currency, (c: Currency) => void] {
   return [useStore(currencyStore), (c) => { currencyStore.set(c); setItem('w.currency', c).catch(() => {}); }];
 }
 
-async function fetchQuotes(ids: string[], cur: Currency): Promise<Record<string, Quote>> {
+export async function fetchQuotes(ids: string[], cur: Currency): Promise<Record<string, Quote>> {
   const key = `w.prices.${cur}`;
   try {
     const r = await fetchT(marketsUrl(ids, cur), undefined, 12_000);

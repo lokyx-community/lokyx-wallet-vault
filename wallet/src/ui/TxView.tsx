@@ -37,6 +37,8 @@ export interface TxViewProps {
   onExplorer?: () => void;
   /** for money you sent: opens the send screen with the same person and amount filled in */
   onAgain?: () => void;
+  /** what it was worth when first seen and now, in the chosen currency (already formatted); either may be missing */
+  worth?: { then?: string; now?: string; pct?: number };
   extra?: ReactNode;
 }
 
@@ -100,6 +102,26 @@ export function TxView(p: TxViewProps) {
           </View>
         ) : null}
       </View>
+
+      {p.worth && (p.worth.then || p.worth.now) ? (
+        <View style={{ borderRadius: 26, paddingHorizontal: 18, paddingVertical: 6, ...glass }}>
+          {p.worth.then ? (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 46 }}>
+              <T v="sub" dim style={{ fontSize: 14 }}>{p.sign === '−' ? 'When you sent it' : 'When it arrived'}</T>
+              <T style={{ fontFamily: F.medium, fontSize: 15, fontVariant: ['tabular-nums'] }}>{p.worth.then}</T>
+            </View>
+          ) : null}
+          {p.worth.now ? (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 46, borderTopWidth: p.worth.then ? 0.5 : 0, borderTopColor: 'rgba(255,255,255,0.08)' }}>
+              <T v="sub" dim style={{ fontSize: 14 }}>Worth now</T>
+              <T style={{ fontFamily: F.medium, fontSize: 15, fontVariant: ['tabular-nums'] }}>
+                {p.worth.now}
+                {p.worth.pct !== undefined ? <T style={{ fontFamily: F.medium, fontSize: 13, color: p.worth.pct >= 0 ? '#9BE5BD' : C.sub }}>{`  ${p.worth.pct >= 0 ? '+' : '−'}${Math.abs(p.worth.pct).toFixed(1)}%`}</T> : null}
+              </T>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
 
       <View style={{ borderRadius: 26, paddingHorizontal: 18, paddingVertical: 6, ...glass }}>
         {p.rows.map(([l, v, mono], i) => (
