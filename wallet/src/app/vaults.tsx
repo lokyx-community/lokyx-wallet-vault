@@ -82,7 +82,7 @@ export default function Vaults() {
           {have.map((n) => <EthVaultRow key={n} net={n} />)}
         </Group>
       ) : (
-        <View style={{ borderRadius: 24, backgroundColor: C.fill, padding: 18, gap: 6 }}>
+        <View style={{ borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)', padding: 18, gap: 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Icon name="shield" size={18} color={C.sub} width={1.9} />
             <T v="callout">No vault yet</T>
