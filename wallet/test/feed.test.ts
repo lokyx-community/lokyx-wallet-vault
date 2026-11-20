@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { btcItems, ethItems, filterFeed, mergeFeed, solItems, trxItems, type FeedItem } from '../src/lib/feed-core.ts';
+import { btcItems, ethItems, filterFeed, isWaiting, landed, mergeFeed, nameIn, solItems, trxItems, type FeedItem } from '../src/lib/feed-core.ts';
+import { parseEthTxs } from '../src/lib/multichain-core.ts';
 
 test('feed: every coin maps to the same shape, with the right sign, unit and explorer link', () => {
   const b = btcItems('signet', [{ txid: 'aa', confirmed: true, time: 100, delta: 2_500_000n }, { txid: 'bb', confirmed: false, delta: -1_000n }]);
@@ -30,4 +31,41 @@ test('feed: filter by coin and by kind together', () => {
   assert.deepEqual(filterFeed(l, 'btc', 'all').map((x) => x.id), ['1', '2']);
   assert.deepEqual(filterFeed(l, 'all', 'sent').map((x) => x.id), ['2', '3']);
   assert.deepEqual(filterFeed(l, 'lyx', 'mined').map((x) => x.id), ['4']);
+});
+
+test('feed: a payment the network already has in a block is not waiting, whatever the list says', () => {
+  const held: FeedItem = { id: 'eth:sepolia:0xabc', coin: 'eth', kind: 'sent', time: 0, amount: '0.01', unit: 'ETH', failed: false, net: 'Sepolia' };
+  assert.equal(isWaiting(held), true);
+  assert.equal(isWaiting(held, {}), true);
+  assert.equal(isWaiting(held, { block: 12170084 }), false);
+  assert.equal(isWaiting({ ...held, time: 5 }), false);
+  assert.equal(isWaiting({ ...held, failed: true }), false);
+});
+
+test('feed: a held payment that lands gets the block time, and keeps everything else', () => {
+  const held: FeedItem = { id: 'eth:sepolia:0xabc', coin: 'eth', kind: 'sent', time: 0, amount: '0.01', unit: 'ETH', failed: false, other: '0x3601', net: 'Sepolia' };
+  assert.equal(landed(held, {}), held, 'not in a block yet: unchanged');
+  const l = landed(held, { block: 9, time: 1000 });
+  assert.deepEqual([l.time, l.other, l.amount], [1000, '0x3601', '0.01']);
+  assert.equal(landed(held, { block: 9 }, 77).time, 77, 'no block time known: use now');
+  const done = { ...held, time: 50 };
+  assert.equal(landed(done, { block: 9, time: 1000 }), done);
+});
+
+test('feed: your own shared account is called by its name, in any letter case', () => {
+  const list = [{ address: '0x3601901fC0C87eEEf445381B0349852344868b73', name: 'Family' }];
+  assert.equal(nameIn(list, '0x3601901fc0c87eeef445381b0349852344868b73'), 'Family');
+  assert.equal(nameIn(list, '0xdead'), undefined);
+  assert.equal(nameIn(list, undefined), undefined);
+});
+
+test('feed: Ethereum rows say who is on the other side', () => {
+  const me = '0xAbC0000000000000000000000000000000000001';
+  const a = '0x0000000000000000000000000000000000000002';
+  const rows = parseEthTxs({ items: [
+    { hash: '0x1', from: { hash: me }, to: { hash: a }, value: '5', status: 'ok', result: 'success', timestamp: '2026-11-16T10:00:00Z' },
+    { hash: '0x2', from: { hash: a }, to: { hash: me }, value: '7', status: 'ok', result: 'success', timestamp: '2026-11-16T11:00:00Z' },
+  ] }, me, 'ETH');
+  assert.deepEqual(rows.map((r) => r.other), [a, a]);
+  assert.equal(ethItems('sepolia', rows)[0].other, a);
 });

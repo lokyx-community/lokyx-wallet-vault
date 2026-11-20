@@ -455,16 +455,18 @@ export interface MoreAboutTx {
   /** how many blocks are on top of it; 0 while it is waiting */
   confirmations?: number;
   block?: number;
+  /** unix seconds of that block */
+  time?: number;
 }
 
 /** What the network says about one Bitcoin payment: the fee and how deep it is. Missing pieces are left out. */
 export async function btcTxMore(net: BtcNet, txid: string): Promise<MoreAboutTx> {
   const [t, tip] = await Promise.all([
-    getJson<{ fee?: number; status?: { confirmed?: boolean; block_height?: number } }>(`${esplora(net)}/tx/${txid}`),
+    getJson<{ fee?: number; status?: { confirmed?: boolean; block_height?: number; block_time?: number } }>(`${esplora(net)}/tx/${txid}`),
     getJson<number>(`${esplora(net)}/blocks/tip/height`).catch(() => 0),
   ]);
   const h = t.status?.confirmed ? t.status.block_height : undefined;
-  return { fee: typeof t.fee === 'number' ? `${formatBtc(BigInt(t.fee))} ${BTC_NETS[net].unit}` : undefined, block: h, confirmations: h && tip ? Math.max(0, tip - h + 1) : 0 };
+  return { fee: typeof t.fee === 'number' ? `${formatBtc(BigInt(t.fee))} ${BTC_NETS[net].unit}` : undefined, block: h, time: t.status?.block_time, confirmations: h && tip ? Math.max(0, tip - h + 1) : 0 };
 }
 
 /** What the network says about one Ethereum payment: who, the fee paid, and how deep it is. */
@@ -480,6 +482,8 @@ export async function ethTxMore(net: EthNet, hash: string): Promise<MoreAboutTx>
   if (b) {
     out.block = Number(BigInt(b));
     out.confirmations = Math.max(0, Number(BigInt(head) - BigInt(b)) + 1);
+    const blk = (await ethPass(net, 'eth_getBlockByNumber', [b, false]).catch(() => null)) as { timestamp?: string } | null;
+    if (blk?.timestamp) out.time = Number(BigInt(blk.timestamp));
   }
   return out;
 }

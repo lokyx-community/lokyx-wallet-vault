@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { anyHeldWaiting, refreshHeld } from './feed-held';
 import { useCoins } from './coins';
 import { usePendingFeed } from './feed-pending';
 import { activeNets, btcHistory, ethHistory, useAsync, useChainSettings } from './multichain';
@@ -13,6 +14,17 @@ export function useOtherFeed() {
   const n = activeNets();
   const a = { btc: coins.btc.address, eth: coins.eth.address, sol: coins.sol.address, trx: coins.trx.address };
   const held = usePendingFeed();
+  const waiting = held.some((x) => !x.time && !x.failed && (x.coin === 'eth' || x.coin === 'btc'));
+  // ask the network about waiting payments every few seconds, so a landed one turns confirmed at once
+  useEffect(() => {
+    if (!waiting) return;
+    const look = () => {
+      if (anyHeldWaiting()) refreshHeld().catch(() => {});
+    };
+    look();
+    const t = setInterval(look, 4000);
+    return () => clearInterval(t);
+  }, [waiting]);
   const r = useAsync(
     async () => {
       const ok = <T,>(p: Promise<T[]>) => p.catch(() => [] as T[]);

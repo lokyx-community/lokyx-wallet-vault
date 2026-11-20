@@ -10,7 +10,9 @@ import { C } from './theme';
 import type { HistoryItem } from '../lib/rpc';
 import { maturity } from '../lib/chain';
 import type { Pending } from '../lib/data';
-import { labelFor, niceLyx, timeAgo } from '../lib/format';
+import { labelFor, nameFor, niceLyx, timeAgo } from '../lib/format';
+import { nameIn } from '../lib/feed-core';
+import { useEthShared } from '../lib/ethms';
 import { DUR, EASE_OUT } from './motion';
 import { CoinLogo } from './CoinLogo';
 import { Logo } from './Logo';
@@ -102,7 +104,8 @@ export function PendingRow({ p, hide }: { p: Pending; hide?: boolean }) {
 /** A payment on another coin: same look as a LOKYX row, opens its page in the app. */
 export function FeedRow({ item, i = 0, hide, pos = 'only' }: { item: FeedItem; i?: number; hide?: boolean; pos?: Pos }) {
   const plus = item.kind === 'received';
-  const who = item.other ? `${item.other.slice(0, 5)}…${item.other.slice(-4)}` : '';
+  const shared = useEthShared();
+  const who = item.other ? nameFor(item.other) ?? nameIn(shared, item.other) ?? `${item.other.slice(0, 5)}…${item.other.slice(-4)}` : '';
   const title = item.failed ? 'Failed' : item.kind === 'received' ? 'Received' : item.kind === 'self' ? 'To yourself' : 'Sent';
   const sub = item.kind === 'self' ? item.net : who ? `${plus ? 'From' : 'To'} ${who}` : item.net;
   return (

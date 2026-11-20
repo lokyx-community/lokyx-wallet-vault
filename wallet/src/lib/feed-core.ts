@@ -32,6 +32,22 @@ export interface FeedItem {
   net: string;
 }
 
+/** What the network says about one payment, as far as the list needs it. */
+export interface TxMore {
+  block?: number;
+  /** unix seconds of that block */
+  time?: number;
+}
+/** Still waiting for a block? A payment with no time only means the history list has not shown it yet: if the network
+ *  itself says it is in a block, it is not waiting. */
+export const isWaiting = (item: FeedItem, more?: TxMore) => !item.failed && !item.time && !more?.block;
+/** A payment held on the phone, once the network says it is in a block: it gets that block's time. */
+export function landed(item: FeedItem, more: TxMore, now = Math.floor(Date.now() / 1000)): FeedItem {
+  return item.time || !more.block ? item : { ...item, time: more.time || now };
+}
+/** The name of one of your own shared accounts, when this address is one. */
+export const nameIn = (list: { address: string; name: string }[], address?: string) => (address ? list.find((x) => x.address.toLowerCase() === address.toLowerCase())?.name : undefined);
+
 const abs = (n: bigint) => (n < 0n ? -n : n);
 const kindOf = (d: bigint): FeedKind => (d < 0n ? 'sent' : 'received');
 
@@ -58,6 +74,7 @@ export function ethItems(net: EthNet, rows: EthTxRow[]): FeedItem[] {
     amount: formatUnits(abs(r.delta), r.decimals, 6),
     unit: r.symbol || ETH_NETS[net].unit,
     failed: r.failed,
+    other: r.other,
     url: `${ETH_NETS[net].explorer}/tx/${r.hash}`,
     net: ETH_NETS[net].short,
   }));

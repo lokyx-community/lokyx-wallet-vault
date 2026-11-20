@@ -453,6 +453,8 @@ export interface EthTxRow {
   failed: boolean;
   /** unix seconds, 0 if unknown */
   time: number;
+  /** the address on the other side (lower case), when there is one */
+  other?: string;
 }
 
 type Hash = { hash?: string } | null | undefined;
@@ -482,7 +484,7 @@ export function parseEthTxs(json: unknown, me: string, symbol: string): EthTxRow
     const sent = lower(t.from) === m;
     const got = lower(t.to) === m;
     if (!sent && !got) continue;
-    out.push({ hash: t.hash, delta: sent && !got ? -v : sent && got ? 0n : v, decimals: 18, symbol, failed: t.status === 'error' || (!!t.result && t.result !== 'success'), time: secs(t.timestamp) });
+    out.push({ hash: t.hash, delta: sent && !got ? -v : sent && got ? 0n : v, decimals: 18, symbol, failed: t.status === 'error' || (!!t.result && t.result !== 'success'), time: secs(t.timestamp), other: sent ? lower(t.to) : lower(t.from) || undefined });
   }
   return out;
 }

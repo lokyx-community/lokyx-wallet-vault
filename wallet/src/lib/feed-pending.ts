@@ -19,6 +19,8 @@ export async function loadPendingFeed() {
 }
 resetHooks.push(() => pendingFeed.set([]));
 
+export const saveHeld = () => setItem(KEY, JSON.stringify(pendingFeed.get()));
+
 export async function notePendingFeed(item: FeedItem) {
   pendingFeed.set([{ ...item, time: 0, at: Date.now() }, ...pendingFeed.get().filter((x) => x.id !== item.id && Date.now() - x.at < DAY)].slice(0, 30));
   await setItem(KEY, JSON.stringify(pendingFeed.get()));
