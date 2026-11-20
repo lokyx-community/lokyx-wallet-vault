@@ -1,5 +1,5 @@
-// Switches for things that exist as code but are not turned on. Nothing here is user-facing yet.
-// Every flag is false in this build; a release that turns one on is a deliberate, reviewed change.
+// Switches for things that exist as code. Anything off here is not user-facing yet.
+// Swap, buy and usage counts are off. Predict is on for the test network only (play money). Turning a flag on is a deliberate, reviewed change.
 
 export const FEATURES = {
   /** In-app swaps through a partner. No provider is wired in. */
@@ -8,8 +8,8 @@ export const FEATURES = {
   buy: false,
   /** Anonymous usage counts (see usage-core.ts). Designed, off, and sends nothing. */
   usageCounts: false,
-  /** Prediction markets (BNB Chain with USDT, LOKYX chain with LYX). Testnet only; no screen is reachable while this is false. */
-  predict: false,
+  /** Prediction markets (BNB Chain with USDT, LOKYX chain with LYX). On for the test network only: play money, no real value. */
+  predict: true,
 } as const;
 
 export type Feature = keyof typeof FEATURES;

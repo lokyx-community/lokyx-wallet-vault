@@ -4,8 +4,8 @@ import { FEATURES } from '../src/lib/features.ts';
 import { swapProvider, onRampProvider, registerSwapProvider, registerOnRampProvider, type SwapProvider, type OnRampProvider } from '../src/lib/partners.ts';
 import { DEFAULT_USAGE, buildReport, bucketValue, isoWeek, mayReport, maybeSend } from '../src/lib/usage-core.ts';
 
-test('every business flag is off in this build', () => {
-  assert.deepEqual(Object.values(FEATURES), [false, false, false, false]);
+test('swap, buy and usage counts are off; predict is on for the test network', () => {
+  assert.deepEqual(Object.values(FEATURES), [false, false, false, true]); // swap, buy, usageCounts stay off; predict is on for the test network
 });
 
 test('a registered swap or on-ramp provider stays hidden while the flag is off', () => {
