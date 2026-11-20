@@ -57,7 +57,7 @@ export default function SharedList() {
   return (
     <Screen title="Shared accounts" large>
       <T v="sub" dim style={{ lineHeight: 20, marginTop: -8 }}>Money moves only when enough owners approve. Each person keeps their own key on their own phone.</T>
-      <Press onPress={() => router.push(contractsOn ? '/shared/new' : '/shared/eth/new')} scaleTo={0.985} style={{ borderRadius: 26, backgroundColor: C.fill, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+      <Press onPress={() => router.push(contractsOn ? '/shared/new' : '/shared/eth/new')} scaleTo={0.985} style={{ borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.14)', padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
         <ApprovalRing n={3} have={2} need={2} size={64} stroke={6}>
           <Icon name="people" size={22} color={C.text} width={1.9} />
         </ApprovalRing>
@@ -77,7 +77,7 @@ export default function SharedList() {
       <Group title="Other">
         <View style={{ flexDirection: 'row', gap: 10, padding: 12 }}>
           {([['btc', 'Bitcoin', '/shared/btc/new'], ['eth', 'Ethereum', '/shared/eth/new']] as const).map(([id, name, to]) => (
-            <Press key={id} onPress={() => router.push(to)} scaleTo={0.97} accessibilityLabel={`New shared ${name} account`} style={{ flex: 1, backgroundColor: C.fill2, borderRadius: 20, padding: 14, gap: 12 }}>
+            <Press key={id} onPress={() => router.push(to)} scaleTo={0.97} accessibilityLabel={`New shared ${name} account`} style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)', borderRadius: 20, padding: 14, gap: 12 }}>
               <Logo id={id} size={40} />
               <View style={{ gap: 2 }}>
                 <T style={{ fontFamily: F.semibold, fontSize: 16 }}>{name}</T>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Share, View, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import Svg, { Circle as SvgCircle, Path } from 'react-native-svg';
 import { T } from '../../ui/Text';
 import { Field, Press, Screen, success, ErrorText } from '../../ui/controls';
 import { Label, Panel, GRow, Primary, Secondary } from '../../ui/Glass';
@@ -59,10 +60,18 @@ export default function SharedAccount() {
     const mine = p.approvals.includes(me);
     const enough = d ? p.approvals.length >= d.threshold : false;
     return (
-      <View style={{ paddingVertical: 14, gap: 10, borderTopWidth: 0.5, borderTopColor: 'rgba(255,255,255,0.07)' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ paddingVertical: 14, gap: 10, }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <ApprovalRing n={Math.min(10, d?.owners.length ?? 3)} have={p.approvals.length} need={d?.threshold ?? 99} size={46} stroke={5}>
+            {enough ? (
+              <Svg width={20} height={20} viewBox="0 0 32 32">
+                <Path d="M16.74 7.53 A8.5 8.5 0 1 0 24.47 16.74" stroke="#fff" strokeWidth={3.2} strokeLinecap="round" fill="none" />
+                <SvgCircle cx={22.5} cy={10.5} r={1.8} fill="#fff" />
+              </Svg>
+            ) : null}
+          </ApprovalRing>
           <View style={{ flex: 1 }}>
-            <T style={{ fontFamily: F.semibold, fontSize: 16 }}>{`Send ${p.amount} LYX`}</T>
+            <T style={{ fontFamily: F.semibold, fontSize: 16 }}>{enough ? `Ready · ${p.amount} LYX` : `Send ${p.amount} LYX`}</T>
             <T v="caption" dim>{`to ${labelFor(p.to)} · from ${who(p.by, me)}${p.note ? ` · ${p.note}` : ''}`}</T>
           </View>
           <View style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.1)' }}>
@@ -124,7 +133,7 @@ export default function SharedAccount() {
             ))}
           </View>
           <Label>Waiting for approval</Label>
-          {waiting.length ? waiting.map((p) => <View key={p.id} style={{ borderRadius: 22, backgroundColor: C.fill, paddingHorizontal: 16, marginBottom: 10 }}><PaymentRow p={p} /></View>) : <T v="sub" dim style={{ paddingVertical: 10, paddingHorizontal: 6 }}>Nothing waiting</T>}
+          {waiting.length ? waiting.map((p) => <View key={p.id} style={{ borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 16, marginBottom: 10 }}><PaymentRow p={p} /></View>) : <T v="sub" dim style={{ paddingVertical: 10, paddingHorizontal: 6 }}>Nothing waiting</T>}
           {done.length > 0 && (
             <>
               <Label>Earlier</Label>
