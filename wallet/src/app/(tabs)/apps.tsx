@@ -75,6 +75,23 @@ function Feature({ width, onPress }: { width: number; onPress: () => void }) {
     drift.value = withRepeat(withSequence(withTiming(1, { duration: 6000, easing: Easing.inOut(Easing.sin) }), withTiming(0, { duration: 6000, easing: Easing.inOut(Easing.sin) })), -1);
   }, [still, drift]);
   const glow = useAnimatedStyle(() => ({ transform: [{ translateX: -30 + drift.value * 60 }], opacity: 0.8 + drift.value * 0.2 }));
+  // a band of light that passes over the whole card, then rests a few seconds
+  const sheen = useSharedValue(-1);
+  // the dot on the badge breathes, the lock and the Open button gently pulse
+  const pulse = useSharedValue(0);
+  // the address panel's edge is lit by a light that travels round it
+  const edge = useSharedValue(0);
+  useEffect(() => {
+    if (still) return;
+    sheen.value = withDelay(900, withRepeat(withSequence(withTiming(1.25, { duration: 1700, easing: Easing.inOut(Easing.quad) }), withDelay(4600, withTiming(-1, { duration: 0 }))), -1));
+    pulse.value = withRepeat(withSequence(withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.sin) }), withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.sin) })), -1);
+    edge.value = withRepeat(withTiming(1, { duration: 5200, easing: Easing.linear }), -1);
+  }, [still, sheen, pulse, edge]);
+  const sheenStyle = useAnimatedStyle(() => ({ transform: [{ translateX: sheen.value * width }, { rotate: '16deg' }] }));
+  const dot = useAnimatedStyle(() => ({ opacity: 0.45 + 0.55 * pulse.value, transform: [{ scale: 0.85 + 0.35 * pulse.value }] }));
+  const lock = useAnimatedStyle(() => ({ opacity: 0.6 + 0.4 * pulse.value }));
+  const openBtn = useAnimatedStyle(() => ({ transform: [{ scale: 1 + 0.025 * pulse.value }], shadowOpacity: 0.12 + 0.25 * pulse.value }));
+  const edgeLight = useAnimatedStyle(() => ({ transform: [{ translateX: -90 + edge.value * (width - 40 + 180) }] }));
   const c0 = useFloat(1700, 2.5, 0);
   const c1 = useFloat(1900, 2.5, 300);
   const c2 = useFloat(2100, 2.5, 600);
@@ -93,18 +110,20 @@ function Feature({ width, onPress }: { width: number; onPress: () => void }) {
             <Rect x={0} y={0} width={width} height={H} fill={`url(#${id}a)`} />
           </Svg>
         </Animated.View>
+        <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: -60, bottom: -60, left: 0, width: 90, backgroundColor: 'rgba(255,255,255,0.08)' }, sheenStyle]} />
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <T style={{ fontFamily: F.medium, fontSize: 11.5, letterSpacing: 2, color: C.sub }}>APPS WALLET</T>
           <View style={{ height: 26, paddingHorizontal: 11, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.1)', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: siteCount ? '#fff' : C.faint }} />
+            <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: siteCount ? '#fff' : C.faint }, siteCount ? dot : null]} />
             <T style={{ fontSize: 11.5, color: C.soft }}>{siteCount ? `${siteCount} ${siteCount === 1 ? 'site' : 'sites'}` : 'No sites'}</T>
           </View>
         </View>
-        <View style={{ marginTop: 16, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.14)', paddingHorizontal: 16, paddingVertical: 14 }}>
+        <View style={{ marginTop: 16, borderRadius: 22, overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.14)', paddingHorizontal: 16, paddingVertical: 14 }}>
+          <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: 0, left: 0, width: 90, height: 1, backgroundColor: 'rgba(255,255,255,0.7)' }, edgeLight]} />
           <T style={{ fontSize: 11.5, color: C.sub }}>{address ? 'The only address websites can see' : 'Make one to connect to websites'}</T>
           <T style={{ fontFamily: F.mono, fontSize: 15, letterSpacing: 0.3, marginTop: 6 }}>{address ? shortAddr(address, 6, 4) : 'Not made yet'}</T>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
-            <AppGlyph name="lock" size={15} color="#fff" />
+            <Animated.View style={lock}><AppGlyph name="lock" size={15} color="#fff" /></Animated.View>
             <T style={{ fontSize: 12.5, color: C.sub }}>Your vault stays hidden</T>
           </View>
         </View>
@@ -116,9 +135,9 @@ function Feature({ width, onPress }: { width: number; onPress: () => void }) {
               </Animated.View>
             ))}
           </View>
-          <View style={{ height: 40, paddingHorizontal: 24, borderRadius: 20, backgroundColor: '#F5F5F7', justifyContent: 'center' }}>
+          <Animated.View style={[{ height: 40, paddingHorizontal: 24, borderRadius: 20, backgroundColor: '#F5F5F7', justifyContent: 'center', shadowColor: '#fff', shadowRadius: 12, shadowOffset: { width: 0, height: 0 } }, openBtn]}>
             <T style={{ fontFamily: F.semibold, fontSize: 15, letterSpacing: -0.2, color: '#000' }}>{address ? 'Open' : 'Make'}</T>
-          </View>
+          </Animated.View>
         </View>
       </View>
     </Press>
