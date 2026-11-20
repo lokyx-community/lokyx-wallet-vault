@@ -71,7 +71,14 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
       - run: git clone --depth 1 https://github.com/foundry-rs/forge-std lib/forge-std
       - run: forge build --sizes
+      - run: mkdir -p coverage-out && rm -f coverage-out/counters.csv
       - run: forge test -vv
+      - name: Totals over every invariant run
+        run: |
+          echo "runs: $(wc -l < coverage-out/counters.csv)"
+          awk -F, '{for(i=1;i<=NF;i++)s[i]+=$i; for(i=1;i<=NF;i++) if($i>0) r[i]++} END{
+            split("trades fullBookPlaces evictions cancels proposals disputes finalized panelDecided expiredNoAnswer expiredStuckDispute claims shareTransfers",n," ");
+            for(i=1;i<=12;i++) printf "%-22s total %-8d runs that reached it: %d\n", n[i], s[i], r[i]}' coverage-out/counters.csv
       # Static analysis. Findings are printed in full and kept as a file; the job does not fail on them so they can be
       # read and judged, and nothing here is "fixed" by hiding it.
       - uses: actions/setup-python@v5

@@ -345,18 +345,14 @@ contract InvariantTest is StdInvariant, Test {
         }
     }
 
-    function afterInvariant() public view {
-        console.log("trades", h.trades());
-        console.log("fullBookPlaces", h.fullBookPlaces());
-        console.log("evictions", h.evictions());
-        console.log("cancels", h.cancels());
-        console.log("proposals", h.proposals());
-        console.log("disputes", h.disputes());
-        console.log("finalized", h.finalized());
-        console.log("panelDecided", h.panelDecided());
-        console.log("expiredNoAnswer", h.expiredNoAnswer());
-        console.log("expiredStuckDispute", h.expiredStuckDispute());
-        console.log("claims", h.claims());
-        console.log("shareTransfers", h.shareTransfers());
+    /// One line per run is appended to a file, so the totals over all runs can be added up afterwards.
+    function afterInvariant() public {
+        string memory line = string.concat(
+            vm.toString(h.trades()), ",", vm.toString(h.fullBookPlaces()), ",", vm.toString(h.evictions()), ",",
+            vm.toString(h.cancels()), ",", vm.toString(h.proposals()), ",", vm.toString(h.disputes()), ",",
+            vm.toString(h.finalized()), ",", vm.toString(h.panelDecided()), ",", vm.toString(h.expiredNoAnswer()), ",",
+            vm.toString(h.expiredStuckDispute()), ",", vm.toString(h.claims()), ",", vm.toString(h.shareTransfers())
+        );
+        vm.writeLine("coverage-out/counters.csv", line);
     }
 }

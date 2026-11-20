@@ -6,12 +6,13 @@ import { bytesToHex, hexToBytes } from './lokyx';
 import { rpc, type GasEstimate, type RunResult } from './rpc';
 import { currentAddress, sendContract } from './wallet';
 import { addPending } from './data';
-import { BOARD_ABI, BOARD_WASM, MULTISIG_ABI, MULTISIG_WASM, TOKENLOCK_ABI, TOKENLOCK_WASM } from './contracts-wallet';
+import { BOARD_ABI, BOARD_WASM, MULTISIG_ABI, MULTISIG_WASM, TOKENLOCK_ABI, TOKENLOCK_WASM, MARKET_ABI, MARKET_WASM } from './contracts-wallet';
 
 export const KINDS = {
   multisig: { code: base64.decode(MULTISIG_WASM), abi: MULTISIG_ABI },
   board: { code: base64.decode(BOARD_WASM), abi: BOARD_ABI },
   tokenlock: { code: base64.decode(TOKENLOCK_WASM), abi: TOKENLOCK_ABI },
+  market: { code: base64.decode(MARKET_WASM), abi: MARKET_ABI },
 };
 export type Kind = keyof typeof KINDS;
 
