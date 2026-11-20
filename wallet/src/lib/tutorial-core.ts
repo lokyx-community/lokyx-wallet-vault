@@ -3,10 +3,8 @@
 
 export type TutorialId = 'vault' | 'recovery' | 'apps' | 'swap' | 'predict';
 
-/** The pictures a step can play. Each one loops quietly while its line is on screen. */
-export type SceneKind = 'split' | 'wait' | 'approve' | 'drop' | 'swap' | 'price';
-
-export type TutorialStep = { scene: SceneKind; line: string };
+/** One step: a line under the picture. The picture itself belongs to the feature (ui/TutorialScenes.tsx) and changes with the step. */
+export type TutorialStep = { line: string };
 export type Tutorial = { id: TutorialId; title: string; steps: TutorialStep[] };
 
 // Rule for every line: one or two short plain sentences, no jargon, says what happens to the person's money.
@@ -15,45 +13,45 @@ export const TUTORIALS: Record<TutorialId, Tutorial> = {
     id: 'vault',
     title: 'How your vault works',
     steps: [
-      { scene: 'drop', line: 'A daily allowance leaves at once, so everyday spending works as normal.' },
-      { scene: 'wait', line: 'Anything bigger waits first and can only go to your safe address. You can cancel it while it waits.' },
-      { scene: 'approve', line: 'Even someone who gets into your phone is held to the same limit and the same wait.' },
+      { line: 'A daily allowance leaves at once, so everyday spending works as normal.' },
+      { line: 'Anything bigger waits first and can only go to your safe address. You can cancel it while it waits.' },
+      { line: 'Even someone who gets into your phone is held to the same limit and the same wait.' },
     ],
   },
   recovery: {
     id: 'recovery',
     title: 'How the recovery key works',
     steps: [
-      { scene: 'split', line: 'Your 12 recovery words are kept apart from your phone. They never leave it once typed here.' },
-      { scene: 'wait', line: 'With them you can cancel anything that is still waiting.' },
-      { scene: 'approve', line: 'Or move everything to your safe address. They can do nothing else.' },
+      { line: 'Your 12 recovery words are kept apart from your phone. They never leave it once typed here.' },
+      { line: 'With them you can cancel anything that is still waiting.' },
+      { line: 'Or move everything to your safe address. They can do nothing else.' },
     ],
   },
   apps: {
     id: 'apps',
     title: 'How the Apps wallet works',
     steps: [
-      { scene: 'drop', line: 'Websites connect to this small wallet, never to your main one.' },
-      { scene: 'drop', line: 'Add only what you want to use. Anything else stays out of reach of sites.' },
-      { scene: 'approve', line: 'You approve every action on your phone before a site can spend.' },
+      { line: 'Websites connect to this small wallet, never to your main one.' },
+      { line: 'Add only what you want to use. Anything else stays out of reach of sites.' },
+      { line: 'You approve every action on your phone before a site can spend.' },
     ],
   },
   swap: {
     id: 'swap',
     title: 'How a swap works',
     steps: [
-      { scene: 'swap', line: 'You offer one coin and ask for another. Someone takes the other side.' },
-      { scene: 'wait', line: 'Both sides are locked until the trade completes, or you get your coin back.' },
-      { scene: 'approve', line: 'You see the final amounts before you confirm.' },
+      { line: 'You offer one coin and ask for another. Someone takes the other side.' },
+      { line: 'Both sides are locked until the trade completes, or you get your coin back.' },
+      { line: 'You see the final amounts before you confirm.' },
     ],
   },
   predict: {
     id: 'predict',
     title: 'How prediction markets work',
     steps: [
-      { scene: 'price', line: 'Each question has a Yes price and a No price. The price is the crowd’s chance, in cents.' },
-      { scene: 'drop', line: 'Buy at 60¢ and if you are right it pays 100¢. If you are wrong it pays nothing.' },
-      { scene: 'wait', line: 'After the end time an answer is proposed. Anyone can dispute it before it is final.' },
+      { line: 'Each question has a Yes price and a No price. The price is the crowd’s chance, in cents.' },
+      { line: 'Buy at 60¢ and if you are right it pays 100¢. If you are wrong it pays nothing.' },
+      { line: 'After the end time an answer is proposed. Anyone can dispute it before it is final.' },
     ],
   },
 };
