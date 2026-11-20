@@ -112,6 +112,9 @@ export interface TradeRow extends Trade {
   tx: string;
 }
 
+/** The newest block number, to start a short look-back from. */
+export const headBlock = async (): Promise<bigint> => BigInt((await ethPass(NET, 'eth_blockNumber', [])) as string);
+
 /** Every trade in one market, oldest first. Reads logs in windows so a public node never refuses the range. */
 export async function readTrades(id: number, fromBlock?: bigint, n: PredictNet = NET): Promise<TradeRow[]> {
   const d = deployment(n);
@@ -158,6 +161,12 @@ export const cancelOrder = (id: number, orderId: bigint) => send(deployment().ma
 export const proposeAnswer = (id: number, answer: 0 | 1 | 2) => send(deployment().market, PREDICT_ABI, 'propose', [BigInt(id), answer]);
 export const disputeAnswer = (id: number) => send(deployment().market, PREDICT_ABI, 'dispute', [BigInt(id)]);
 export const finalizeAnswer = (id: number) => send(deployment().market, PREDICT_ABI, 'finalize', [BigInt(id)]);
+/** Starts a market: the question, when trading stops (unix seconds), what one winning share pays, and 3 to 9 people who settle a dispute. */
+export const createMarket = (title: string, close: number, unit: bigint, panel: string[]) => send(deployment().market, PREDICT_ABI, 'create', [title, BigInt(close), unit, panel]);
+/** After a market has gone 30 days past its time with no settled answer, anyone can end it and everyone gets their coins back. */
+export const expireMarket = (id: number) => send(deployment().market, PREDICT_ABI, 'expire', [BigInt(id)]);
+/** The address that trades here: the first account's, which is also the one the play money goes to. */
+export const myAddress = async (): Promise<string> => (await ensurePrimary()).eth;
 export const claimWinnings = (id: number) => send(deployment().market, PREDICT_ABI, 'claim', [BigInt(id)]);
 
 // ---------- what happened, for the receipt ----------

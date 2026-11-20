@@ -65,6 +65,14 @@ export default function SwapTab() {
         button="Make or take an offer"
         onPress={() => router.push('/swap')}
       />
+      <Door
+        title="Markets"
+        tag={FEATURES.predict ? undefined : 'Not on yet'}
+        logos={<Stack><Over first><Logo id="usdt" size={26} /></Over><Over><CoinLogo chain="lyx" size={26} /></Over></Stack>}
+        text="Bet Yes or No on what happens next. Prices come from other people. Test coins only, for now."
+        button={FEATURES.predict ? 'Open markets' : 'See how it works'}
+        onPress={() => router.push('/predict')}
+      />
       {list.length > 0 && (
         <Group title="Your swaps">
           {list.map((r, i) => (
