@@ -3,17 +3,7 @@ pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
 import "../src/PredictionMarket.sol";
-
-contract MockUSDT {
-    mapping(address => uint256) public balanceOf;
-    mapping(address => mapping(address => uint256)) public allowance;
-    function mint(address to, uint256 n) external { balanceOf[to] += n; }
-    function approve(address s, uint256 n) external returns (bool) { allowance[msg.sender][s] = n; return true; }
-    function transfer(address to, uint256 n) external returns (bool) { balanceOf[msg.sender] -= n; balanceOf[to] += n; return true; }
-    function transferFrom(address f, address to, uint256 n) external returns (bool) {
-        allowance[f][msg.sender] -= n; balanceOf[f] -= n; balanceOf[to] += n; return true;
-    }
-}
+import "./Mocks.sol";
 
 contract PredictionMarketTest is Test {
     MockUSDT usdt;

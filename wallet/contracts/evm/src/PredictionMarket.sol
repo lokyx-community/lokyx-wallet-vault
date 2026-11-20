@@ -8,10 +8,38 @@ pragma solidity ^0.8.24;
 interface IERC20 {
     function transfer(address to, uint256 amount) external returns (bool);
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function balanceOf(address who) external view returns (uint256);
+}
+
+/// Token calls that fail loudly. USDT-style tokens return nothing from transfer, so an empty answer is accepted,
+/// but only from an address that really has code (a call to an empty address "succeeds" and moves nothing).
+library SafeERC20 {
+    function safeTransfer(IERC20 t, address to, uint256 v) internal {
+        _call(address(t), abi.encodeCall(IERC20.transfer, (to, v)));
+    }
+
+    function safeTransferFrom(IERC20 t, address from, address to, uint256 v) internal {
+        _call(address(t), abi.encodeCall(IERC20.transferFrom, (from, to, v)));
+    }
+
+    function _call(address t, bytes memory data) private {
+        require(t.code.length > 0, "the token must be a contract");
+        (bool ok, bytes memory r) = t.call(data);
+        require(ok, "token transfer failed");
+        if (r.length > 0) require(r.length == 32 && abi.decode(r, (bool)), "token transfer failed");
+    }
 }
 
 contract PredictionMarket {
+    using SafeERC20 for IERC20;
+
     IERC20 public immutable token;
+
+    /// The owner can only pause NEW activity (deposits, new markets, new orders). It can never touch anyone's coins,
+    /// and withdrawals, cancels, votes, finalizing, expiring and claims keep working while paused.
+    address public owner;
+    bool public paused;
+    uint256 private _lock = 1;
 
     uint256 public constant MAX_ORDERS = 100;
     uint256 public constant WINDOW = 1 days;
@@ -59,45 +87,71 @@ contract PredictionMarket {
     event Voted(uint256 indexed id, address indexed who, uint8 vote);
     event Decided(uint256 indexed id, State state);
 
+    modifier nonReentrant() {
+        require(_lock == 1, "reentrant call");
+        _lock = 2;
+        _;
+        _lock = 1;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "paused: no new deposits, markets or orders");
+        _;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "only the owner");
+        _;
+    }
+
+    event Paused(bool paused);
+    event OwnershipTransferred(address indexed from, address indexed to);
+
     constructor(address token_) {
+        require(token_ != address(0) && token_.code.length > 0, "the token must be a contract");
         token = IERC20(token_);
+        owner = msg.sender;
+        emit OwnershipTransferred(address(0), msg.sender);
+    }
+
+    function setPaused(bool p) external onlyOwner {
+        paused = p;
+        emit Paused(p);
+    }
+
+    function transferOwnership(address to) external onlyOwner {
+        emit OwnershipTransferred(owner, to);
+        owner = to; // address(0) gives the owner role up for good
     }
 
     // ---------- coins ----------
 
-    function deposit(uint256 amount) external {
+    function deposit(uint256 amount) external nonReentrant whenNotPaused {
         require(amount > 0, "send some coins to deposit");
-        _pull(msg.sender, amount);
+        uint256 before = token.balanceOf(address(this));
+        token.safeTransferFrom(msg.sender, address(this), amount);
+        // credit only what really arrived: a token that skims a fee would otherwise leave the market short
+        require(token.balanceOf(address(this)) - before == amount, "this token takes a fee on transfer");
         free[msg.sender] += amount;
         emit Deposit(msg.sender, amount);
     }
 
-    function withdraw(uint256 amount) external {
+    function withdraw(uint256 amount) external nonReentrant {
         require(free[msg.sender] >= amount, "not enough free coins");
-        free[msg.sender] -= amount;
-        _push(msg.sender, amount);
+        free[msg.sender] -= amount; // effects before the outside call
+        token.safeTransfer(msg.sender, amount);
         emit Withdraw(msg.sender, amount);
-    }
-
-    // USDT-style tokens may return nothing, so accept either.
-    function _pull(address from, uint256 amount) internal {
-        (bool ok, bytes memory r) = address(token).call(abi.encodeWithSelector(IERC20.transferFrom.selector, from, address(this), amount));
-        require(ok && (r.length == 0 || abi.decode(r, (bool))), "token transfer failed");
-    }
-
-    function _push(address to, uint256 amount) internal {
-        (bool ok, bytes memory r) = address(token).call(abi.encodeWithSelector(IERC20.transfer.selector, to, amount));
-        require(ok && (r.length == 0 || abi.decode(r, (bool))), "token transfer failed");
     }
 
     // ---------- markets ----------
 
-    function create(string calldata title, uint64 close, uint256 unit, address[] calldata panel) external returns (uint256 id) {
+    function create(string calldata title, uint64 close, uint256 unit, address[] calldata panel) external whenNotPaused returns (uint256 id) {
         require(bytes(title).length > 0 && bytes(title).length <= MAX_TITLE, "the question is empty or too long");
         require(close >= block.timestamp + 1 hours, "close at least an hour from now");
         require(unit >= 100 && unit % 100 == 0, "the share value must be a multiple of 100 base units");
         require(panel.length >= 3 && panel.length <= 9, "the panel needs between 3 and 9 people");
         for (uint256 i = 0; i < panel.length; i++) {
+            require(panel[i] != address(0) && panel[i] != address(this) && panel[i] != address(token), "that can't be a panel member");
             for (uint256 j = 0; j < i; j++) require(panel[i] != panel[j], "a panel member is listed twice");
         }
         id = count++;
@@ -118,13 +172,12 @@ contract PredictionMarket {
     }
 
     /// outcome: 0 Yes, 1 No. side: 0 buy, 1 sell. price is in the terms of `outcome` (62 = 62 cents per share).
-    function place(uint256 id, uint8 outcome, uint8 side, uint8 price, uint64 qty) external returns (uint64) {
+    function place(uint256 id, uint8 outcome, uint8 side, uint8 price, uint64 qty) external whenNotPaused returns (uint64) {
         Market storage m = _market(id);
         require(m.state == State.Open && block.timestamp < m.close, "this market is not taking orders");
         require(outcome < 2 && side < 2, "bad outcome or side");
         require(price >= 1 && price <= 99, "the price must be between 1 and 99");
         require(qty > 0, "buy or sell at least one share");
-        require(books[id].length < MAX_ORDERS, "too many orders are waiting in this market");
 
         uint256 cu = m.unit / 100;
         Kind kind;
@@ -150,7 +203,12 @@ contract PredictionMarket {
         uint64 oid = m.nextId++;
         Order memory inc = Order(oid, msg.sender, kind, yp, qty, locked);
         _match(id, m, inc);
-        if (inc.qty > 0) books[id].push(inc);
+        if (inc.qty > 0) {
+            // The cap limits only what can REST. If this order traded at all, at least one resting order was used up
+            // and removed, so there is room for what is left; only an order that could not trade is turned away.
+            require(books[id].length < MAX_ORDERS, "the book is full of waiting orders");
+            books[id].push(inc);
+        }
         emit OrderPlaced(id, oid, msg.sender);
         return oid;
     }
@@ -263,6 +321,8 @@ contract PredictionMarket {
         require(m.state == State.Open, "this market is already decided");
         require(block.timestamp >= m.close, "voting opens when the market closes");
         require(v < 3, "vote is 0 (Yes), 1 (No) or 2 (Invalid)");
+        // Once the objection window has run out the decision is final-able; a late vote must not be able to undo it.
+        if (m.decidedVote != 255) require(block.timestamp < uint256(m.decidedAt) + WINDOW, "the objection window is over: finalize it");
         uint256 idx = type(uint256).max;
         for (uint256 i = 0; i < m.panel.length; i++) if (m.panel[i] == msg.sender) idx = i;
         require(idx != type(uint256).max, "only the panel can vote");
@@ -296,6 +356,7 @@ contract PredictionMarket {
     function expire(uint256 id) external {
         Market storage m = _market(id);
         require(m.state == State.Open, "this market is already decided");
+        require(m.decidedVote == 255, "the panel has agreed: finalize it instead");
         require(block.timestamp >= uint256(m.close) + EXPIRE_AFTER, "not yet: the panel still has time");
         m.state = State.Invalid;
         emit Decided(id, State.Invalid);
