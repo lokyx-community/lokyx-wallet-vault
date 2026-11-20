@@ -1,3 +1,4 @@
+import { Aurora } from '../ui/Aurora';
 import { useEffect, useId, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
@@ -99,6 +100,7 @@ export default function VaultFirst() {
   };
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top + 18, paddingBottom: insets.bottom + 20, paddingHorizontal: 22, gap: 22 }}>
+      <Aurora />
       <View style={{ flexDirection: 'row', gap: 8, paddingTop: 6 }}>
         <View style={{ flex: 1, height: 2, borderRadius: 1, backgroundColor: C.text }} />
         <View style={{ flex: 1, height: 2, borderRadius: 1, backgroundColor: C.line2 }} />

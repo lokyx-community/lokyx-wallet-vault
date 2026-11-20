@@ -1,3 +1,4 @@
+import { Aurora } from '../../ui/Aurora';
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   RefreshControl,
@@ -18,7 +19,7 @@ import { T } from "../../ui/Text";
 import { Icon } from "../../ui/Icon";
 import { Field, Press, success } from "../../ui/controls";
 import { MarkDraw } from "../../ui/Intro";
-import { NeonCard, cardHeight, type NeonData } from "../../ui/NeonCard";
+import { NeonCard, type NeonData } from "../../ui/NeonCard";
 import { CardCarousel } from "../../ui/CardCarousel";
 import { EthNets, netName } from "../../ui/ChainGroup";
 import { Logo } from "../../ui/Logo";
@@ -196,6 +197,9 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const { width: sw } = useWindowDimensions();
   const cw = Math.min(sw - 32, 420);
+  // the cards are tall like the Receive card, a little narrower than the page so the next one peeks in
+  const tallW = Math.round(cw * 0.7);
+  const tallH = Math.round(tallW * 1.28);
   const me = useAccountRef();
   const w = useWallet();
   const hide = w.settings.hideBalance;
@@ -309,6 +313,7 @@ export default function Home() {
   const btcH = useAsync(async () => (frontId === "btc" && coins.btc.address ? btcHistory(nets.btc, coins.btc.address) : null), [frontId, coins.btc.address, nets.btc], 60_000);
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <Aurora strength={1} />
       <Animated.ScrollView
         onScroll={onScroll}
         scrollEventThrottle={16}
@@ -406,17 +411,17 @@ export default function Home() {
         ) : null}
         <Animated.View style={[{ marginTop: 6, zIndex: 2 }, cardDepth]}>
           <CardCarousel
-            width={cw - 24}
-            height={cardHeight(cw - 24)}
+            width={tallW}
+            height={tallH}
             index={front}
             onIndex={setFront}
             cards={[
               ...deck.map((d) => (
                 <Press key={d.id} onPress={() => open(d.id)} scaleTo={0.985} accessibilityLabel={`${d.c.title} card`}>
-                  <NeonCard c={d.c} width={cw - 24} hide={hide} />
+                  <NeonCard c={d.c} width={tallW} height={tallH} hide={hide} />
                 </Press>
               )),
-              ...(port ? [<Press key="portfolio" onPress={() => open("portfolio")} scaleTo={0.985} accessibilityLabel="Portfolio card"><PortfolioCard p={port} cur={cur} width={cw - 24} height={cardHeight(cw - 24)} hide={hide} /></Press>] : []),
+              ...(port ? [<Press key="portfolio" onPress={() => open("portfolio")} scaleTo={0.985} accessibilityLabel="Portfolio card"><PortfolioCard p={port} cur={cur} width={tallW} height={tallH} hide={hide} /></Press>] : []),
             ]}
           />
         </Animated.View>

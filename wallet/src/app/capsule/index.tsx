@@ -1,3 +1,4 @@
+import { Aurora } from '../../ui/Aurora';
 import { useEffect } from 'react';
 import { ScrollView, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
@@ -46,6 +47,7 @@ function Capsules() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <Aurora />
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 120 }}>
         <View style={{ paddingHorizontal: 16, flexDirection: 'row' }}>
           <IconButton name="back" label="Back" onPress={() => router.back()} />

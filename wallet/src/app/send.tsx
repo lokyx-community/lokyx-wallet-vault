@@ -1,3 +1,4 @@
+import { Aurora } from '../ui/Aurora';
 import { useEffect, useMemo, useState } from 'react';
 import { flyCoin } from '../ui/CoinFlight';
 import { ScrollView, View } from 'react-native';
@@ -75,6 +76,7 @@ export default function Send() {
   const title = step === 'to' ? 'Send' : step === 'amount' ? '' : step === 'review' ? 'Review' : '';
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top + 8, paddingBottom: insets.bottom + 12 }}>
+      <Aurora />
       {step !== 'sent' && (
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 48, gap: 12 }}>
           {step === 'to' || (step === 'amount' && q.to) ? (

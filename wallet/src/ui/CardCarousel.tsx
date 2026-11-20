@@ -1,5 +1,5 @@
 import { useRef, type ReactNode } from 'react';
-import { View } from 'react-native';
+import { View, useWindowDimensions } from 'react-native';
 import Animated, { Extrapolation, interpolate, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import { tick } from './controls';
 import { C } from './theme';
@@ -12,6 +12,9 @@ const GAP = 12;
  */
 export function CardCarousel({ cards, width, height, index, onIndex }: { cards: ReactNode[]; width: number; height: number; index: number; onIndex: (i: number) => void }) {
   const x = useSharedValue(0);
+  const screen = useWindowDimensions().width;
+  // a card narrower than the page sits in the middle, with its neighbours peeking in at both sides
+  const pad = Math.max(16, Math.round((screen - width) / 2));
   const step = width + GAP;
   const last = useRef(index);
   const settle = (i: number) => {
@@ -37,7 +40,7 @@ export function CardCarousel({ cards, width, height, index, onIndex }: { cards: 
         disableIntervalMomentum
         onScroll={onScroll}
         scrollEventThrottle={16}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 14, gap: GAP }}
+        contentContainerStyle={{ paddingHorizontal: pad, paddingVertical: 14, gap: GAP }}
         style={{ marginHorizontal: -16 }}
       >
         {cards.map((c, i) => (

@@ -1,3 +1,4 @@
+import { Aurora } from '../../ui/Aurora';
 import { useCallback, useMemo } from 'react';
 import { RefreshControl, SectionList, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -70,6 +71,7 @@ export default function Notifications() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <Aurora />
       <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 20, paddingBottom: 6, flexDirection: 'row', alignItems: 'flex-end' }}>
         <View style={{ flex: 1 }}>
           <T style={{ fontFamily: F.semibold, fontSize: 34, letterSpacing: -1.2 }}>Inbox</T>

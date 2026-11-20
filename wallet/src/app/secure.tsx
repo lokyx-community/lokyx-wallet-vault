@@ -1,3 +1,4 @@
+import { Aurora } from '../ui/Aurora';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +29,7 @@ export default function Secure() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top + 64, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }}>
+      <Aurora />
       <SetupSteps at={step === 'bio' ? 4 : 3} />
       {step === 'pin' && (
         <Animated.View key="a" entering={FadeIn} style={{ flex: 1 }}>

@@ -1,3 +1,4 @@
+import { Aurora } from '../../ui/Aurora';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
@@ -76,7 +77,9 @@ export default function SwapQuote() {
   const direct = directReady(from, to);
 
   return (
-    <KeyboardScroll contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 20, paddingBottom: insets.bottom + 130, gap: 14 }} style={{ flex: 1, backgroundColor: C.bg }}>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <Aurora />
+    <KeyboardScroll contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 20, paddingBottom: insets.bottom + 130, gap: 14 }} style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <IconButton name="back" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
         <T v="display">Swap</T>
@@ -142,6 +145,7 @@ export default function SwapQuote() {
         </>
       )}
     </KeyboardScroll>
+    </View>
   );
 }
 

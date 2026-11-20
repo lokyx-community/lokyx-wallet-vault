@@ -1,3 +1,4 @@
+import { Aurora } from '../../ui/Aurora';
 import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -150,6 +151,7 @@ function TradeOn() {
     };
     return (
       <View style={{ flex: 1, backgroundColor: C.bg, paddingHorizontal: 24, paddingTop: 80, paddingBottom: 40 }}>
+        <Aurora />
         <View style={{ flex: 1, justifyContent: 'center' }}>
           {printed ? <Slip slip={slip} done={done} caption={result?.mined ? facts.detail : 'On its way · lands with the next block'} /> : <Sending />}
         </View>

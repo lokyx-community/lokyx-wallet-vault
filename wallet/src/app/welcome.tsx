@@ -1,3 +1,4 @@
+import { Aurora } from '../ui/Aurora';
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
@@ -21,6 +22,7 @@ export default function Welcome() {
   const back = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value * 360}deg` }] }));
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top, paddingBottom: insets.bottom + 20, paddingHorizontal: 24 }}>
+      <Aurora />
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', opacity: 0.07 }]}>
         <Animated.View style={back}>
           <RingCode address={SAMPLE} size={620} center={false} />

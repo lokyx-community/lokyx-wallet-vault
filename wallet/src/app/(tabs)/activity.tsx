@@ -1,3 +1,4 @@
+import { Aurora } from '../../ui/Aurora';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, SectionList, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -114,6 +115,7 @@ export default function Activity() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <Aurora />
       <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 20, gap: 14, paddingBottom: 8 }}>
         <T v="display">Activity</T>
         {summary}

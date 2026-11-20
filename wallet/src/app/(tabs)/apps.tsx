@@ -1,3 +1,4 @@
+import { Aurora } from '../../ui/Aurora';
 import { useEffect, useId, useState } from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
@@ -255,6 +256,7 @@ export default function Apps() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <Aurora />
     <Aurora width={sw} height={340} strength={0.6} />
     <KeyboardScroll style={{ flex: 1 }} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 20, paddingBottom: insets.bottom + 130, gap: 30 }} keyboardShouldPersistTaps="handled">
       <Animated.View entering={r[0]} style={{ gap: 16 }}>

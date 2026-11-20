@@ -1,3 +1,4 @@
+import { Aurora } from '../../ui/Aurora';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, ScrollView, Share, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -214,6 +215,7 @@ function CapsuleScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <Aurora />
       <KeyboardScroll contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 40, gap: 20 }}>
         <View style={{ paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between' }}>
           <IconButton name="back" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/capsule'))} />

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Aurora } from '../../ui/Aurora';
 import { Alert, Platform, ScrollView, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -56,7 +57,9 @@ export default function You() {
   const dot = { height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.4)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.28)', alignItems: 'center' as const, justifyContent: 'center' as const };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 20, paddingBottom: insets.bottom + 130, gap: 18 }}>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <Aurora />
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 20, paddingBottom: insets.bottom + 130, gap: 18 }}>
       <T v="display">You</T>
       <Animated.View entering={FadeIn} style={{ width: cw, height: ch, alignSelf: 'center' }}>
         <WalletCard c={{ kind: 'lyx', title: me?.name ?? 'My wallet', sub: 'My wallet', balance: ' ', unit: '', address: '' }} width={cw} />
@@ -133,5 +136,6 @@ export default function You() {
         <T v="caption" color={C.faint}>Your keys never leave this phone.</T>
       </View>
     </ScrollView>
+    </View>
   );
 }

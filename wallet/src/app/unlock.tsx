@@ -1,3 +1,4 @@
+import { Aurora } from '../ui/Aurora';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, AppState, Platform, View } from 'react-native';
 import { router } from 'expo-router';
@@ -71,6 +72,7 @@ export default function Unlock() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top + 40, paddingBottom: insets.bottom + 12, paddingHorizontal: 24, justifyContent: 'space-between' }}>
+      <Aurora />
       {pad ? (
         <Animated.View key="pad" entering={FadeIn.duration(300)} style={{ alignItems: 'center', gap: 32 }}>
           <Mark size={44} color={C.text} />

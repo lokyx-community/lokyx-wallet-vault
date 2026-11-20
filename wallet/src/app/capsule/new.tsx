@@ -1,3 +1,4 @@
+import { Aurora } from '../../ui/Aurora';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
@@ -125,6 +126,7 @@ function NewCapsule() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top + 8 }}>
+      <Aurora />
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 48 }}>
         <IconButton name="close" label="Close" onPress={() => router.back()} />
         <T v="headline" style={{ flex: 1, textAlign: 'center', marginRight: 40 }}>New time capsule</T>
@@ -232,6 +234,7 @@ function Sealing({ note, opens, to }: { note: string; opens: number; to: string 
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top, paddingBottom: insets.bottom + 20 }}>
+      <Aurora />
       <Animated.View style={[{ position: 'absolute', top: insets.top + 40, left: 0, right: 0, alignItems: 'center' }, orbit]}>
         <OrbitScene size={Math.min(width, 440)} riders={[0.05]} speed={2.2} />
       </Animated.View>

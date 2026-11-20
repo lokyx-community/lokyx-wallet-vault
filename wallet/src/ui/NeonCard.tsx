@@ -6,7 +6,7 @@ import { T } from './Text';
 import { Digits } from './Digits';
 import { Skeleton } from './Skeleton';
 import { Logo } from './Logo';
-import { CoinLogo, TokenLogo } from './CoinLogo';
+import { TokenLogo } from './CoinLogo';
 import { F } from './theme';
 import type { LogoId } from './logos';
 
@@ -19,12 +19,12 @@ export interface NeonData {
   unit: string;
   /** the second line: the fiat value on mainnet, or "Testnet · no market value" */
   note?: string;
-  /** the whole coin mark, top right */
+  /** the coin mark, top left */
   mark: { kind: 'lyx' } | { kind: 'logo'; id: LogoId } | { kind: 'token'; symbol: string; seed: string };
   address?: string;
 }
 
-const R = 26;
+const R = 34;
 
 /** A credit card is 85.6 by 54 mm, so every card in the wallet is this shape. */
 export const CARD_RATIO = 1.586;
@@ -37,9 +37,9 @@ export function NeonCard({ c, width, height, hide }: { c: NeonData; width: numbe
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
   const [whole, dec] = c.balance.includes('.') ? [c.balance.slice(0, c.balance.indexOf('.')), c.balance.slice(c.balance.indexOf('.'))] : [c.balance, ''];
   const numeric = /^[\d,]+$/.test(whole) && /^(\.\d+)?$/.test(dec);
-  const big = { fontFamily: F.medium, fontSize: 40, lineHeight: 48, letterSpacing: -1.8 } as const;
-  const small = { fontFamily: F.regular, fontSize: 23, lineHeight: 30, letterSpacing: -0.6 } as const;
-  const mark = Math.min(46, Math.round(h * 0.2));
+  const narrow = width < 300;
+  const big = { fontFamily: F.medium, fontSize: narrow ? 31 : 40, lineHeight: narrow ? 38 : 48, letterSpacing: narrow ? -1.3 : -1.8 } as const;
+  const small = { fontFamily: F.regular, fontSize: narrow ? 19 : 23, lineHeight: narrow ? 26 : 30, letterSpacing: -0.6 } as const;
   const logo = c.mark.kind === 'logo' ? c.mark.id : undefined;
   return (
     <View style={{ width, height: h, borderRadius: R, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 20, shadowOffset: { width: 0, height: 12 }, elevation: 10 }}>
@@ -68,14 +68,14 @@ export function NeonCard({ c, width, height, hide }: { c: NeonData; width: numbe
         <Rect width={width} height={h} fill={`url(#h${id})`} />
         <Rect y={h * 0.55} width={width} height={h * 0.45} fill={`url(#d${id})`} />
       </Svg>
-      <Watermark kind={kind} logo={logo} h={h} />
-      {/* stops short of the coin mark so a long network name never runs under it */}
-      <View style={{ position: 'absolute', left: 22, top: 24, right: mark + 44 }}>
-        <T numberOfLines={1} style={{ fontFamily: F.semibold, fontSize: 12, letterSpacing: 1.8, color: s.ink }}>{c.title.toUpperCase()}</T>
-        {c.sub ? <T numberOfLines={1} style={{ fontFamily: F.regular, fontSize: 12, color: s.sub, paddingTop: 3 }}>{c.sub}</T> : null}
-      </View>
-      <View style={{ position: 'absolute', right: 20, top: 20 }}>
-        {c.mark.kind === 'lyx' ? <CoinLogo chain="lyx" size={mark} /> : c.mark.kind === 'token' ? <TokenLogo symbol={c.mark.symbol} seed={c.mark.seed} size={mark} /> : <Logo id={c.mark.id} size={mark} />}
+      {kind === 'lyx' ? null : <Watermark kind={kind} logo={logo} h={h} />}
+      {/* like the Receive card: the coin's mark and name at the top left. LOKYX has no mark here, just its name. */}
+      <View style={{ position: 'absolute', left: 22, top: 22, right: 22, flexDirection: 'row', alignItems: 'center', gap: 11 }}>
+        {c.mark.kind === 'lyx' ? null : c.mark.kind === 'token' ? <TokenLogo symbol={c.mark.symbol} seed={c.mark.seed} size={30} /> : <Logo id={c.mark.id} size={30} />}
+        <View style={{ flex: 1 }}>
+          <T numberOfLines={1} style={{ fontFamily: F.semibold, fontSize: 16, letterSpacing: -0.2, color: s.ink }}>{c.title}</T>
+          {c.sub ? <T numberOfLines={1} style={{ fontSize: 10, letterSpacing: 1.8, color: s.sub, marginTop: 1 }}>{c.sub.toUpperCase()}</T> : null}
+        </View>
       </View>
       <View style={{ position: 'absolute', left: 22, right: 18, bottom: 46, flexDirection: 'row', alignItems: 'flex-end', overflow: 'hidden' }}>
         {hide ? (

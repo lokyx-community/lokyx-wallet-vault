@@ -9,7 +9,7 @@ import { KeyboardScroll } from './KeyboardScroll';
 import { C, F } from './theme';
 import { T } from './Text';
 import { Icon, type IconName } from './Icon';
-import { Glow } from './Glow';
+import { Aurora } from './Aurora';
 import { PopCard } from './PopCard';
 import { cardFor } from '../lib/problem-core';
 import { plainError } from '../lib/plain-error';
@@ -111,7 +111,7 @@ export function Screen({ title, children, right, scroll = true, back = true, clo
   const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <Glow />
+      <Aurora />
       <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: insets.top + 56 }}>
         {back && !close && <IconButton name="back" label="Back" onPress={leave} />}
         <T v="headline" style={{ flex: 1, textAlign: close ? 'left' : 'center', marginRight: back && !close && !right ? 52 : 0 }} numberOfLines={1}>
@@ -142,7 +142,7 @@ export function Group({ children, title, style }: { children: ReactNode; title?:
           {title}
         </T>
       )}
-      <View style={{ borderRadius: 24, backgroundColor: C.fill, overflow: 'hidden' }}>
+      <View style={{ borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
         {kids.map((k, i) => (
           <View key={i}>
             {i > 0 && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: C.line2, marginLeft: (kids[i] as { props?: { icon?: unknown; lead?: unknown } })?.props?.lead ? 70 : (kids[i] as { props?: { icon?: unknown } })?.props?.icon ? 64 : 16 }} />}
