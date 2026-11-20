@@ -1,3 +1,5 @@
+import { Tutorial, HowItWorks } from '../../ui/Tutorial';
+import { useTutorial } from '../../lib/tutorial';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
@@ -33,6 +35,7 @@ const trim = (s: string) => (s.includes('.') ? s.replace(/0+$/, '').replace(/\.$
 
 /** The Apps wallet: the only account websites can see. Holds what you add and nothing else. */
 export default function AppsWallet() {
+  const tut = useTutorial('apps');
   const { address } = useApps();
   const sites = useEvmSites().filter((s) => !!address && s.address.toLowerCase() === address.toLowerCase());
   const [making, setMaking] = useState(false);
@@ -55,16 +58,19 @@ export default function AppsWallet() {
   if (!address)
     return (
       <Screen title="Apps wallet" large>
+        <Tutorial id="apps" open={tut.open} onClose={tut.close} />
         <AppsCard />
         <T v="sub" dim style={{ lineHeight: 21 }}>A small wallet just for websites. They can only reach what you put in it, so the worst a bad site can do is take that. Your vault and main wallet stay hidden.</T>
         <ErrorText>{err}</ErrorText>
         <Button title="Make my Apps wallet" onPress={make} busy={making} />
+        <HowItWorks onPress={tut.replay} />
       </Screen>
     );
 
   const heldLogos = [...new Set((held.data ?? []).map((h) => logoFor(h.symbol)).filter((x): x is NonNullable<typeof x> => !!x))];
   return (
     <Screen title="Apps wallet" large>
+      <Tutorial id="apps" open={tut.open} onClose={tut.close} />
       <AppsCard held={heldLogos} />
       {held.data && held.data.length > 0 ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
@@ -121,6 +127,7 @@ export default function AppsWallet() {
           ))
         )}
       </Group>
+      <HowItWorks onPress={tut.replay} />
     </Screen>
   );
 }

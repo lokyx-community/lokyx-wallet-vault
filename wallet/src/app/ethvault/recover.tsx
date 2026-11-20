@@ -1,3 +1,5 @@
+import { Tutorial, HowItWorks } from '../../ui/Tutorial';
+import { useTutorial } from '../../lib/tutorial';
 import { useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { plainError } from '../../lib/plain-error';
@@ -20,6 +22,7 @@ import { formatUnits } from '../../lib/multichain-core';
  * needs a little ETH on the network for fees.
  */
 export default function EthRecover() {
+  const tut = useTutorial('recovery');
   const p = useLocalSearchParams<{ net?: VaultNet }>();
   const [net, setNet] = useState<VaultNet>(p.net && NETS.includes(p.net) ? p.net : NETS[0]);
   const v = useStore(vaults)[net];
@@ -59,6 +62,7 @@ export default function EthRecover() {
   const ready = words.trim().split(/\s+/).length >= 12;
   return (
     <Screen title="Ethereum recovery key" large>
+      <Tutorial id="recovery" open={tut.open} onClose={tut.close} />
       <ScreenGuard />
       <LogoChips<VaultNet> value={net} onChange={setNet} items={NETS.map((n) => ({ key: n, label: VAULT_MARK[n].name, logo: VAULT_MARK[n].logo }))} />
       <T v="callout" dim style={{ lineHeight: 22 }}>Type the 12 words you wrote down when you made the vault. They never leave this phone. With them you can cancel everything waiting, or move the coins to your safe address. They can do nothing else.</T>
@@ -71,6 +75,7 @@ export default function EthRecover() {
       <T v="caption" dim style={{ lineHeight: 18 }}>The recovery address pays its own network fees, so keep a little ETH on it on each network. Only ETH and the tokens on your allowance list move. Other tokens stay until you add them to that list.</T>
       <ErrorText>{err}</ErrorText>
       {note ? <Note>{note}</Note> : null}
+      <HowItWorks onPress={tut.replay} />
     </Screen>
   );
 }

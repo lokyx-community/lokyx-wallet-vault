@@ -1,3 +1,5 @@
+import { Tutorial, HowItWorks } from '../../ui/Tutorial';
+import { useTutorial } from '../../lib/tutorial';
 import { IntroHero, Feature, Features } from '../../ui/Feature';
 import { View } from 'react-native';
 import { router } from 'expo-router';
@@ -30,6 +32,7 @@ function Pending({ p, height, blockTime, me, delay, onDone }: { p: PendingInfo; 
 }
 
 export default function VaultScreen() {
+  const tut = useTutorial('vault');
   const me = currentAddress();
   const acct = usePoll<Account>('lyx_getAccount', { address: me }, 6000);
   const info = usePoll<ChainInfo>('lyx_chainInfo', {}, 6000);
@@ -44,6 +47,7 @@ export default function VaultScreen() {
   if (!v) {
     return (
       <Screen title="Vault" large>
+        <Tutorial id="vault" open={tut.open} onClose={tut.close} />
         <IntroHero icon="shield" text="A normal account with a speed limit. Only a daily allowance can leave right away. Anything bigger waits, in the open, where you can stop it." />
         <Features>
           <Feature icon="coin" title="A daily allowance" text="Everyday spending works as normal, up to a limit you choose." />
@@ -54,6 +58,7 @@ export default function VaultScreen() {
         <Button title="Set up a vault" onPress={() => router.push('/vault/setup')} />
         <Button title="Use a recovery key" kind="line" onPress={() => router.push('/vault/recover')} />
         {a.heirOf && a.heirOf.length > 0 ? <HeirClaims vaults={a.heirOf} me={me} bt={bt} /> : null}
+        <HowItWorks onPress={tut.replay} />
       </Screen>
     );
   }
@@ -63,6 +68,7 @@ export default function VaultScreen() {
   const dayLeft = inTime(v.dayResetsAt - height, bt);
   return (
     <Screen title="Vault" large>
+      <Tutorial id="vault" open={tut.open} onClose={tut.close} />
       <View style={{ borderRadius: 24, backgroundColor: C.fill, padding: 20, gap: 6 }}>
         <T v="sub" dim>Left to spend today</T>
         <T v="display">{niceLyx(formatLyx(BigInt(v.allowanceLeft)))} LYX</T>
@@ -93,6 +99,7 @@ export default function VaultScreen() {
       )}
       <Note>{KEY_THEFT_NOTICE}</Note>
       {a.heirOf && a.heirOf.length > 0 ? <HeirClaims vaults={a.heirOf} me={me} bt={bt} /> : null}
+      <HowItWorks onPress={tut.replay} />
     </Screen>
   );
 }

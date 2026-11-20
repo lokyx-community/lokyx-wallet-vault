@@ -1,3 +1,5 @@
+import { Tutorial, HowItWorks } from '../../ui/Tutorial';
+import { useTutorial } from '../../lib/tutorial';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { T } from '../../ui/Text';
@@ -14,6 +16,7 @@ import { currentAddress } from '../../lib/wallet';
 
 /** With the 12-word recovery phrase: cancel what's pending, or sweep everything to the safe address. */
 export default function Recover() {
+  const tut = useTutorial('recovery');
   const [phrase, setPhrase] = useState('');
   const [bk, setBk] = useState(false);
   const [keys, setKeys] = useState<ReturnType<typeof recoveryKeys> | null>(null);
@@ -41,6 +44,7 @@ export default function Recover() {
 
   return (
     <Screen title="Recovery key" large>
+      <Tutorial id="recovery" open={tut.open} onClose={tut.close} />
       <ScreenGuard />
       {!keys || vaults.length === 0 ? (
         <>
@@ -59,6 +63,7 @@ export default function Recover() {
           ))}
         </>
       )}
+      <HowItWorks onPress={tut.replay} />
     </Screen>
   );
 }

@@ -1,3 +1,5 @@
+import { Tutorial, HowItWorks } from '../../ui/Tutorial';
+import { useTutorial } from '../../lib/tutorial';
 import { useEffect, useState } from "react";
 import { View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
@@ -69,6 +71,7 @@ const left = (t: number) => {
 
 /** The Ethereum vault, one network at a time: the same vault address has separate settings on each network. */
 export default function EthVault() {
+  const tut = useTutorial('vault');
   const p = useLocalSearchParams<{ net?: VaultNet }>();
   const [net, setNet] = useState<VaultNet>(
     p.net && NETS.includes(p.net) ? p.net : NETS[0],
@@ -98,6 +101,7 @@ export default function EthVault() {
 
   return (
     <Screen title="Ethereum vault" large>
+      <Tutorial id="vault" open={tut.open} onClose={tut.close} />
       <LogoChips<VaultNet> value={net} onChange={setNet} items={NETS.map((n) => ({ key: n, label: VAULT_MARK[n].name, logo: VAULT_MARK[n].logo }))} />
       {!v ? (
         <>
@@ -295,6 +299,7 @@ export default function EthVault() {
           {s && <T v="caption" dim style={{ lineHeight: 18 }}>Each time you open the app, the vault's rules are read from the network and checked against what you set up. Anything different is shown here and sent as an alert.</T>}
         </>
       )}
+      <HowItWorks onPress={tut.replay} />
     </Screen>
   );
 }
