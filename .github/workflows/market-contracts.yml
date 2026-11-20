@@ -117,3 +117,21 @@ jobs:
       - run: git clone --depth 1 https://github.com/foundry-rs/forge-std lib/forge-std
       # Plants one deliberate bug and checks that some test fails. A mutant that survives is a gap in the tests.
       - run: python3 script/mutate.py ${{ matrix.index }}
+
+  engine-mutants:
+    name: LOKYX engine (mutation check)
+    runs-on: ubuntu-latest
+    needs: lokyx
+    defaults:
+      run:
+        working-directory: wallet/contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: wallet/contracts
+      - run: cargo install cargo-mutants --locked
+      # Changes the engine one small way at a time (a + into a -, a < into a <=, a return value, ...) and checks that a test fails.
+      # A change no test notices is listed as MISSED.
+      - run: cargo mutants -p market-engine --no-shuffle --timeout 60 -- --lib
