@@ -72,6 +72,16 @@ const cached = new Map<number, Addrs>();
 export function ensureAddresses(): Promise<Addrs> {
   return addrsFor(curAcct());
 }
+/**
+ * The addresses of the account in use, for a screen. It looks them up again whenever the account in use changes, and never
+ * hands back the previous account's addresses while the new ones load.
+ */
+export function useMyAddresses() {
+  const idx = useStore(wallet).current;
+  const r = useAsync(async () => (wallet.get().exists ? { i: idx, a: await addrsFor(idx) } : null), [idx]);
+  const data = r.data && r.data.i === idx ? r.data.a : undefined;
+  return { data, error: r.error, refresh: r.refresh };
+}
 /** The first account's addresses. Vaults, shared accounts and swaps belong to it, whichever account is in use. */
 export const ensurePrimary = (): Promise<Addrs> => addrsFor(0);
 

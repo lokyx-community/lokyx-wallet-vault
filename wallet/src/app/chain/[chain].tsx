@@ -10,7 +10,7 @@ import { Segmented } from '../../ui/Segmented';
 import { chainToSun } from '../../lib/chain-sun';
 import { C, F } from '../../ui/theme';
 import { CoinLogo } from '../../ui/CoinLogo';
-import { ensureAddresses, btcBalance, btcHistory, ethBalance, tokenBalance, tokensFor, useAsync, useChainSettings, activeNets } from '../../lib/multichain';
+import { btcBalance, btcHistory, ethBalance, tokenBalance, tokensFor, useAsync, useChainSettings, useMyAddresses, activeNets } from '../../lib/multichain';
 import { BTC_NETS, ETH_NETS, formatBtc, formatUnits } from '../../lib/multichain-core';
 import { shortAddr } from '../../lib/format';
 
@@ -20,7 +20,7 @@ export default function Chain() {
   useChainSettings();
   const nets = activeNets();
   const isBtc = chain === 'btc';
-  const a = useAsync(() => ensureAddresses(), []);
+  const a = useMyAddresses();
   const addr = a.data ? (isBtc ? a.data.btc[nets.btc] : a.data.eth) : '';
   const meta = isBtc ? BTC_NETS[nets.btc] : ETH_NETS[nets.eth];
   const bal = useAsync(async () => {

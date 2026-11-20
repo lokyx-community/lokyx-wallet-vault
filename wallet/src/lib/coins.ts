@@ -1,9 +1,9 @@
 import { useMemo, useRef } from 'react';
 import { usePoll, type Account } from './rpc';
-import { useAccountRef, wallet } from './wallet';
+import { useAccountRef } from './wallet';
 import { useStore } from './store';
 import { readFrom } from './arrivals-core';
-import { addrs as addrStore, activeNets, btcBalance, ensureAddresses, ethBalance, tokenBalance, tokensFor, useAsync, useChainSettings, useTokensStore } from './multichain';
+import { addrs as addrStore, activeNets, btcBalance, ethBalance, tokenBalance, tokensFor, useAsync, useChainSettings, useMyAddresses, useTokensStore } from './multichain';
 import { BTC_NETS, ETH_NETS, EVM_FAMILIES, EVM_ORDER, evmNet, evmOf, formatBtc, formatUnits, type EvmFamily } from './multichain-core';
 import { SOL_NETS, SOL_DECIMALS } from './sol-core';
 import { TRON_NETS, TRX_DECIMALS } from './tron-core';
@@ -47,7 +47,7 @@ export function useCoins(): Coins {
   useChainSettings();
   useTokensStore();
   const nets = activeNets();
-  const addrs = useAsync(async () => (wallet.get().exists ? ensureAddresses() : null), []);
+  const addrs = useMyAddresses();
   const btcAddr = addrs.data?.btc[nets.btc] ?? '';
   const ethAddr = addrs.data?.eth ?? '';
   // A balance that is still the old network's while a new one loads must never be filed under the new network:

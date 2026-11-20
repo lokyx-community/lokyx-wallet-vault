@@ -5,16 +5,15 @@ import { T } from './Text';
 import { Press } from './controls';
 import { CoinLogo } from './CoinLogo';
 import { Skeleton } from './Skeleton';
-import { activeNets, btcBalance, ensureAddresses, ethBalance, useAsync, useChainSettings } from '../lib/multichain';
+import { activeNets, btcBalance, ethBalance, useAsync, useChainSettings, useMyAddresses } from '../lib/multichain';
 import { BTC_NETS, ETH_NETS, formatBtc, formatUnits } from '../lib/multichain-core';
-import { wallet } from '../lib/wallet';
 import { DUR, EASE_OUT } from './motion';
 
 /** Bitcoin and Ethereum rows under the LYX balance. Test networks only in this beta. */
 export function OtherChains({ hide }: { hide: boolean }) {
   useChainSettings();
   const nets = activeNets();
-  const a = useAsync(async () => (wallet.get().exists ? ensureAddresses().catch(() => null) : null), []);
+  const a = useMyAddresses();
   const addrs = a.data;
   const b = useAsync(async () => (addrs ? btcBalance(nets.btc, addrs.btc[nets.btc]) : null), [addrs, nets.btc], 30_000);
   const e = useAsync(async () => (addrs ? ethBalance(nets.eth, addrs.eth) : null), [addrs, nets.eth], 30_000);
