@@ -94,7 +94,7 @@ export default function SharedList() {
           <T v="sub" dim>Ask whoever made it for its address. You must be one of its owners.</T>
           <Field value={addr} onChangeText={setAddr} placeholder="lyx1…" autoCapitalize="none" autoCorrect={false} mono />
           <Field value={name} onChangeText={setName} placeholder="A name for it, like Family fund" maxLength={30} />
-          <ErrorText>{addr.length > 8 && !isAddress(addr.trim().toLowerCase()) ? "That isn't a LOKYX address." : ''}</ErrorText>
+          <ErrorText hint>{addr.length > 8 && !isAddress(addr.trim().toLowerCase()) ? "That isn't a LOKYX address." : ''}</ErrorText>
           <Primary title="Add it" busy={busy} disabled={!isAddress(addr.trim().toLowerCase())} onPress={add} />
         </View>
       </Sheet>

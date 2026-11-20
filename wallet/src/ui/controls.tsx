@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type PressableProps, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -10,6 +10,8 @@ import { C, F } from './theme';
 import { T } from './Text';
 import { Icon, type IconName } from './Icon';
 import { Glow } from './Glow';
+import { PopCard } from './PopCard';
+import { cardFor } from '../lib/problem-core';
 
 const native = Platform.OS !== 'web';
 export const tap = (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light) => {
@@ -205,17 +207,34 @@ export function Note({ children, center }: { children: ReactNode; center?: boole
 }
 
 /** A problem, said calmly: a soft card with a small mark, not a line of red text. */
-export function ErrorText({ children }: { children: ReactNode }) {
-  return children ? (
-    <Animated.View entering={FadeIn.duration(DUR.base)} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, borderRadius: 18, backgroundColor: 'rgba(255,92,92,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,92,92,0.22)' }}>
-      <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,92,92,0.16)', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
-        <Icon name="info" size={13} color={C.bad} width={2.2} />
-      </View>
-      <T v="sub" style={{ flex: 1, lineHeight: 20, color: C.soft }}>
-        {children}
-      </T>
-    </Animated.View>
-  ) : null;
+/**
+ * A failure. By default it pops up as a card in the middle of the screen with a title that says what kind of trouble it
+ * is and the sentence you pass as the body. Pass `hint` for a quiet note that sits in the page, such as "That isn't an
+ * address" while someone is still typing; those never pop up.
+ */
+export function ErrorText({ children, hint }: { children: ReactNode; hint?: boolean }) {
+  const text = typeof children === 'string' ? children : '';
+  const [seen, setSeen] = useState('');
+  // When the message clears, forget it, so the same message popping up again is shown again.
+  useEffect(() => {
+    if (!text) setSeen('');
+  }, [text]);
+  if (!children) return null;
+  if (hint || typeof children !== 'string') {
+    return (
+      <Animated.View entering={FadeIn.duration(DUR.base)} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, borderRadius: 18, backgroundColor: 'rgba(255,92,92,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,92,92,0.22)' }}>
+        <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,92,92,0.16)', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+          <Icon name="info" size={13} color={C.bad} width={2.2} />
+        </View>
+        <T v="sub" style={{ flex: 1, lineHeight: 20, color: C.soft }}>
+          {children}
+        </T>
+      </Animated.View>
+    );
+  }
+  // The sentence passed in is already in plain words; the classifier only chooses the title.
+  const { title, tone } = cardFor(text);
+  return <PopCard open={seen !== text} tone={tone} title={title} body={text} options={[{ label: 'OK', main: true, onPress: () => setSeen(text) }]} onClose={() => setSeen(text)} />;
 }
 
 export function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {

@@ -161,7 +161,8 @@ export default function Refill() {
               <T v="sub" dim>{plan.instant ? "Within today's allowance." : `Above today's allowance. ${arrivalText(plan.arrivesAt, Date.now())}. You can cancel it until then.`}</T>
             </View>
           ) : null}
-          <ErrorText>{problem || err || snap.error}</ErrorText>
+          <ErrorText>{err}</ErrorText>
+          <ErrorText hint>{problem || snap.error}</ErrorText>
           <SlideToPay label={plan && !plan.instant ? 'Slide to start the wait' : 'Slide to add'} disabled={!ready || !!problem} onSlide={go} />
         </>
       )}

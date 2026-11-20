@@ -105,7 +105,8 @@ export default function VaultSetup() {
               <Segmented value={String(heirWait)} options={HEIR_WAITS.map(([l], i) => [String(i), l] as [string, string])} onChange={(k) => setHeirWait(Number(k))} />
             </>
           )}
-          <ErrorText>{err || safeProblem || built.error}</ErrorText>
+          <ErrorText>{err}</ErrorText>
+          <ErrorText hint>{safeProblem || built.error}</ErrorText>
           <Button title="Review" disabled={!built.settings || !!safeProblem} onPress={() => { setErr(''); setStep('tower'); }} />
         </>
       )}

@@ -86,7 +86,7 @@ export default function GiftCard() {
       )}
       <Primary title="Send the card" onPress={share} disabled={g.closed} />
       <Secondary title={busy ? 'Taking it back…' : 'Take it back'} onPress={takeBack} disabled={busy || g.closed || !!empty} />
-      <ErrorText>{bal.error}</ErrorText>
+      <ErrorText hint>{bal.error}</ErrorText>
     </Screen>
   );
 }

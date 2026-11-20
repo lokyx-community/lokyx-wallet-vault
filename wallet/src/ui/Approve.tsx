@@ -174,7 +174,8 @@ export function Approve({ ask, onDone, rejected }: { ask: Ask | null; onDone: (i
           </>
         )}
 
-        <ErrorText>{bad ? 'This request has a bad address or amount.' : err}</ErrorText>
+        <ErrorText hint>{bad ? 'This request has a bad address or amount.' : ''}</ErrorText>
+        <ErrorText>{err}</ErrorText>
         {ask.kind === 'send' || ask.kind === 'call' ? (
           <View style={{ gap: 6 }}>
             <SlideToPay label={ask.kind === 'send' ? 'Slide to pay' : 'Slide to approve'} onSlide={approve} busy={busy} disabled={bad || (ask.kind === 'call' && (!gas || !gas.ok))} />

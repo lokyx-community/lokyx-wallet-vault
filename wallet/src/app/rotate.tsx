@@ -41,7 +41,7 @@ export default function Rotate() {
       ) : (
         <>
           <Field value={to} onChangeText={(t) => { setTo(t); setReady(false); }} placeholder="lyx1… the new key's address" autoCapitalize="none" autoCorrect={false} mono style={{ height: 60, borderRadius: 22, fontSize: 14 }} />
-          <ErrorText>{to && !valid ? 'That is not a valid lyx1 address.' : ''}</ErrorText>
+          <ErrorText hint>{to && !valid ? 'That is not a valid lyx1 address.' : ''}</ErrorText>
           {ready && valid ? (
             <ConfirmOp op={{ kind: 'keyRotate', newKey: to.trim().toLowerCase() }} me={me} blockTime={bt} delayBlocks={delay} label="Slide to start rotation" onDone={acct.refresh} />
           ) : (

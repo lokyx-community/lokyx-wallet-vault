@@ -114,7 +114,7 @@ export default function EthSharedScreen() {
         { icon: 'receive', label: 'Receive', onPress: () => setSheet('recv') },
         { icon: 'share', label: 'Send the setup to the others', onPress: () => Share.share({ message: `Add our shared account in LOKYX (Apps › Shared accounts › Ethereum › I've been added).\nNetwork: ${ETH_NETS[net].label}\nPeople:\n${s.owners.join('\n')}\nApprovals needed: ${s.threshold}\nAddress: ${s.address}${s.relay ? `\nRelay key: ${s.relay}` : ''}` }) },
       ]} />
-      {info.data && !info.data.exists ? <ErrorText>This account has not been created on {ETH_NETS[net].label} yet. Ask whoever made it, or make it again with the same people.</ErrorText> : null}
+      {info.data && !info.data.exists ? <ErrorText hint>This account has not been created on {ETH_NETS[net].label} yet. Ask whoever made it, or make it again with the same people.</ErrorText> : null}
 
       {pay && view && view.kind !== 'other' && sheet !== 'code' ? (
         <Press onPress={() => setSheet('code')} scaleTo={0.985} style={{ borderRadius: 20, backgroundColor: 'rgba(245,184,61,0.07)', borderWidth: 0.5, borderColor: 'rgba(245,184,61,0.22)', padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -206,8 +206,8 @@ export default function EthSharedScreen() {
           <Field value={code} onChangeText={setCode} placeholder="lokyx-eth-safe:…" autoCapitalize="none" autoCorrect={false} mono multiline />
           {!code ? <Button title="Paste" kind="line" onPress={async () => setCode((await Clipboard.getStringAsync()).trim())} /> : null}
           <ErrorText>{err}</ErrorText>
-          {pay && pay.chainId !== s.chainId ? <ErrorText>This payment is for a different network, so it can't be signed here.</ErrorText> : null}
-          {view?.kind === 'other' ? <ErrorText>This payment does something other than send a coin or a token. It can't be signed here.</ErrorText> : null}
+          {pay && pay.chainId !== s.chainId ? <ErrorText hint>This payment is for a different network, so it can't be signed here.</ErrorText> : null}
+          {view?.kind === 'other' ? <ErrorText hint>This payment does something other than send a coin or a token. It can't be signed here.</ErrorText> : null}
           {pay && view && view.kind !== 'other' ? (
             <Group>
               <LeadRow lead={view.kind === 'token' ? <CoinMark symbol={tokMeta?.symbol ?? '?'} seed={view.token} size={40} /> : <CoinMark symbol={unit} seed={net} logo={logo} size={40} />} title={`Pays ${headline}`} sub={`to ${recipient}`} />

@@ -49,7 +49,7 @@ export default function Claim() {
     <Screen title="Claim a gift card" large>
       <Field value={text} onChangeText={setText} placeholder="lokyx-gift:…" autoCapitalize="none" autoCorrect={false} mono multiline />
       {!g && <Secondary title="Paste" onPress={async () => setText((await Clipboard.getStringAsync()).trim())} />}
-      <ErrorText>{text.length > 10 && !g ? "That isn't a LOKYX gift card code. It starts with lokyx-gift:" : ''}</ErrorText>
+      <ErrorText hint>{text.length > 10 && !g ? "That isn't a LOKYX gift card code. It starts with lokyx-gift:" : ''}</ErrorText>
       {g ? (
         <>
           <WalletCard c={{ kind: KIND[g.coin], logo: g.coin === 'lyx' ? undefined : g.coin, title: `Gift · ${NAMES[g.coin]}`, balance: bal.data ? bal.data.text.split(' ')[0] : '', unit: bal.data ? bal.data.text.split(' ')[1] : '', address: addr, tag: done ? 'Claimed' : '' }} width={Math.min(width - 40, 420)} height={180} />

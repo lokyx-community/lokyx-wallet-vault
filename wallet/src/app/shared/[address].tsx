@@ -104,7 +104,7 @@ export default function SharedAccount() {
         <T style={{ fontFamily: F.regular, fontSize: 36, letterSpacing: -1.2, marginTop: 8 }}>{d ? d.balance : '…'}<T style={{ fontSize: 16, color: C.sub }}> LYX</T></T>
         <T v="caption" dim>{shortAddr(address)}</T>
       </View>
-      <ErrorText>{info.error}</ErrorText>
+      <ErrorText hint>{info.error}</ErrorText>
       {d && (
         <>
           <View style={{ flexDirection: 'row', gap: 10 }}>

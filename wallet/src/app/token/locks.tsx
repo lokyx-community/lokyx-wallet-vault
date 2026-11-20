@@ -106,7 +106,7 @@ export default function TokenLocks() {
       <Field value={amt} onChangeText={setAmt} placeholder={`How many ${t.symbol}`} keyboardType="decimal-pad" />
       <Field value={to} onChangeText={setTo} placeholder="Goes to: you (or paste lyx1…)" autoCapitalize="none" autoCorrect={false} mono />
       <Segmented value={span} onChange={setSpan} options={SPANS.map(([k, l]) => [k, l] as [string, string])} />
-      <ErrorText>{to.trim() && !isAddress(to.trim().toLowerCase()) ? "That isn't a LOKYX address." : ''}</ErrorText>
+      <ErrorText hint>{to.trim() && !isAddress(to.trim().toLowerCase()) ? "That isn't a LOKYX address." : ''}</ErrorText>
       <Primary title="Make the lock" busy={busy === 'make'} disabled={!amt || !height || (!!to.trim() && !isAddress(to.trim().toLowerCase()))} onPress={make} />
       {list.length > 0 && (
         <View>

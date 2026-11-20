@@ -227,7 +227,7 @@ function ToStep({ onPick }: { onPick: (a: string) => void }) {
           ))}
         </View>
       )}
-      <ErrorText>{t.length > 8 && !valid && match.length === 0 ? "That isn't a LOKYX address. They start with lyx1." : ''}</ErrorText>
+      <ErrorText hint>{t.length > 8 && !valid && match.length === 0 ? "That isn't a LOKYX address. They start with lyx1." : ''}</ErrorText>
     </KeyboardScroll>
   );
 }

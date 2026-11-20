@@ -154,7 +154,7 @@ export default function BtcSharedScreen() {
           <T v="headline">A payment to approve</T>
           <Field value={code} onChangeText={setCode} placeholder="lokyx-btc-psbt:…" autoCapitalize="none" autoCorrect={false} mono multiline />
           {!code ? <Secondary title="Paste" onPress={async () => setCode((await Clipboard.getStringAsync()).trim())} /> : null}
-          <ErrorText>{readErr}</ErrorText>
+          <ErrorText hint>{readErr}</ErrorText>
           {reading ? (
             <Panel style={{ paddingVertical: 10 }}>
               {reading.pays.map((p, i) => <GRow key={i} title={`Pays ${formatBtc(p.amount)} BTC`} sub={`to ${p.to}`} />)}

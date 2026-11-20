@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { problemFrom, faucetFor } from '../src/lib/problem-core.ts';
+import { problemFrom, faucetFor, cardFor } from '../src/lib/problem-core.ts';
 
 const ids = (p: NonNullable<ReturnType<typeof problemFrom>>) => p.options.map((o) => o.id);
 
@@ -61,4 +61,11 @@ test('every problem has exactly one main action', () => {
     const p = problemFrom(new Error(e))!;
     assert.equal(p.options.filter((o) => o.main).length, 1, e);
   }
+});
+
+test('the pop-up card names the kind of trouble, and falls back to a plain title', () => {
+  assert.equal(cardFor('Network request failed').title, 'No connection');
+  assert.equal(cardFor('Network request failed').tone, 'wait');
+  assert.equal(cardFor('The chain said something odd').title, "That didn't work");
+  assert.equal(cardFor('The chain said something odd').tone, 'bad');
 });

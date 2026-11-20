@@ -226,7 +226,7 @@ function CapsuleScreen() {
           </View>
         ) : !st ? (
           <View style={{ alignItems: 'center', paddingTop: 120, gap: 10 }}>
-            {err ? <ErrorText>{err}</ErrorText> : <T v="sub" dim>Finding the capsule…</T>}
+            {err ? <ErrorText hint>{err}</ErrorText> : <T v="sub" dim>Finding the capsule…</T>}
           </View>
         ) : (
           <>

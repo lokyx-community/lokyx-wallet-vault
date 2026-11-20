@@ -185,7 +185,8 @@ export default function EthVaultSetup() {
           <Note>Where a sweep sends everything. It cannot be made from these 12 words, or someone who finds only the words could send your coins to themselves. It starts as your everyday address; a separate wallet or hardware wallet is better.</Note>
           <Field value={safe} onChangeText={setSafe} placeholder={everyday.data ?? 'Your everyday address'} autoCapitalize="none" autoCorrect={false} mono />
           <Note>Ethereum vaults have no heir yet.</Note>
-          <ErrorText>{err || safeProblem || built.error}</ErrorText>
+          <ErrorText>{err}</ErrorText>
+          <ErrorText hint>{safeProblem || built.error}</ErrorText>
           <Button title="Review" disabled={!built.settings || !!safeProblem} onPress={() => { setErr(''); setStep('tower'); }} />
         </>
       )}

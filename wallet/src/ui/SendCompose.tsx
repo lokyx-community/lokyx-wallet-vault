@@ -50,7 +50,7 @@ export function SendCompose(p: {
           <Icon name="copy" size={18} color={C.text} width={1.9} />
         </Press>
       </View>
-      {p.to && p.badTo ? <ErrorText>{p.badTo}</ErrorText> : p.to ? <T v="caption" dim style={{ marginTop: -8, paddingHorizontal: 6 }}>{'Check the first and last four characters: '}<T v="caption" style={{ fontFamily: F.semibold ?? F.regular }}>{p.to.trim().slice(0, 6)}</T>{'…'}<T v="caption" style={{ fontFamily: F.semibold ?? F.regular }}>{p.to.trim().slice(-4)}</T></T> : null}
+      {p.to && p.badTo ? <ErrorText hint>{p.badTo}</ErrorText> : p.to ? <T v="caption" dim style={{ marginTop: -8, paddingHorizontal: 6 }}>{'Check the first and last four characters: '}<T v="caption" style={{ fontFamily: F.semibold ?? F.regular }}>{p.to.trim().slice(0, 6)}</T>{'…'}<T v="caption" style={{ fontFamily: F.semibold ?? F.regular }}>{p.to.trim().slice(-4)}</T></T> : null}
       {p.guard}
       {p.network ? (
         <View style={{ alignItems: 'center', paddingTop: 4 }}>
