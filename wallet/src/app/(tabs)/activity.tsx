@@ -7,13 +7,17 @@ import { ActivityRow, EventRow, FeedRow, PendingRow } from '../../ui/ActivityRow
 import { useEvents } from '../../lib/events';
 import type { AppEvent } from '../../lib/events-core';
 import { Press } from '../../ui/controls';
+import { Icon } from '../../ui/Icon';
+import { TextInput } from 'react-native';
+import { loadTxMeta, metaId, useAllTxMeta } from '../../lib/txmeta';
+import { matches } from '../../lib/txmeta-core';
 import { C, F } from '../../ui/theme';
 import { SkeletonRows } from '../../ui/Skeleton';
 import { EmptyState } from '../../ui/EmptyState';
 import { rpc, type History, type HistoryItem } from '../../lib/rpc';
 import { useAccountRef, useWallet } from '../../lib/wallet';
 import { usePending } from '../../lib/data';
-import { dayLabel } from '../../lib/format';
+import { dayLabel, nameFor, timeAgo } from '../../lib/format';
 import { useOtherFeed } from '../../lib/feed';
 import { FEED_COINS, type FeedCoin, type FeedItem } from '../../lib/feed-core';
 
@@ -35,6 +39,9 @@ export default function Activity() {
   const [pulling, setPulling] = useState(false);
   const other = useOtherFeed();
   const evs = useEvents();
+  const [q, setQ] = useState('');
+  const metas = useAllTxMeta();
+  useEffect(() => { loadTxMeta(); }, []);
 
   const load = useCallback(
     async (before?: number) => {
@@ -66,6 +73,20 @@ export default function Activity() {
     if (coin === 'all' || coin === 'lyx') for (const it of items) if (kindOk(it.kind, filter)) rows.push({ k: 'lyx', it, time: it.timestamp });
     for (const it of other.data ?? []) if ((coin === 'all' || coin === it.coin) && kindOk(it.kind, filter)) rows.push({ k: 'x', it, time: it.time });
     if (coin === 'all' && (filter === 'all' || filter === 'events')) for (const it of evs) rows.push({ k: 'ev', it, time: it.time });
+    const text = (r: Row): string[] => {
+      if (r.k === 'ev') return [r.it.title, r.it.sub];
+      const id = r.k === 'lyx' ? r.it.txHash ?? '' : r.it.id.split(':').pop() ?? '';
+      const m = metas[metaId(id)];
+      const note = [m?.note, ...(m?.tags ?? [])].filter(Boolean) as string[];
+      if (r.k === 'lyx') {
+        const other = r.it.kind === 'received' ? r.it.from : r.it.to;
+        return [nameFor(other) ?? '', other ?? '', 'LOKYX LYX', r.it.amountLyx, r.it.kind, ...note];
+      }
+      return [nameFor(r.it.other) ?? '', r.it.other ?? '', FEED_COINS.find((c) => c.id === r.it.coin)?.name ?? '', r.it.unit, r.it.amount, r.it.kind, ...note];
+    };
+    const kept = q.trim() ? rows.filter((r) => matches(q, ...text(r))) : rows;
+    rows.length = 0;
+    rows.push(...kept);
     rows.sort((a, b) => (b.time || Infinity) - (a.time || Infinity));
     const out: { title: string; data: Row[] }[] = [];
     for (const r of rows) {
@@ -74,7 +95,12 @@ export default function Activity() {
       out.at(-1)!.data.push(r);
     }
     return out;
-  }, [items, other.data, filter, coin, evs]);
+  }, [items, other.data, filter, coin, evs, q, metas]);
+  const found = useMemo(() => {
+    const all = sections.flatMap((x) => x.data).filter((r) => r.k !== 'ev');
+    const last = all.map((r) => r.time).filter(Boolean).sort((a, b) => b - a)[0];
+    return { n: all.length, last };
+  }, [sections]);
   const summary = useMemo(() => {
     const week = Date.now() / 1000 - 7 * 86400;
     const all: { t: number; inn: boolean }[] = [];
@@ -90,7 +116,7 @@ export default function Activity() {
     });
     const top = Math.max(1, ...days.map((d) => d.a + d.b));
     return (
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 4, paddingBottom: 14, borderBottomWidth: 0.5, borderBottomColor: '#1D1D22' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 16, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' }}>
         <View style={{ gap: 6 }}>
           <T v="caption" dim>This week</T>
           <View style={{ flexDirection: 'row', gap: 20, alignItems: 'baseline' }}>
@@ -118,7 +144,18 @@ export default function Activity() {
       <Aurora />
       <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 20, gap: 14, paddingBottom: 8 }}>
         <T v="display">Activity</T>
-        {summary}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 46, borderRadius: 23, paddingHorizontal: 16, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: q ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.14)' }}>
+          <Icon name="search" size={17} color={C.sub} />
+          <TextInput value={q} onChangeText={setQ} placeholder="Search people, coins, notes" placeholderTextColor={C.faint} selectionColor={C.text} keyboardAppearance="dark" autoCorrect={false} autoCapitalize="none" returnKeyType="search" style={{ flex: 1, fontFamily: F.regular, fontSize: 15, color: C.text, paddingVertical: 0 }} />
+          {q ? <Press onPress={() => setQ('')} accessibilityLabel="Clear search" haptic={false}><Icon name="close" size={16} color={C.sub} /></Press> : null}
+        </View>
+        {q.trim() ? (
+          <View style={{ paddingHorizontal: 18, paddingVertical: 14, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)', gap: 4 }}>
+            <T v="caption" dim numberOfLines={1}>{q.trim()}</T>
+            <T style={{ fontFamily: F.medium, fontSize: 22, letterSpacing: -0.4 }}>{found.n} {found.n === 1 ? 'payment' : 'payments'}</T>
+            {found.last ? <T v="caption" dim>Last one {timeAgo(found.last)}</T> : null}
+          </View>
+        ) : summary}
         <View style={{ flexDirection: 'row', gap: 26, paddingHorizontal: 4 }}>
           {([['all', 'All'], ['sent', 'Sent'], ['received', 'Received'], ['mined', 'Mined'], ['events', 'Account']] as [Filter, string][]).map(([id, name]) => (
             <Press key={id} onPress={() => setFilter(id)} haptic={false} accessibilityLabel={name} style={{ paddingBottom: 8, borderBottomWidth: 1.5, borderBottomColor: filter === id ? C.text : 'transparent' }}>

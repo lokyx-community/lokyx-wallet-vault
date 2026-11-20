@@ -1,4 +1,5 @@
 import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg';
+import { Logo } from './Logo';
 
 /** The Bitcoin mark (the one the LOKYX app already uses). */
 export function BtcLogo({ size }: { size: number }) {
@@ -60,5 +61,6 @@ export function TokenLogo({ symbol, seed, size }: { symbol: string; seed: string
   );
 }
 
+/** Bitcoin and Ethereum use the same real marks as the Home cards (the hand-drawn BtcLogo/EthLogo above are no longer shown). */
 export const CoinLogo = ({ chain, size }: { chain: 'btc' | 'eth' | 'lyx'; size: number }) =>
-  chain === 'btc' ? <BtcLogo size={size} /> : chain === 'eth' ? <EthLogo size={size} /> : <LyxLogo size={size} />;
+  chain === 'lyx' ? <LyxLogo size={size} /> : <Logo id={chain} size={size} />;

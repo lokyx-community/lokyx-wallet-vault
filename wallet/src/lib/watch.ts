@@ -9,7 +9,7 @@ import * as BackgroundTask from 'expo-background-task';
 import { getItem, setItem } from './kv';
 import { store } from './store';
 import { rpc, type Account } from './rpc';
-import { balanceDrop, balanceRise, findAlerts, fresh, newReceipts, newSends, prune, receiptKey, rotationKey, sendKey, type Alert } from './watch-core';
+import { findAlerts, judgeChange, fresh, newReceipts, newSends, prune, receiptKey, rotationKey, sendKey, type Alert } from './watch-core';
 import type { History } from './rpc';
 import { shortAddr } from './format';
 import { addInbox, type InboxKind } from './inbox';
@@ -126,6 +126,13 @@ export async function startWatching() {
 const SEEN_RX = 'w.rx.seen';
 const RX_READY = 'w.rx.ready';
 const CHAIN_BAL = 'w.rx.chains';
+const OWN_SEND = 'w.rx.own';
+
+/** This phone just sent something on Bitcoin or Ethereum: the balance dropping is not a surprise. */
+export async function markOwnSend() {
+  await setItem(OWN_SEND, String(Date.now())).catch(() => {});
+}
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Mark payments as already told (the Home screen does this when it shows one live). */
 export async function markReceiptsSeen(keys: string[]) {
@@ -177,23 +184,30 @@ async function checkReceipts(mine: { address: string; name?: string }[], node: s
       const nets = activeNets();
       const prev: Record<string, string> = JSON.parse((await getItem(CHAIN_BAL)) ?? '{}');
       const next = { ...prev };
+      const ownAt = Number((await getItem(OWN_SEND)) ?? 0);
+      const ago = ownAt ? Date.now() - ownAt : null;
       const btcAddr = a.btc[nets.btc];
       if (btcAddr) {
-        const bb = await btcBalance(nets.btc, btcAddr);
-        const b = bb.confirmed + bb.pending;
-        const up = balanceRise(prev[`btc:${btcAddr}`], b);
-        if (notify && ready && up > 0n) await say(`Received ${formatBtc(up)} ${BTC_NETS[nets.btc].unit}`, `On ${BTC_NETS[nets.btc].label}.`, { chain: 'btc' });
-        const down = balanceDrop(prev[`btc:${btcAddr}`], b);
-        if (notify && ready && alertsOn && down > 0n) await say(`${formatBtc(down)} ${BTC_NETS[nets.btc].unit} left your wallet`, `On ${BTC_NETS[nets.btc].label}. Not you? Open LOKYX now.`, { chain: 'btc' }, 'send');
-        next[`btc:${btcAddr}`] = b.toString();
+        const read = async () => { const bb = await btcBalance(nets.btc, btcAddr); return bb.confirmed + bb.pending; };
+        const b1 = await read();
+        const k = `btc:${btcAddr}`;
+        const differs = prev[k] !== undefined && prev[k] !== b1.toString();
+        const b2 = differs ? (await pause(6000), await read()) : b1;
+        const r = judgeChange(prev[k], b1, b2, ago);
+        if (notify && ready && r.up > 0n) await say(`Received ${formatBtc(r.up)} ${BTC_NETS[nets.btc].unit}`, `On ${BTC_NETS[nets.btc].label}.`, { chain: 'btc' });
+        if (notify && ready && alertsOn && r.down > 0n) await say(`${formatBtc(r.down)} ${BTC_NETS[nets.btc].unit} left your wallet`, `On ${BTC_NETS[nets.btc].label}. Not you? Open LOKYX now.`, { chain: 'btc' }, 'send');
+        next[k] = r.next;
       }
       if (a.eth) {
-        const e = await ethBalance(nets.eth, a.eth);
-        const up = balanceRise(prev[`eth:${nets.eth}:${a.eth}`], e);
-        if (notify && ready && up > 0n) await say(`Received ${formatUnits(up, 18, 6)} ${ETH_NETS[nets.eth].unit}`, `On ${ETH_NETS[nets.eth].label}.`, { chain: 'eth' });
-        const down = balanceDrop(prev[`eth:${nets.eth}:${a.eth}`], e);
-        if (notify && ready && alertsOn && down > 0n) await say(`${formatUnits(down, 18, 6)} ${ETH_NETS[nets.eth].unit} left your wallet`, `On ${ETH_NETS[nets.eth].label}. Not you? Open LOKYX now.`, { chain: 'eth' }, 'send');
-        next[`eth:${nets.eth}:${a.eth}`] = e.toString();
+        const read = () => ethBalance(nets.eth, a.eth);
+        const e1 = await read();
+        const k = `eth:${nets.eth}:${a.eth}`;
+        const differs = prev[k] !== undefined && prev[k] !== e1.toString();
+        const e2 = differs ? (await pause(6000), await read()) : e1;
+        const r = judgeChange(prev[k], e1, e2, ago);
+        if (notify && ready && r.up > 0n) await say(`Received ${formatUnits(r.up, 18, 6)} ${ETH_NETS[nets.eth].unit}`, `On ${ETH_NETS[nets.eth].label}.`, { chain: 'eth' });
+        if (notify && ready && alertsOn && r.down > 0n) await say(`${formatUnits(r.down, 18, 6)} ${ETH_NETS[nets.eth].unit} left your wallet`, `On ${ETH_NETS[nets.eth].label}. Not you? Open LOKYX now.`, { chain: 'eth' }, 'send');
+        next[k] = r.next;
       }
       await setItem(CHAIN_BAL, JSON.stringify(next));
     }

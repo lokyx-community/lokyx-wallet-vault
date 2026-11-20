@@ -95,3 +95,16 @@ export function balanceRise(prev: string | undefined, now: bigint): bigint {
   const p = BigInt(prev);
   return now > p ? now - p : 0n;
 }
+
+/**
+ * Balance alerts for Bitcoin and Ethereum without false alarms. A public node can answer from a block behind (several servers
+ * sit behind one address), and a payment this phone sent itself also lowers the balance. So a change is announced only when
+ * two reads a moment apart agree on the new balance, and a drop is not announced shortly after this phone sent something.
+ */
+export function judgeChange(prev: string | undefined, first: bigint, second: bigint, ownSendAgo: number | null, quiet = 30 * 60_000): { next: string; up: bigint; down: bigint } {
+  if (prev === undefined || !/^\d+$/.test(prev)) return { next: second.toString(), up: 0n, down: 0n };
+  if (first !== second) return { next: prev, up: 0n, down: 0n };
+  const up = balanceRise(prev, second);
+  const mine = ownSendAgo !== null && ownSendAgo < quiet;
+  return { next: second.toString(), up, down: mine ? 0n : balanceDrop(prev, second) };
+}

@@ -9,6 +9,7 @@ import { TxView, type TxStep } from '../ui/TxView';
 import { toast } from '../ui/Toast';
 import { activeNets, btcTxMore, ethTxMore, useAsync, type MoreAboutTx } from '../lib/multichain';
 import { shortAddr } from '../lib/format';
+import { BTC_NETS, ETH_NETS } from '../lib/multichain-core';
 import { receiptText } from '../lib/slip-core';
 import { CoinLogo } from '../ui/CoinLogo';
 import { Logo } from '../ui/Logo';
@@ -56,6 +57,9 @@ export default function PaymentDetails() {
   const self = item.kind === 'self';
   const conf = m?.confirmations ?? 0;
   const state = item.failed ? 'failed' : pending ? 'pending' : conf >= 6 || (item.coin !== 'btc' && item.coin !== 'eth') ? 'settled' : 'block';
+  // only plain coin payments can be repeated: a token or another coin has its own send screen
+  const nativeUnit = item.coin === 'btc' ? BTC_NETS[activeNets().btc].unit : item.coin === 'eth' ? ETH_NETS[activeNets().eth].unit : '';
+  const again = out && other && (item.coin === 'btc' || item.coin === 'eth') && item.unit === nativeUnit ? () => router.push(`/chain/send?chain=${item.coin}&to=${other}&amount=${item.amount.replace(/,/g, '')}`) : undefined;
   const other = item.other || (out ? m?.to : m?.from) || '';
   const known = nameFor(other) ?? nameIn(shared, other);
   const line = self ? 'To yourself' : other ? `${out ? 'to' : 'from'} ${known ?? shortAddr(other, 8, 6)}` : out ? 'Sent' : 'Received';
@@ -79,7 +83,7 @@ export default function PaymentDetails() {
   if (other) rows.push([out ? 'To' : 'From', known ? `${known} · ${shortAddr(other, 6, 4)}` : shortAddr(other, 10, 8), !known]);
   return (
     <Screen title="Payment">
-      <TxView state={state} sign={out ? '−' : self ? '' : '+'} amount={item.amount} unit={item.unit} line={line} kind={item.coin} mark={mark} label={`${verb} · ${item.net}`} hash={id} qrUrl={item.url} shareText={shareText} steps={steps} rows={rows} onCopy={copyId} onExplorer={item.url ? () => Linking.openURL(item.url!).catch(() => {}) : undefined} />
+      <TxView state={state} sign={out ? '−' : self ? '' : '+'} amount={item.amount} unit={item.unit} line={line} mark={mark} label={`${verb} · ${item.net}`} hash={id} qrUrl={item.url} shareText={shareText} steps={steps} rows={rows} onCopy={copyId} onAgain={again} onExplorer={item.url ? () => Linking.openURL(item.url!).catch(() => {}) : undefined} />
     </Screen>
   );
 }

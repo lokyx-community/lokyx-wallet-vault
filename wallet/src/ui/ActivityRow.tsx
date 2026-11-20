@@ -18,6 +18,19 @@ import { CoinLogo } from './CoinLogo';
 import { Logo } from './Logo';
 import type { AppEvent } from '../lib/events-core';
 import { F } from './theme';
+import { metaId, useAllTxMeta } from '../lib/txmeta';
+
+/** Your own note or tag under a payment, when you wrote one. */
+function NoteChip({ id }: { id: string }) {
+  const m = useAllTxMeta()[metaId(id)];
+  const text = m?.note || m?.tags?.[0];
+  if (!text) return null;
+  return (
+    <View style={{ alignSelf: 'flex-start', marginTop: 4, height: 20, paddingHorizontal: 9, borderRadius: 10, justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.09)' }}>
+      <T style={{ fontFamily: F.medium, fontSize: 11, color: C.soft }} numberOfLines={1}>{text}</T>
+    </View>
+  );
+}
 
 export type Pos = 'first' | 'mid' | 'last' | 'only';
 
@@ -39,12 +52,12 @@ function Shell({ pos, onPress, children }: { pos: Pos; onPress: () => void; chil
   const top = pos === 'first' || pos === 'only';
   const bottom = pos === 'last' || pos === 'only';
   return (
-    <Press haptic={false} scaleTo={0.99} onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 14, paddingHorizontal: 16, backgroundColor: '#0B0B0E', borderLeftWidth: 0.5, borderRightWidth: 0.5, borderTopWidth: top ? 0.5 : 0, borderBottomWidth: bottom ? 0.5 : 0, borderColor: '#1F1F25', borderTopLeftRadius: top ? 22 : 0, borderTopRightRadius: top ? 22 : 0, borderBottomLeftRadius: bottom ? 22 : 0, borderBottomRightRadius: bottom ? 22 : 0 }}>
+    <Press haptic={false} scaleTo={0.99} onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 14, paddingHorizontal: 16, backgroundColor: 'rgba(255,255,255,0.06)', borderLeftWidth: 0.5, borderRightWidth: 0.5, borderTopWidth: top ? 0.5 : 0, borderBottomWidth: bottom ? 0.5 : 0, borderColor: 'rgba(255,255,255,0.12)', borderTopLeftRadius: top ? 22 : 0, borderTopRightRadius: top ? 22 : 0, borderBottomLeftRadius: bottom ? 22 : 0, borderBottomRightRadius: bottom ? 22 : 0 }}>
       {children}
     </Press>
   );
 }
-const Rule = ({ pos }: { pos: Pos }) => (pos === 'mid' || pos === 'last' ? <View style={{ height: 0.5, backgroundColor: '#1D1D22', marginHorizontal: 16 }} /> : null);
+const Rule = ({ pos }: { pos: Pos }) => (pos === 'mid' || pos === 'last' ? <View style={{ height: 0.5, backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: 16 }} /> : null);
 function Amount({ text, unit, good }: { text: string; unit: string; good?: boolean }) {
   return (
     <T style={{ fontFamily: F.medium, fontSize: 19, letterSpacing: -0.4, color: good ? '#9BE5BD' : C.text, fontVariant: ['tabular-nums'] }}>
@@ -75,6 +88,7 @@ export function ActivityRow({ item, i = 0, hide, pos = 'only' }: { item: History
         <View style={{ flex: 1, gap: 2 }}>
           <T style={{ fontFamily: F.medium, fontSize: 16 }} numberOfLines={1}>{title}</T>
           <T v="caption" dim numberOfLines={1}>{who}</T>
+          {item.txHash ? <NoteChip id={item.txHash} /> : null}
         </View>
         <View style={{ alignItems: 'flex-end', gap: 2 }}>
           <Amount text={hide ? '•••' : `${plus ? '+' : '−'}${niceLyx(item.amountLyx)}`} unit="LYX" good={plus} />
@@ -116,6 +130,7 @@ export function FeedRow({ item, i = 0, hide, pos = 'only' }: { item: FeedItem; i
         <View style={{ flex: 1, gap: 2 }}>
           <T style={{ fontFamily: F.medium, fontSize: 16 }} numberOfLines={1}>{title}</T>
           <T v="caption" dim numberOfLines={1}>{sub}</T>
+          <NoteChip id={item.id.split(':').pop() ?? ''} />
         </View>
         <View style={{ alignItems: 'flex-end', gap: 2 }}>
           <Amount text={hide ? '•••' : `${plus ? '+' : '−'}${item.amount}`} unit={item.unit} good={plus && !item.failed} />

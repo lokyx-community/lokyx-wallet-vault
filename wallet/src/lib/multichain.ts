@@ -229,10 +229,12 @@ export async function prepareBtc(to: string, amount: bigint, speed: Speed) {
     k.sk.fill(0);
   }
 }
+const ownSend = () => { import('./watch').then((m) => m.markOwnSend()).catch(() => {}); };
 export async function broadcastBtc(net: BtcNet, hex: string): Promise<string> {
   const r = await fetchT(`${esplora(net)}/tx`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: hex });
   const t = await r.text();
   if (!r.ok) throw new Error(`The network refused it: ${t.slice(0, 160)}`);
+  ownSend();
   return t.trim();
 }
 
@@ -328,7 +330,9 @@ export async function prepareEth(to: string, amount: bigint, speed: Speed, token
 }
 export async function broadcastEth(net: EthNet, raw: string): Promise<string> {
   await checkEth(net);
-  return eth<string>(net, 'eth_sendRawTransaction', [raw]);
+  const h = await eth<string>(net, 'eth_sendRawTransaction', [raw]);
+  ownSend();
+  return h;
 }
 
 // ---------- contract calls from your own Ethereum address (shared accounts on Safe) ----------

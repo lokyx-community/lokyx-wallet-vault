@@ -38,7 +38,6 @@ export default function TxScreen() {
           <TxView
             state={failed ? 'failed' : pending ? 'pending' : conf >= SETTLED ? 'settled' : 'block'}
             sign={out ? '−' : '+'}
-            kind="lyx"
             mark={<CoinLogo chain="lyx" size={34} />}
             label={`${out ? 'Sent' : 'Received'} · LOKYX testnet`}
             hash={t.hash}
@@ -68,6 +67,7 @@ export default function TxScreen() {
               success();
               toast('Copied');
             }}
+            onAgain={out && t.to && !call ? () => router.push(`/send?to=${t.to}&amount=${niceLyx(t.valueLyx, 6).replace(/,/g, '')}`) : undefined}
             onExplorer={() => router.push(`/browser?url=${encodeURIComponent(`${siteUrl()}/#/tx/${t.hash}`)}`)}
             extra={!out && t.from ? <Press onPress={() => router.push(`/send?to=${t.from}`)} style={{ alignItems: 'center', padding: 8 }}><T v="callout" dim>Send back</T></Press> : null}
           />

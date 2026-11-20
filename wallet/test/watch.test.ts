@@ -45,7 +45,7 @@ test('the watchtower hook exists and does nothing yet', async () => {
   await noWatchtower.register('lyx1me', { cancelKinds: ['withdraw'] });
 });
 
-import { balanceRise, newReceipts, receiptKey } from '../src/lib/watch-core.ts';
+import { balanceRise, judgeChange, newReceipts, receiptKey } from '../src/lib/watch-core.ts';
 
 test('incoming: only received payments not told yet; mining rewards and sends are not announced', () => {
   const base = { height: 1, blockHash: 'bb', timestamp: 0, confirmations: 1, amount: '1', amountLyx: '1' };
@@ -65,4 +65,19 @@ test('incoming: a balance rise is reported only after a first look, and never fo
   assert.equal(balanceRise('100', 500n), 400n);
   assert.equal(balanceRise('500', 100n), 0n);
   assert.equal(balanceRise('junk', 100n), 0n);
+});
+
+test('balance alerts: a server a block behind, or this phone\'s own send, is not announced', () => {
+  // two reads disagree (one server lagging): nothing is announced and the old balance is kept
+  assert.deepEqual(judgeChange('100', 40n, 100n, null), { next: '100', up: 0n, down: 0n });
+  // both reads agree on a real drop: announced
+  assert.deepEqual(judgeChange('100', 40n, 40n, null), { next: '40', up: 0n, down: 60n });
+  // this phone sent something 5 minutes ago: the drop is expected, the balance is just re-based
+  assert.deepEqual(judgeChange('100', 40n, 40n, 5 * 60_000), { next: '40', up: 0n, down: 0n });
+  // a long time after an own send, a drop is announced again
+  assert.equal(judgeChange('100', 40n, 40n, 3 * 3600_000).down, 60n);
+  // a payment in is always announced when both reads agree
+  assert.equal(judgeChange('100', 500n, 500n, 60_000).up, 400n);
+  // first look: nothing to compare with
+  assert.deepEqual(judgeChange(undefined, 9n, 9n, null), { next: '9', up: 0n, down: 0n });
 });
