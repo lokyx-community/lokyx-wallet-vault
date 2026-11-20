@@ -1,4 +1,5 @@
 import { Aurora } from '../../ui/Aurora';
+import Svg, { Circle, Path } from "react-native-svg";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   RefreshControl,
@@ -45,6 +46,7 @@ import { useArrivals } from "../../ui/useArrivals";
 import { usePortfolio } from "../../lib/prices";
 import { changeText, money } from "../../lib/prices-core";
 import { AssetsPanel, PortfolioCard } from "../../ui/PortfolioBits";
+import { AddChainSheet } from "../../ui/AddChainSheet";
 import {
   activeNets,
   btcHistory,
@@ -337,7 +339,11 @@ export default function Home() {
         showsVerticalScrollIndicator={false}
       >
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", height: 52, paddingHorizontal: 4 }}>
-          <Press onPress={() => router.push("/accounts")} accessibilityLabel="Switch account" haptic={false}>
+          <Press onPress={() => router.push("/accounts")} accessibilityLabel="Switch account" haptic={false} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <Svg width={22} height={22} viewBox="0 0 100 100" fill="none">
+              <Path d="M50 16A34 34 0 1 0 84 50" stroke={C.text} strokeWidth={13} strokeLinecap="round" />
+              <Circle cx={74} cy={26} r={7.5} fill={C.text} />
+            </Svg>
             <T style={{ fontFamily: F.regular, fontSize: 16.5, color: C.sub, letterSpacing: -0.2 }}>
               {greeting()}, <T style={{ fontFamily: F.regular, fontSize: 16.5, color: C.text }}>{me?.name}</T>
             </T>
@@ -349,6 +355,9 @@ export default function Home() {
                 <View style={{ position: "absolute", top: 8, right: 9, width: 9, height: 9, borderRadius: 5, backgroundColor: C.bad, borderWidth: 1.5, borderColor: C.bg }} />
               </Press>
             ) : null}
+            <Press onPress={() => setAdd(true)} accessibilityLabel="Add a chain" style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.14)", alignItems: "center", justifyContent: "center" }}>
+              <Icon name="plus" size={19} color={C.text} width={1.9} />
+            </Press>
             <Press onPress={() => router.push("/ring?mode=scan")} accessibilityLabel="Scan" style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.14)", alignItems: "center", justifyContent: "center" }}>
               <Icon name="scan" size={19} color={C.text} width={1.9} />
             </Press>
@@ -392,9 +401,6 @@ export default function Home() {
             <T v="caption" dim>Tap Receive to add your first coins.</T>
           </Press>
         ) : null}
-        <Press onPress={() => setAdd(true)} haptic={false} accessibilityLabel="Add a blockchain" style={{ alignItems: "center", paddingTop: 16 }}>
-          <T style={{ fontFamily: F.medium, fontSize: 14, color: C.sub }}>+ Add a blockchain</T>
-        </Press>
 
         {chainError ? (
           <Animated.View
@@ -512,49 +518,15 @@ export default function Home() {
           <T style={{ fontFamily: F.regular, fontSize: 28, letterSpacing: -0.8, color: "#fff", fontVariant: ["tabular-nums"] }}>{hide ? "••••" : money(port.total, cur)}</T>
         </Animated.View>
       ) : null}
-      <Sheet open={add} onClose={() => setAdd(false)}>
-        <View style={{ gap: 6 }}>
-          <T v="headline">Add a blockchain</T>
-          <T v="caption" dim style={{ paddingBottom: 10 }}>Each blockchain gets its own card on Home. Base, Arbitrum and the other Ethereum-style chains use the same address as Ethereum, so there is nothing to set up.</T>
-          {([{ id: "sol", n: "Solana", s: "SOL · devnet" }, { id: "trx", n: "Tron", s: "TRX · Nile testnet" }] as const).map((b) => {
-            const on = coins.extra.includes(b.id);
-            return (
-              <Press key={b.id} haptic={false} onPress={() => updateChains({ extra: on ? coins.extra.filter((x) => x !== b.id) : [...coins.extra, b.id] })} style={{ flexDirection: "row", alignItems: "center", gap: 14, height: 58 }}>
-                <Logo id={b.id} size={38} />
-                <View style={{ flex: 1 }}>
-                  <T style={{ fontFamily: F.medium, fontSize: 16 }}>{b.n}</T>
-                  <T v="caption" dim>{b.s}</T>
-                </View>
-                <T style={{ fontFamily: F.medium, fontSize: 14.5, color: on ? C.sub : C.text }}>{on ? "On Home · Remove" : "Add"}</T>
-              </Press>
-            );
-          })}
-          {EVM_ORDER.map((f) => {
-            const on = coins.evm.some((x) => x.id === f);
-            const m2 = EVM_FAMILIES[f];
-            return (
-              <Press key={f} haptic={false} onPress={() => updateChains({ evm: on ? (chainCfg.evm ?? []).filter((x) => x !== f) : [...(chainCfg.evm ?? []), f] })} style={{ flexDirection: "row", alignItems: "center", gap: 14, height: 58 }}>
-                <Logo id={m2.logo} size={38} />
-                <View style={{ flex: 1 }}>
-                  <T style={{ fontFamily: F.medium, fontSize: 16 }}>{m2.name}</T>
-                  <T v="caption" dim>{m2.unit} · same address as Ethereum</T>
-                </View>
-                <T style={{ fontFamily: F.medium, fontSize: 14.5, color: on ? C.sub : C.text }}>{on ? "On Home · Remove" : "Add"}</T>
-              </Press>
-            );
-          })}
-          <Press onPress={() => { setAdd(false); router.push("/coins"); }} scaleTo={0.985} style={{ flexDirection: "row", alignItems: "center", gap: 14, height: 58 }}>
-            <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: C.fill2, alignItems: "center", justifyContent: "center" }}>
-              <Icon name="plus" size={18} color={C.text} width={2} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <T style={{ fontFamily: F.medium, fontSize: 16 }}>Add a coin or token</T>
-              <T v="caption" dim>USDC, USDT or another token</T>
-            </View>
-            <Icon name="chevron" size={16} color={C.faint} width={2.2} />
-          </Press>
-        </View>
-      </Sheet>
+      <AddChainSheet
+        open={add}
+        onClose={() => setAdd(false)}
+        isOn={(id) => (id === "sol" || id === "trx" ? coins.extra.includes(id) : coins.evm.some((x) => x.id === id))}
+        toggle={(id, on) => {
+          if (id === "sol" || id === "trx") updateChains({ extra: on ? [...coins.extra, id] : coins.extra.filter((x) => x !== id) });
+          else updateChains({ evm: on ? [...(chainCfg.evm ?? []), id as EvmFamily] : (chainCfg.evm ?? []).filter((x) => x !== id) });
+        }}
+      />
     </View>
   );
 }

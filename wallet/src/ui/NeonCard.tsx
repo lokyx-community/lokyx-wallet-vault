@@ -5,8 +5,6 @@ import { SURFACE, Watermark, type CardKind } from './WalletCards';
 import { T } from './Text';
 import { Digits } from './Digits';
 import { Skeleton } from './Skeleton';
-import { Logo } from './Logo';
-import { TokenLogo } from './CoinLogo';
 import { F } from './theme';
 import type { LogoId } from './logos';
 
@@ -68,14 +66,11 @@ export function NeonCard({ c, width, height, hide }: { c: NeonData; width: numbe
         <Rect width={width} height={h} fill={`url(#h${id})`} />
         <Rect y={h * 0.55} width={width} height={h * 0.45} fill={`url(#d${id})`} />
       </Svg>
-      {kind === 'lyx' ? null : <Watermark kind={kind} logo={logo} h={h} />}
-      {/* like the Receive card: the coin's mark and name at the top left. LOKYX has no mark here, just its name. */}
-      <View style={{ position: 'absolute', left: 22, top: 22, right: 22, flexDirection: 'row', alignItems: 'center', gap: 11 }}>
-        {c.mark.kind === 'lyx' ? null : c.mark.kind === 'token' ? <TokenLogo symbol={c.mark.symbol} seed={c.mark.seed} size={30} /> : <Logo id={c.mark.id} size={30} />}
-        <View style={{ flex: 1 }}>
-          <T numberOfLines={1} style={{ fontFamily: F.semibold, fontSize: 16, letterSpacing: -0.2, color: s.ink }}>{c.title}</T>
-          {c.sub ? <T numberOfLines={1} style={{ fontSize: 10, letterSpacing: 1.8, color: s.sub, marginTop: 1 }}>{c.sub.toUpperCase()}</T> : null}
-        </View>
+      <Watermark kind={kind} logo={logo} h={h} />
+      {/* engraved: the real mark sits large and faint in the corner; the name is set in spaced capitals */}
+      <View style={{ position: 'absolute', left: 24, top: 24, right: 24 }}>
+        <T numberOfLines={1} style={{ fontFamily: F.semibold, fontSize: 12, letterSpacing: 6, color: s.ink }}>{c.title.toUpperCase()}</T>
+        {c.sub ? <T numberOfLines={1} style={{ fontSize: 9.5, letterSpacing: 1.8, color: s.sub, marginTop: 5 }}>{c.sub.toUpperCase()}</T> : null}
       </View>
       <View style={{ position: 'absolute', left: 22, right: 18, bottom: 46, flexDirection: 'row', alignItems: 'flex-end', overflow: 'hidden' }}>
         {hide ? (
