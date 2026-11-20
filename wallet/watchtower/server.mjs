@@ -7,7 +7,8 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import { checkRegistration, tick } from '../src/lib/tower-core.ts';
-import { RelayStore, checkNotify, checkPut, checkTopic } from '../src/lib/relay-store.ts';
+import { RelayStore, checkNotify, checkPush, checkPut, checkTopic } from '../src/lib/relay-store.ts';
+import { PUSH_URL, deadTokens, pushMessages } from '../src/lib/push-core.ts';
 
 const RPC = process.env.NODE_RPC;
 const PORT = Number(process.env.PORT ?? 8787);
@@ -34,6 +35,14 @@ async function rpc(method, params) {
   if (j.error) throw new Error(j.error.message);
   return j.result;
 }
+// Ring the phones of a shared account through Expo's push service. The text says only that something is waiting.
+const ring = async (topic, skip) => {
+  const tokens = relay.phonesFor(topic).filter((t) => t !== skip);
+  if (!tokens.length) return;
+  const r = await fetch(PUSH_URL, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(pushMessages(tokens, topic)), signal: AbortSignal.timeout(10_000) });
+  if (!r.ok) throw new Error(`push service answered ${r.status}`);
+  for (const t of deadTokens(tokens, await r.json().catch(() => null))) relay.dropToken(t);
+};
 const send = async (url, title, text) => {
   const r = await fetch(url, { method: 'POST', headers: { Title: title, 'content-type': 'text/plain' }, body: text, signal: AbortSignal.timeout(10_000) });
   if (!r.ok) throw new Error(`webhook answered ${r.status}`);
@@ -75,6 +84,7 @@ const server = http.createServer(async (req, res) => {
     const seq = relay.put(m.topic, m.blob, Date.now());
     if (typeof seq === 'string') return out(503, { error: seq });
     for (const u of relay.pingsFor(m.topic)) send(u, 'LOKYX', 'A payment is waiting').catch((e) => console.error('ping failed', e.message));
+    ring(m.topic, m.skip).catch((e) => console.error('push failed', e.message));
     return out(200, { ok: true, seq });
   }
   if (req.method === 'POST' && url.pathname === '/relay/notify') {
@@ -83,6 +93,17 @@ const server = http.createServer(async (req, res) => {
     const m = checkNotify(body);
     if (typeof m === 'string') return out(400, { error: m });
     relay.watch(m.topic, m.notify);
+    return out(200, { ok: true });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/relay/push') {
+    if (limited(ip + 't', 30)) return out(429, { error: 'slow down' });
+    const body = await readBody(req, res, out); if (!body) return;
+    const m = checkPush(body);
+    if (typeof m === 'string') return out(400, { error: m });
+    if (m.off) relay.dropPhone(m.topic, m.token);
+    else if (!relay.addPhone(m.topic, m.token, Date.now())) return out(503, { error: 'full' });
+    saveRelay();
     return out(200, { ok: true });
   }
 

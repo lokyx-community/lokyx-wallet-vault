@@ -17,8 +17,9 @@ async function call<T>(f: Fetch, url: string, init?: RequestInit): Promise<T> {
 }
 
 /** Leave a message for the others. Returns its number on the relay. */
-export async function relayPut(base: string, groupKey: string, text: string, f: Fetch = fetch): Promise<number> {
-  const j = await call<{ seq: number }>(f, `${clean(base)}/relay/put`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ topic: topicOf(groupKey), blob: sealMsg(groupKey, text) }) });
+export async function relayPut(base: string, groupKey: string, text: string, f: Fetch = fetch, skip?: string): Promise<number> {
+  // `skip` is this phone's own push token, so the relay does not ring it for its own message
+  const j = await call<{ seq: number }>(f, `${clean(base)}/relay/put`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ topic: topicOf(groupKey), blob: sealMsg(groupKey, text), ...(skip ? { skip } : {}) }) });
   return j.seq;
 }
 
@@ -34,4 +35,9 @@ export async function relayGet(base: string, groupKey: string, after: number, f:
 /** Ask the relay to ping these https links (ntfy topics or webhooks) when a message lands. The ping only says one is waiting. */
 export async function relayNotify(base: string, groupKey: string, notify: string[], f: Fetch = fetch): Promise<void> {
   await call<{ ok: boolean }>(f, `${clean(base)}/relay/notify`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ topic: topicOf(groupKey), notify }) });
+}
+
+/** Ask the relay to ring this phone when something lands on the account (or stop). The token is this phone's own. */
+export async function relayPush(base: string, groupKey: string, token: string, off = false, f: Fetch = fetch): Promise<void> {
+  await call<{ ok: boolean }>(f, `${clean(base)}/relay/push`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ topic: topicOf(groupKey), token, ...(off ? { off: true } : {}) }) });
 }

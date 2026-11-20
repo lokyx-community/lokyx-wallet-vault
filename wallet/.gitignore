@@ -8,3 +8,7 @@ web-build/
 *.aab
 expo-env.d.ts
 contracts/target/
+
+# Firebase push file and service account keys: secrets, never commit
+google-services.json
+*firebase-adminsdk*.json

@@ -16,7 +16,7 @@ export async function relayBase(): Promise<string> {
 export async function sendToGroup(key: string | undefined, text: string): Promise<boolean> {
   if (!key) return false;
   try {
-    await relayPut(await relayBase(), key, text);
+    await relayPut(await relayBase(), key, text, fetch, (await getItem('w.push.token')) ?? undefined);
     return true;
   } catch {
     return false;

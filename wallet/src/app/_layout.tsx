@@ -35,8 +35,9 @@ import { loadPendingFeed } from '../lib/feed-pending';
 import { loadBookmarks } from '../lib/bookmarks';
 import { loadGifts } from '../lib/gifts';
 import { settleBoard } from '../lib/board';
-import { loadBtcShared } from '../lib/btcms';
-import { loadEthShared } from '../lib/ethms';
+import { loadBtcShared, useBtcShared } from '../lib/btcms';
+import { loadEthShared, useEthShared } from '../lib/ethms';
+import { registerPush, routeForPush } from '../lib/push';
 import { loadSwaps, loadSwapSettings } from '../lib/swaps';
 import { AlertBanner } from '../ui/AlertBanner';
 import { BetaNotice } from '../ui/BetaNotice';
@@ -49,6 +50,7 @@ const SETUP = ['welcome', 'create', 'restore', 'secure', 'keys-lost'];
 
 function Gate() {
   const w = useWallet();
+  const sharedCount = useEthShared().length + useBtcShared().length;
   const seg = useSegments();
   const first = seg[0] as string | undefined;
   const path = usePathname();
@@ -83,11 +85,13 @@ function Gate() {
   // and again whenever the app comes back to the front. A tapped alert opens the review screen.
   useEffect(() => {
     if (!w.exists || w.locked) return;
-    startWatching();
-    const sub = AppState.addEventListener('change', (s) => s === 'active' && check(false).catch(() => {}));
-    const tap = Notifications.addNotificationResponseReceivedListener(() => router.push('/alerts'));
+    // permission is asked inside startWatching, so the phone is registered for shared-account pushes after it
+    startWatching().finally(() => registerPush());
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') { check(false).catch(() => {}); registerPush(); } });
+    // a shared-account push opens that account; any other alert opens the review screen
+    const tap = Notifications.addNotificationResponseReceivedListener((r) => router.push((routeForPush(r.notification.request.content.data) ?? '/alerts') as never));
     return () => { sub.remove(); tap.remove(); };
-  }, [w.exists, w.locked]);
+  }, [w.exists, w.locked, sharedCount]);
 
   // Lock again after a while in the background.
   const away = useRef(0);
