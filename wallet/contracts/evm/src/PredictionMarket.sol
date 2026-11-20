@@ -32,6 +32,11 @@ library SafeERC20 {
     }
 }
 
+interface IERC1155Receiver {
+    function onERC1155Received(address operator, address from, uint256 id, uint256 value, bytes calldata data) external returns (bytes4);
+    function onERC1155BatchReceived(address operator, address from, uint256[] calldata ids, uint256[] calldata values, bytes calldata data) external returns (bytes4);
+}
+
 contract PredictionMarket {
     using SafeERC20 for IERC20;
 
@@ -84,8 +89,11 @@ contract PredictionMarket {
     uint256 public count;
     mapping(uint256 => Market) internal markets;
     mapping(uint256 => Order[]) internal books;
-    mapping(uint256 => mapping(address => uint64)) public yesOf;
-    mapping(uint256 => mapping(address => uint64)) public noOf;
+    // Shares are ERC-1155 tokens issued by this contract: market `id` has Yes shares as token 2*id and No shares as
+    // token 2*id+1. Shares waiting in a sell order are held by the contract itself (their escrow), so for every token
+    // the balances of everyone plus the contract always add up to the shares in existence.
+    mapping(uint256 => mapping(address => uint256)) private _bal;
+    mapping(address => mapping(address => bool)) private _operators;
     mapping(address => uint256) public free;
 
     event Deposit(address indexed who, uint256 amount);
@@ -96,6 +104,10 @@ contract PredictionMarket {
     event Proposed(uint256 indexed id, address indexed who, uint8 outcome);
     event Disputed(uint256 indexed id, address indexed who);
     event Evicted(uint256 indexed id, uint64 order);
+    event TransferSingle(address indexed operator, address indexed from, address indexed to, uint256 id, uint256 value);
+    event TransferBatch(address indexed operator, address indexed from, address indexed to, uint256[] ids, uint256[] values);
+    event ApprovalForAll(address indexed account, address indexed operator, bool approved);
+    event URI(string value, uint256 indexed id);
     event Decided(uint256 indexed id, State state);
 
     modifier nonReentrant() {
@@ -204,11 +216,11 @@ contract PredictionMarket {
             require(free[msg.sender] >= locked, "not enough coins deposited");
             free[msg.sender] -= locked;
         } else if (kind == Kind.Sell) {
-            require(yesOf[id][msg.sender] >= qty, "you don't hold that many Yes shares");
-            yesOf[id][msg.sender] -= qty;
+            require(_bal[id * 2][msg.sender] >= qty, "you don't hold that many Yes shares");
+            _shift(id * 2, msg.sender, address(this), qty);
         } else {
-            require(noOf[id][msg.sender] >= qty, "you don't hold that many No shares");
-            noOf[id][msg.sender] -= qty;
+            require(_bal[id * 2 + 1][msg.sender] >= qty, "you don't hold that many No shares");
+            _shift(id * 2 + 1, msg.sender, address(this), qty);
         }
 
         uint64 oid = m.nextId++;
@@ -285,21 +297,23 @@ contract PredictionMarket {
 
             if (bid.kind == Kind.Buy && ask.kind == Kind.Sell) {
                 free[ask.owner] += t * qq * cu;
-                yesOf[id][bid.owner] += q;
+                _shift(id * 2, address(this), bid.owner, q);
             } else if (bid.kind == Kind.Buy && ask.kind == Kind.MintNo) {
-                yesOf[id][bid.owner] += q;
-                noOf[id][ask.owner] += q;
+                _mint(id * 2, bid.owner, q);
+                _mint(id * 2 + 1, ask.owner, q);
                 m.supply += q;
                 m.pool += 100 * qq * cu;
             } else if (bid.kind == Kind.BurnNo && ask.kind == Kind.Sell) {
                 free[ask.owner] += t * qq * cu;
                 free[bid.owner] += (100 - t) * qq * cu;
+                _burn(id * 2, address(this), q);
+                _burn(id * 2 + 1, address(this), q);
                 m.supply -= q;
                 m.pool -= 100 * qq * cu;
             } else {
                 // BurnNo meets MintNo: the No share changes hands
                 free[bid.owner] += (100 - t) * qq * cu;
-                noOf[id][ask.owner] += q;
+                _shift(id * 2 + 1, address(this), ask.owner, q);
             }
             // a buyer's locked coins: pay what was due at the trade price, give back any difference
             if (bid.kind == Kind.Buy) {
@@ -346,8 +360,8 @@ contract PredictionMarket {
 
     function _refund(uint256 id, Order memory o) internal {
         if (o.kind == Kind.Buy || o.kind == Kind.MintNo) free[o.owner] += o.locked;
-        else if (o.kind == Kind.Sell) yesOf[id][o.owner] += o.qty;
-        else noOf[id][o.owner] += o.qty;
+        else if (o.kind == Kind.Sell) _shift(id * 2, address(this), o.owner, o.qty);
+        else _shift(id * 2 + 1, address(this), o.owner, o.qty);
     }
 
     // ---------- settling a market ----------
@@ -469,15 +483,98 @@ contract PredictionMarket {
                 i++;
             }
         }
-        uint256 y = yesOf[id][msg.sender];
-        uint256 n = noOf[id][msg.sender];
-        yesOf[id][msg.sender] = 0;
-        noOf[id][msg.sender] = 0;
+        uint256 y = _bal[id * 2][msg.sender];
+        uint256 n = _bal[id * 2 + 1][msg.sender];
+        if (y > 0) _burn(id * 2, msg.sender, y);
+        if (n > 0) _burn(id * 2 + 1, msg.sender, n);
         if (m.state == State.Yes) pay = y * m.unit;
         else if (m.state == State.No) pay = n * m.unit;
         else pay = (y + n) * (m.unit / 2);
         m.pool -= pay;
         free[msg.sender] += pay;
+    }
+
+    // ---------- shares as ERC-1155 tokens ----------
+
+    function yesOf(uint256 id, address who) external view returns (uint64) { return uint64(_bal[id * 2][who]); }
+    function noOf(uint256 id, address who) external view returns (uint64) { return uint64(_bal[id * 2 + 1][who]); }
+
+    function balanceOf(address who, uint256 tokenId) public view returns (uint256) {
+        require(who != address(0), "the zero address holds nothing");
+        return _bal[tokenId][who];
+    }
+
+    function balanceOfBatch(address[] calldata whos, uint256[] calldata tokenIds) external view returns (uint256[] memory out) {
+        require(whos.length == tokenIds.length, "lists differ in length");
+        out = new uint256[](whos.length);
+        for (uint256 i = 0; i < whos.length; i++) out[i] = balanceOf(whos[i], tokenIds[i]);
+    }
+
+    function setApprovalForAll(address operator, bool approved) external {
+        require(operator != msg.sender, "you can't approve yourself");
+        _operators[msg.sender][operator] = approved;
+        emit ApprovalForAll(msg.sender, operator, approved);
+    }
+
+    function isApprovedForAll(address account, address operator) public view returns (bool) {
+        return _operators[account][operator];
+    }
+
+    function uri(uint256) external pure returns (string memory) { return ""; }
+
+    function supportsInterface(bytes4 i) external pure returns (bool) {
+        return i == 0x01ffc9a7 || i == 0xd9b67a26; // ERC-165, ERC-1155
+    }
+
+    function safeTransferFrom(address from, address to, uint256 tokenId, uint256 value, bytes calldata data) external nonReentrant {
+        _checkTransfer(from, to, tokenId);
+        _shift(tokenId, from, to, value);
+        _acceptance(from, to, tokenId, value, data);
+    }
+
+    function safeBatchTransferFrom(address from, address to, uint256[] calldata tokenIds, uint256[] calldata values, bytes calldata data) external nonReentrant {
+        require(tokenIds.length == values.length, "lists differ in length");
+        require(from == msg.sender || isApprovedForAll(from, msg.sender), "you are not allowed to move these shares");
+        require(to != address(0) && to != address(this), "bad recipient");
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            _bal[tokenIds[i]][from] -= values[i];
+            _bal[tokenIds[i]][to] += values[i];
+        }
+        emit TransferBatch(msg.sender, from, to, tokenIds, values);
+        if (to.code.length > 0) {
+            bytes4 ret;
+            try IERC1155Receiver(to).onERC1155BatchReceived(msg.sender, from, tokenIds, values, data) returns (bytes4 r) { ret = r; } catch { revert("the receiver refused the shares"); }
+            require(ret == IERC1155Receiver.onERC1155BatchReceived.selector, "the receiver refused the shares");
+        }
+    }
+
+    function _checkTransfer(address from, address to, uint256 tokenId) internal view {
+        require(from == msg.sender || isApprovedForAll(from, msg.sender), "you are not allowed to move these shares");
+        require(to != address(0) && to != address(this), "bad recipient");
+        require(tokenId / 2 < count, "no such market");
+    }
+
+    function _acceptance(address from, address to, uint256 tokenId, uint256 value, bytes calldata data) internal {
+        if (to.code.length == 0) return;
+        bytes4 ret;
+        try IERC1155Receiver(to).onERC1155Received(msg.sender, from, tokenId, value, data) returns (bytes4 r) { ret = r; } catch { revert("the receiver refused the shares"); }
+        require(ret == IERC1155Receiver.onERC1155Received.selector, "the receiver refused the shares");
+    }
+
+    function _mint(uint256 tokenId, address to, uint256 q) internal {
+        _bal[tokenId][to] += q;
+        emit TransferSingle(msg.sender, address(0), to, tokenId, q);
+    }
+
+    function _burn(uint256 tokenId, address from, uint256 q) internal {
+        _bal[tokenId][from] -= q;
+        emit TransferSingle(msg.sender, from, address(0), tokenId, q);
+    }
+
+    function _shift(uint256 tokenId, address from, address to, uint256 q) internal {
+        _bal[tokenId][from] -= q;
+        _bal[tokenId][to] += q;
+        emit TransferSingle(msg.sender, from, to, tokenId, q);
     }
 
     // ---------- reading ----------

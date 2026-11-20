@@ -20,6 +20,7 @@ contract Handler is Test {
     uint256 public steps; // settling waits until the market has seen real trading
     uint256 public constant WARMUP = 40;
     uint256 public evictions;
+    uint256 public shareTransfers;
     uint256 public deposited;
     uint256 public withdrawn;
     // coverage counters: printed after each run so a green result can be checked to have reached the hard cases
@@ -122,6 +123,20 @@ contract Handler is Test {
         }
     }
 
+    /// Shares are ERC-1155 tokens, so they can be sent between people at any time, in any state of the market.
+    function shareTransfer(uint256 s, uint256 to, uint256 mid, uint8 outcome, uint256 amt) external {
+        steps++;
+        address from = _actor(s);
+        address dest = _actor(to);
+        mid = mid % MARKETS;
+        uint256 tid = mid * 2 + (outcome % 2);
+        uint256 have = pm.balanceOf(from, tid);
+        if (have == 0) return;
+        amt = bound(amt, 1, have);
+        vm.prank(from);
+        try pm.safeTransferFrom(from, dest, tid, amt, "") { shareTransfers++; } catch {}
+    }
+
     /// Floods a book, then places a better-priced bid: the full book must make room by pushing the worst bid out.
     function evict(uint256 s, uint256 mid) external {
         steps++;
@@ -200,6 +215,10 @@ contract Handler is Test {
         (, , , uint8[] memory sides, uint8[] memory prices, uint64[] memory qtys) = pm.book(mid);
         for (uint256 i = 0; i < sides.length; i++) if (sides[i] == 0) sum += uint256(prices[i]) * qtys[i] * (unit / 100);
     }
+    function escrowed(uint256 mid, uint8 outcome) public view returns (uint256 sum) {
+        (, , uint8[] memory outcomes, uint8[] memory sides, , uint64[] memory qtys) = pm.book(mid);
+        for (uint256 i = 0; i < sides.length; i++) if (sides[i] == 1 && outcomes[i] == outcome) sum += qtys[i];
+    }
     function bondsOf(uint256 mid) public view returns (uint256 x) {
         (, , , , , , x) = pm.resolution(mid);
     }
@@ -223,7 +242,7 @@ contract InvariantTest is StdInvariant, Test {
         pm = new PredictionMarket(address(usdt));
         h = new Handler(pm, usdt);
         targetContract(address(h));
-        bytes4[] memory sel = new bytes4[](22);
+        bytes4[] memory sel = new bytes4[](25);
         sel[0] = Handler.deposit.selector;
         sel[1] = Handler.deposit.selector;
         sel[2] = Handler.withdraw.selector;
@@ -246,6 +265,9 @@ contract InvariantTest is StdInvariant, Test {
         sel[19] = Handler.settleStuck.selector;
         sel[20] = Handler.claim.selector;
         sel[21] = Handler.cancel.selector;
+        sel[22] = Handler.shareTransfer.selector;
+        sel[23] = Handler.shareTransfer.selector;
+        sel[24] = Handler.shareTransfer.selector;
         targetSelector(FuzzSelector({ addr: address(h), selectors: sel }));
     }
 
@@ -259,6 +281,14 @@ contract InvariantTest is StdInvariant, Test {
         }
         assertEq(usdt.balanceOf(address(pm)), owed);
         assertEq(usdt.balanceOf(address(pm)), h.deposited() - h.withdrawn());
+    }
+
+    /// Shares waiting in sell orders are held by the market itself, as tokens, and nowhere else.
+    function invariant_escrowedSharesAreTheMarketsOwnBalance() public view {
+        for (uint256 m = 0; m < h.MARKETS(); m++) {
+            assertEq(pm.balanceOf(address(pm), m * 2), h.escrowed(m, 0));
+            assertEq(pm.balanceOf(address(pm), m * 2 + 1), h.escrowed(m, 1));
+        }
     }
 
     /// Bonds are held only while an answer is pending: none before an answer, one after a proposal, two after a dispute,
@@ -322,5 +352,6 @@ contract InvariantTest is StdInvariant, Test {
         console.log("expiredNoAnswer", h.expiredNoAnswer());
         console.log("expiredStuckDispute", h.expiredStuckDispute());
         console.log("claims", h.claims());
+        console.log("shareTransfers", h.shareTransfers());
     }
 }
