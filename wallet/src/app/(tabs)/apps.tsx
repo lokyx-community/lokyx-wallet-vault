@@ -1,30 +1,34 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { Easing, FadeInDown, FadeOut, LinearTransition, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
-import Svg, { Circle, Defs, LinearGradient as LG, RadialGradient as RG, Rect, Stop } from 'react-native-svg';
+import Animated, { FadeInDown, FadeOut, LinearTransition, useReducedMotion } from 'react-native-reanimated';
 import { T } from '../../ui/Text';
-import { Field, Press } from '../../ui/controls';
+import { Press } from '../../ui/controls';
+import { Aurora } from '../../ui/Aurora';
+import { AppCard, CardChip, WIDE_H, type AppKind } from '../../ui/AppCard';
+import { AppGlyph, type GlyphName } from '../../ui/AppGlyph';
+import { CardCarousel } from '../../ui/CardCarousel';
+import { Sheet } from '../../ui/Sheet';
+import { Logo } from '../../ui/Logo';
+import { KeyboardScroll } from '../../ui/KeyboardScroll';
 import { Icon } from '../../ui/Icon';
 import { C, F } from '../../ui/theme';
-import { siteUrl } from '../../lib/rpc';
+import { DUR, EASE_OUT } from '../../ui/motion';
 import { sites, useEvmSites, useJars, useShared, useSites } from '../../lib/data';
 import { useApps } from '../../lib/appswallet';
-import { shortAddr } from '../../lib/format';
+import { shortAddr, niceLyx } from '../../lib/format';
 import { currentAddress } from '../../lib/wallet';
-import { toUrl } from '../../lib/provider';
-import { Aurora } from '../../ui/Aurora';
-import { useBookmarks } from '../../lib/bookmarks';
 import { useCapsules } from '../../lib/capsules';
 import { useContractsOn } from '../../lib/chain';
-import { KeyboardScroll } from '../../ui/KeyboardScroll';
-import { Logo } from '../../ui/Logo';
-import { DUR, EASE_OUT } from '../../ui/motion';
-import { AppGlyph, type GlyphName } from '../../ui/AppGlyph';
-import { Sheet } from '../../ui/Sheet';
+import { usePoll, type Account } from '../../lib/rpc';
+import { useStore } from '../../lib/store';
+import { loadVaults, vaults } from '../../lib/ethvault';
+import { setLift } from '../../lib/lift';
+import { siteUrl } from '../../lib/rpc';
+import { FEATURES } from '../../lib/features';
 
-const open = (u: string) => router.push(`/browser?url=${encodeURIComponent(u)}`);
+const glass = { backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' } as const;
 
 /** Each block of the page arrives a beat after the one above it, easing in from just below. */
 function useRise(i: number) {
@@ -32,381 +36,210 @@ function useRise(i: number) {
   return still ? undefined : FadeInDown.delay(70 + i * 80).duration(DUR.slow + 120).easing(EASE_OUT);
 }
 
-/** A slow drift, up and down, so resting things are never completely still. */
-function useFloat(period: number, amp: number, phase = 0) {
-  const still = useReducedMotion();
-  const v = useSharedValue(0);
-  useEffect(() => {
-    if (still) return;
-    v.value = withDelay(phase, withRepeat(withSequence(withTiming(1, { duration: period, easing: Easing.inOut(Easing.sin) }), withTiming(0, { duration: period, easing: Easing.inOut(Easing.sin) })), -1));
-  }, [still, period, phase, v]);
-  return useAnimatedStyle(() => ({ transform: [{ translateY: -amp * v.value }] }));
+/** Remember where a card sits on screen, so the page it opens can lift that very card into place. */
+function useLiftFrom() {
+  const refs = useRef<Record<string, View | null>>({});
+  const set = (id: string) => (r: View | null) => { refs.current[id] = r; };
+  const go = (id: string, route: string) => {
+    const v = refs.current[id];
+    if (!v) {
+      setLift(null);
+      return router.push(route as never);
+    }
+    v.measureInWindow((x, y, w, h) => {
+      setLift(w && h ? { x, y, w, h } : null);
+      router.push(route as never);
+    });
+  };
+  return { set, go };
 }
 
-/** A website you use often, as an app icon with its name underneath. */
-function Fav({ title, fixed, onPress, index }: { title: string; fixed?: boolean; onPress: () => void; index: number }) {
-  const still = useReducedMotion();
-  return (
-    <Animated.View entering={still ? undefined : FadeInDown.delay(180 + index * 60).duration(DUR.slow).easing(EASE_OUT)} style={{ width: 64, alignItems: 'center' }}>
-      <Press onPress={onPress} scaleTo={0.92} style={{ alignItems: 'center', gap: 7 }}>
-        <View style={{ width: 56, height: 56, borderRadius: 18, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.14)' }}>
-          {fixed ? <Icon name="globe" size={26} color={C.text} width={1.7} /> : <T style={{ fontFamily: F.semibold, fontSize: 17, letterSpacing: -0.3 }}>{title.slice(0, 2).toUpperCase()}</T>}
-        </View>
-        <T style={{ fontSize: 11.5, color: C.soft, letterSpacing: -0.1 }} numberOfLines={1}>{title}</T>
-      </Press>
-    </Animated.View>
-  );
-}
+const Label = ({ children }: { children: string }) => <T style={{ fontFamily: F.medium, fontSize: 11.5, letterSpacing: 1.8, color: C.sub, paddingLeft: 4 }}>{children}</T>;
 
-function Heading({ children }: { children: string }) {
-  return <T style={{ fontFamily: F.semibold, fontSize: 22, letterSpacing: -0.5, lineHeight: 28 }}>{children}</T>;
-}
-
-/** The Apps wallet card: what a website can see of you, shown instead of described. A slow light drifts over it and the coins float. */
-function Feature({ width, onPress }: { width: number; onPress: () => void }) {
-  const still = useReducedMotion();
-  const { address } = useApps();
-  const siteCount = useEvmSites().filter((s) => !!address && s.address.toLowerCase() === address.toLowerCase()).length;
-  const id = 'z' + useId().replace(/[^a-zA-Z0-9]/g, '');
-  const H = 236;
-  const drift = useSharedValue(0);
-  useEffect(() => {
-    if (still) return;
-    drift.value = withRepeat(withSequence(withTiming(1, { duration: 6000, easing: Easing.inOut(Easing.sin) }), withTiming(0, { duration: 6000, easing: Easing.inOut(Easing.sin) })), -1);
-  }, [still, drift]);
-  const glow = useAnimatedStyle(() => ({ transform: [{ translateX: -30 + drift.value * 60 }], opacity: 0.8 + drift.value * 0.2 }));
-  // a band of light that passes over the whole card, then rests a few seconds
-  const sheen = useSharedValue(-1);
-  // the dot on the badge breathes, the lock and the Open button gently pulse
-  const pulse = useSharedValue(0);
-  // the address panel's edge is lit by a light that travels round it
-  const edge = useSharedValue(0);
-  useEffect(() => {
-    if (still) return;
-    sheen.value = withDelay(900, withRepeat(withSequence(withTiming(1.25, { duration: 1700, easing: Easing.inOut(Easing.quad) }), withDelay(4600, withTiming(-1, { duration: 0 }))), -1));
-    pulse.value = withRepeat(withSequence(withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.sin) }), withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.sin) })), -1);
-    edge.value = withRepeat(withTiming(1, { duration: 5200, easing: Easing.linear }), -1);
-  }, [still, sheen, pulse, edge]);
-  const sheenStyle = useAnimatedStyle(() => ({ transform: [{ translateX: sheen.value * width }, { rotate: '16deg' }] }));
-  const dot = useAnimatedStyle(() => ({ opacity: 0.45 + 0.55 * pulse.value, transform: [{ scale: 0.85 + 0.35 * pulse.value }] }));
-  const lock = useAnimatedStyle(() => ({ opacity: 0.6 + 0.4 * pulse.value }));
-  const openBtn = useAnimatedStyle(() => ({ transform: [{ scale: 1 + 0.025 * pulse.value }], shadowOpacity: 0.12 + 0.25 * pulse.value }));
-  const edgeLight = useAnimatedStyle(() => ({ transform: [{ translateX: -90 + edge.value * (width - 40 + 180) }] }));
-  const c0 = useFloat(1700, 2.5, 0);
-  const c1 = useFloat(1900, 2.5, 300);
-  const c2 = useFloat(2100, 2.5, 600);
-  const coins = [['eth', c0], ['usdt', c1], ['usdc', c2]] as const;
-  return (
-    <Press onPress={onPress} scaleTo={0.985} haptic={false} style={{ width, height: H, borderRadius: 34 }}>
-      <View style={[{ flex: 1, borderRadius: 34, overflow: 'hidden', padding: 20 }, glassBox]}>
-        <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: 0, left: 0, width, height: H }, glow]}>
-          <Svg width={width} height={H}>
-            <Defs>
-              <RG id={id + 'a'} cx={width * 0.5} cy={0} r={width * 0.75} gradientUnits="userSpaceOnUse">
-                <Stop offset="0" stopColor="#8296FF" stopOpacity={0.26} />
-                <Stop offset="1" stopColor="#8296FF" stopOpacity={0} />
-              </RG>
-            </Defs>
-            <Rect x={0} y={0} width={width} height={H} fill={`url(#${id}a)`} />
-          </Svg>
-        </Animated.View>
-        <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: -60, bottom: -60, left: 0, width: 90, backgroundColor: 'rgba(255,255,255,0.08)' }, sheenStyle]} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <T style={{ fontFamily: F.medium, fontSize: 11.5, letterSpacing: 2, color: C.sub }}>APPS WALLET</T>
-          <View style={{ height: 26, paddingHorizontal: 11, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.1)', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: siteCount ? '#fff' : C.faint }, siteCount ? dot : null]} />
-            <T style={{ fontSize: 11.5, color: C.soft }}>{siteCount ? `${siteCount} ${siteCount === 1 ? 'site' : 'sites'}` : 'No sites'}</T>
-          </View>
-        </View>
-        <View style={{ marginTop: 16, borderRadius: 22, overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.14)', paddingHorizontal: 16, paddingVertical: 14 }}>
-          <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: 0, left: 0, width: 90, height: 1, backgroundColor: 'rgba(255,255,255,0.7)' }, edgeLight]} />
-          <T style={{ fontSize: 11.5, color: C.sub }}>{address ? 'The only address websites can see' : 'Make one to connect to websites'}</T>
-          <T style={{ fontFamily: F.mono, fontSize: 15, letterSpacing: 0.3, marginTop: 6 }}>{address ? shortAddr(address, 6, 4) : 'Not made yet'}</T>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
-            <Animated.View style={lock}><AppGlyph name="lock" size={15} color="#fff" /></Animated.View>
-            <T style={{ fontSize: 12.5, color: C.sub }}>Your vault stays hidden</T>
-          </View>
-        </View>
-        <View style={{ position: 'absolute', left: 20, right: 20, bottom: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row' }}>
-            {coins.map(([id2, style], i) => (
-              <Animated.View key={id2} entering={still ? undefined : FadeInDown.delay(400 + i * 120).duration(DUR.slow).easing(EASE_OUT)} style={{ marginLeft: i ? -10 : 0, width: 36, height: 36, borderRadius: 18, borderWidth: 2.5, borderColor: '#101219', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
-                <Animated.View style={style}><Logo id={id2} size={31} /></Animated.View>
-              </Animated.View>
-            ))}
-          </View>
-          <Animated.View style={[{ height: 40, paddingHorizontal: 24, borderRadius: 20, backgroundColor: '#F5F5F7', justifyContent: 'center', shadowColor: '#fff', shadowRadius: 12, shadowOffset: { width: 0, height: 0 } }, openBtn]}>
-            <T style={{ fontFamily: F.semibold, fontSize: 15, letterSpacing: -0.2, color: '#000' }}>{address ? 'Open' : 'Make'}</T>
-          </Animated.View>
-        </View>
-      </View>
-    </Press>
-  );
-}
-
-const glassBox = { backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' } as const;
-
-const glass = { backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' } as const;
-
-/** A glass tile of the page: a mark, a name, one line (or a live fact), and room for a picture. */
-function Tile({ w, h, glyph, name, line, meta, onPress, dim, children, wide }: { w?: number; h: number; glyph: GlyphName; name: string; line: string; meta?: string; onPress: () => void; dim?: boolean; children?: React.ReactNode; wide?: boolean }) {
-  return (
-    <Press onPress={onPress} scaleTo={0.98} style={{ width: w, flex: w ? undefined : 1, height: h, borderRadius: 30, opacity: dim ? 0.55 : 1 }}>
-      <View style={[{ flex: 1, borderRadius: 30, overflow: 'hidden', padding: 14, justifyContent: 'space-between', flexDirection: wide ? 'row' : 'column', alignItems: wide ? 'center' : undefined, gap: wide ? 14 : 0 }, glass]}>
-        {children}
-        {wide ? null : (
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
-              <AppGlyph name={glyph} size={20} color="#fff" />
-            </View>
-            {meta ? <T style={{ fontSize: 12, color: C.sub }}>{meta}</T> : null}
-          </View>
-        )}
-        {wide ? null : (
-          <View>
-            <T style={{ fontFamily: F.semibold, fontSize: 17, letterSpacing: -0.4 }} numberOfLines={1}>{name}</T>
-            <T style={{ fontSize: 12.5, lineHeight: 16, color: C.sub, marginTop: 2 }} numberOfLines={2}>{line}</T>
-          </View>
-        )}
-      </View>
-    </Press>
-  );
-}
-
-/** Quiet concentric rings, the Vault's picture. */
-function Rings() {
-  return (
-    <Svg style={{ position: 'absolute', right: -30, top: 40 }} width={140} height={140} viewBox="0 0 130 130">
-      <Circle cx={65} cy={65} r={48} fill="none" stroke="rgba(255,255,255,0.13)" strokeWidth={1.2} />
-      <Circle cx={65} cy={65} r={34} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={1.2} />
-      <Circle cx={65} cy={65} r={20} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth={1.2} />
-      <Circle cx={65} cy={65} r={6} fill="#fff" />
-    </Svg>
-  );
-}
-
-/** A thin ring that fills as a capsule's day gets closer. */
-function Progress({ p, size = 36 }: { p: number; size?: number }) {
-  const r = size / 2 - 3;
-  const c = 2 * Math.PI * r;
-  return (
-    <Svg width={size} height={size}>
-      <Circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth={3.5} />
-      <Circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#fff" strokeWidth={3.5} strokeLinecap="round" strokeDasharray={`${c * Math.max(0.04, Math.min(1, p))} ${c}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
-    </Svg>
-  );
-}
-
-/** Small round pills, for the things you make or open. */
-function Pill({ glyph, name, onPress, dim }: { glyph: GlyphName; name: string; onPress: () => void; dim?: boolean }) {
-  return (
-    <Press onPress={onPress} scaleTo={0.97} style={[{ height: 46, paddingLeft: 9, paddingRight: 18, borderRadius: 23, flexDirection: 'row', alignItems: 'center', gap: 10, opacity: dim ? 0.55 : 1 }, glass]}>
-      <View style={{ width: 28, height: 28, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' }}><AppGlyph name={glyph} size={16} color="#fff" /></View>
-      <T style={{ fontFamily: F.medium, fontSize: 14.5 }}>{name}</T>
-    </Press>
-  );
-}
-
-const Label = ({ children }: { children: string }) => <T style={{ fontFamily: F.medium, fontSize: 11.5, letterSpacing: 1.5, color: C.sub }}>{children}</T>;
-
-type Cat = 'all' | 'protect' | 'share' | 'create';
-function Chips({ value, onChange }: { value: Cat; onChange: (c: Cat) => void }) {
+function PillRow({ items }: { items: { name: string; onPress: () => void; dim?: boolean }[] }) {
   return (
     <View style={{ flexDirection: 'row', gap: 8 }}>
-      {([['all', 'All'], ['protect', 'Protect'], ['share', 'Share'], ['create', 'Create']] as [Cat, string][]).map(([id, name]) => (
-        <Press key={id} onPress={() => onChange(id)} haptic={false} accessibilityLabel={name} style={[{ height: 34, paddingHorizontal: 16, borderRadius: 17, justifyContent: 'center' }, value === id ? { backgroundColor: C.ink } : glass]}>
-          <T style={{ fontFamily: F.medium, fontSize: 14, color: value === id ? C.inkText : C.soft }}>{name}</T>
+      {items.map((it) => (
+        <Press key={it.name} onPress={it.onPress} haptic={false} accessibilityLabel={it.name} style={[{ flex: 1, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', opacity: it.dim ? 0.5 : 1 }, glass]}>
+          <T style={{ fontFamily: F.medium, fontSize: 14 }} numberOfLines={1}>{it.name}</T>
         </Press>
       ))}
     </View>
   );
 }
 
-function Row3({ rows }: { rows: { glyph: GlyphName; name: string; line: string; onPress: () => void; dim?: boolean }[] }) {
+/** A small tile for the apps you reach for less: a mark, a name, one line. */
+function Tile({ glyph, name, line, onPress, dim, liftRef }: { glyph: GlyphName; name: string; line: string; onPress: () => void; dim?: boolean; liftRef?: (r: View | null) => void }) {
   return (
-    <View style={{ borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.045)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.11)', overflow: 'hidden' }}>
-      {rows.map((r, i) => (
-        <Press key={r.name} onPress={r.onPress} haptic={false} scaleTo={0.99} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 16, borderTopWidth: i ? 0.5 : 0, borderTopColor: 'rgba(255,255,255,0.09)', opacity: r.dim ? 0.55 : 1 }}>
-          <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' }}>
-            <AppGlyph name={r.glyph} size={24} color="#FFFFFF" />
-          </View>
-          <View style={{ flex: 1, gap: 2 }}>
-            <T style={{ fontFamily: F.medium, fontSize: 16, letterSpacing: -0.2 }} numberOfLines={1}>{r.name}</T>
-            <T v="caption" dim numberOfLines={2}>{r.line}</T>
-          </View>
-          <Icon name="chevron" size={14} color={C.faint} width={2.2} />
-        </Press>
-      ))}
-    </View>
+    <Press onPress={onPress} scaleTo={0.97} accessibilityLabel={name} style={{ flex: 1, height: 84, borderRadius: 24, opacity: dim ? 0.55 : 1 }}>
+      <View ref={liftRef} collapsable={false} style={[{ flex: 1, borderRadius: 24, padding: 14, justifyContent: 'space-between' }, glass]}>
+        <AppGlyph name={glyph} size={22} color="#fff" />
+        <View>
+          <T style={{ fontFamily: F.medium, fontSize: 14.5 }} numberOfLines={1}>{name}</T>
+          <T style={{ fontSize: 11.5, color: C.sub }} numberOfLines={1}>{line}</T>
+        </View>
+      </View>
+    </Press>
   );
 }
+
+const CHAINS = ['eth', 'bnb', 'pol', 'avax', 'arb'] as const;
 
 export default function Apps() {
   const insets = useSafeAreaInsets();
   const { width: sw } = useWindowDimensions();
-  const [text, setText] = useState('');
-  const [make, setMake] = useState(false);
-  const [cat, setCat] = useState<Cat>('all');
   const me = currentAddress();
+  const { address } = useApps();
+  const evm = useEvmSites().filter((s) => !!address && s.address.toLowerCase() === address.toLowerCase());
   const connected = useSites().filter((s) => s.address === me);
   const capsules = useCapsules().filter((c) => !c.opened);
   const jars = useJars();
-  const sharedAccts = useShared();
+  const shared = useShared();
   const contractsOn = useContractsOn();
-  const marks = useBookmarks();
-  const site = siteUrl();
+  const acct = usePoll<Account>('lyx_getAccount', { address: me }, 20000);
+  const eth = useStore(vaults);
+  const [front, setFront] = useState(0);
+  const [make, setMake] = useState(false);
+  const [showSites, setShowSites] = useState(false);
+  const lift = useLiftFrom();
+  const r = [useRise(0), useRise(1), useRise(2), useRise(3), useRise(4)];
+  useEffect(() => { loadVaults(); }, []);
+
   const cw = sw - 40;
-  const col = Math.floor((cw - 14) / 2);
-  const r = [useRise(0), useRise(1), useRise(2), useRise(3), useRise(4), useRise(5)];
-
-  // the nearest capsule: how far along it is, and how many days are left
+  const tallW = Math.min(300, Math.round(sw * 0.7));
+  const tallH = Math.round(tallW * 1.28);
+  const vaultCount = (acct.data?.vault ? 1 : 0) + Object.values(eth).filter(Boolean).length;
   const soonest = [...capsules].sort((a, b) => a.opens - b.opens)[0];
-  const nowS = Date.now() / 1000;
-  const capP = soonest && soonest.opens > soonest.sealed ? (nowS - soonest.sealed) / (soonest.opens - soonest.sealed) : 0;
-  const capLeft = soonest ? Math.max(0, Math.ceil((soonest.opens - nowS) / 86400)) : 0;
-  const capMeta = soonest ? (capLeft === 0 ? 'Today' : `${capLeft} ${capLeft === 1 ? 'day' : 'days'}`) : undefined;
+  const daysLeft = soonest ? Math.max(0, Math.ceil((soonest.opens - Date.now() / 1000) / 86400)) : 0;
+  const capProgress = soonest && soonest.opens > soonest.sealed ? (Date.now() / 1000 - soonest.sealed) / (soonest.opens - soonest.sealed) : undefined;
 
-  const vault = (
-    <Tile w={col} h={244} glyph="lock" name="Vault" line="Any coin. A daily limit and a delay" onPress={() => router.push('/vaults')}>
-      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-        <Svg width={col} height={244}>
-          <Defs><RG id="vg" cx={col / 2} cy={0} r={col} gradientUnits="userSpaceOnUse"><Stop offset="0" stopColor="#8296FF" stopOpacity={0.24} /><Stop offset="1" stopColor="#8296FF" stopOpacity={0} /></RG></Defs>
-          <Rect x={0} y={0} width={col} height={244} fill="url(#vg)" />
-        </Svg>
-        <Rings />
-      </View>
-    </Tile>
-  );
-  const jar = <Tile w={col} h={114} glyph="jar" name="Savings jar" line="Lock LYX until a date" meta={jars.length ? `${jars.length} ${jars.length === 1 ? 'jar' : 'jars'}` : undefined} dim={!contractsOn} onPress={() => router.push('/jar')} />;
-  const imp = <Tile w={col} h={114} glyph="vault" name="Import a wallet" line="Move old money in" onPress={() => router.push('/import')} />;
-  const cap = (
-    <Press onPress={() => router.push('/capsule')} scaleTo={0.98} style={{ width: col, height: 114, borderRadius: 30, opacity: contractsOn ? 1 : 0.55 }}>
-      <View style={[{ flex: 1, borderRadius: 30, padding: 14, justifyContent: 'space-between' }, glass]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          {soonest ? <Progress p={capP} /> : <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}><AppGlyph name="capsule" size={20} color="#fff" /></View>}
-          {capMeta ? <T style={{ fontSize: 12, color: C.sub }}>{capMeta}</T> : null}
-        </View>
-        <View>
-          <T style={{ fontFamily: F.semibold, fontSize: 17, letterSpacing: -0.4 }} numberOfLines={1}>Time capsule</T>
-          <T style={{ fontSize: 12.5, lineHeight: 16, color: C.sub, marginTop: 2 }} numberOfLines={1}>{capsules.length ? `${capsules.length} waiting` : 'Seal LYX until a day'}</T>
-        </View>
-      </View>
+  const deck: { id: AppKind; route: string; node: React.ReactNode }[] = [
+    {
+      id: 'apps', route: '/apps-wallet',
+      node: (
+        <AppCard kind="apps" width={tallW} height={tallH} corner={<CardChip dot={evm.length > 0} text={evm.length ? `${evm.length} ${evm.length === 1 ? 'site' : 'sites'}` : 'No sites'} />}>
+          <T style={{ position: 'absolute', left: 22, right: 22, bottom: 92, fontFamily: F.mono, fontSize: 21 }} numberOfLines={1} adjustsFontSizeToFit>{address ? shortAddr(address, 6, 4) : 'Not made yet'}</T>
+          <T style={{ position: 'absolute', left: 22, right: 22, bottom: 72, fontSize: 11.5, color: 'rgba(255,255,255,0.7)' }} numberOfLines={1}>{address ? 'The only address websites see' : 'Make one to connect to websites'}</T>
+          <View style={{ position: 'absolute', left: 22, bottom: 22, flexDirection: 'row' }}>
+            {(['eth', 'usdt', 'usdc'] as const).map((id, i) => (
+              <View key={id} style={{ marginLeft: i ? -10 : 0, width: 34, height: 34, borderRadius: 17, borderWidth: 2.5, borderColor: '#101219', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}><Logo id={id} size={29} /></View>
+            ))}
+          </View>
+        </AppCard>
+      ),
+    },
+    { id: 'shared', route: '/shared', node: <AppCard kind="shared" width={tallW} height={tallH} big={String(shared.length)} small={shared.length === 1 ? 'account · pay when enough agree' : 'accounts · pay when enough agree'} /> },
+    { id: 'vault', route: '/vaults', node: <AppCard kind="vault" width={tallW} height={tallH} big={String(vaultCount)} small={vaultCount === 1 ? 'vault · a limit and a wait' : 'vaults · a limit and a wait'} /> },
+  ];
+  const buttons: Record<AppKind, { name: string; onPress: () => void }[]> = {
+    apps: [{ name: address ? 'Open' : 'Make one', onPress: () => lift.go('apps', '/apps-wallet') }, { name: 'Add money', onPress: () => router.push('/apps-wallet/refill') }, { name: 'Sites', onPress: () => setShowSites(true) }],
+    shared: [{ name: 'Open', onPress: () => lift.go('shared', '/shared') }, { name: 'New account', onPress: () => router.push('/shared/new') }],
+    vault: [{ name: 'Open', onPress: () => lift.go('vault', '/vaults') }, { name: 'Use recovery key', onPress: () => router.push('/vault/recover') }],
+    capsule: [], gift: [], mint: [], jar: [], mining: [], markets: [],
+  };
+  const frontId = deck[Math.min(front, deck.length - 1)].id;
+
+  /** The wide card: tall cards above shrink into this shape on their own page. */
+  const wide = (id: AppKind, route: string | null, card: React.ReactNode, label: string, dim?: boolean) => (
+    <Press onPress={() => (route === 'capsule' ? (setLift(null), router.push('/capsule')) : route ? lift.go(id, route) : setMake(true))} scaleTo={0.985} accessibilityLabel={label} style={{ opacity: dim ? 0.55 : 1 }}>
+      <View ref={lift.set(id)} collapsable={false}>{card}</View>
     </Press>
-  );
-  const sharedRow = (
-    <Press onPress={() => router.push('/shared')} scaleTo={0.98} style={{ height: 104, borderRadius: 30 }}>
-      <View style={[{ flex: 1, borderRadius: 30, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 14 }, glass]}>
-        <View style={{ flexDirection: 'row' }}>
-          {['#8AA0FF', '#5FE3A6', '#E8B93A'].map((c, i) => <View key={c} style={{ width: 38, height: 38, borderRadius: 19, marginLeft: i ? -12 : 0, backgroundColor: c, opacity: 0.85, borderWidth: 2.5, borderColor: '#0D0D12' }} />)}
-        </View>
-        <View style={{ flex: 1 }}>
-          <T style={{ fontFamily: F.semibold, fontSize: 17, letterSpacing: -0.4 }}>Shared accounts</T>
-          <T style={{ fontSize: 12.5, color: C.sub, marginTop: 2 }}>{sharedAccts.length ? `${sharedAccts.length} ${sharedAccts.length === 1 ? 'account' : 'accounts'} · pay when enough agree` : 'Pay when enough agree'}</T>
-        </View>
-        <Icon name="chevron" size={14} color={C.faint} width={2.2} />
-      </View>
-    </Press>
-  );
-  const gift = <Tile w={col} h={104} glyph="gift" name="Send a card" line="BTC, USDT, USDC" onPress={() => router.push('/gift')} />;
-  const create = (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-      <Pill glyph="token" name="Make a token" onPress={() => setMake(true)} />
-      <Pill glyph="mining" name="Mining" onPress={() => router.push('/mining')} />
-      <Pill glyph="explorer" name="Explorer" onPress={() => open(`${site}/#/explorer`)} />
-    </View>
-  );
-  const help = (
-    <View style={[{ borderRadius: 26, padding: 18 }, glass]}>
-      <T style={{ fontFamily: F.semibold, fontSize: 15 }}>Not sure which?</T>
-      <T style={{ fontSize: 13, lineHeight: 18, color: C.sub, marginTop: 3 }}>A vault guards everyday money with a limit and a wait. A jar locks LYX until a date you pick.</T>
-    </View>
   );
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Aurora />
-      <KeyboardScroll style={{ flex: 1 }} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 20, paddingBottom: insets.bottom + 130, gap: 22 }} keyboardShouldPersistTaps="handled">
-        <Animated.View entering={r[0]} style={{ gap: 14 }}>
+      <KeyboardScroll style={{ flex: 1 }} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 20, paddingBottom: insets.bottom + 130, gap: 18 }} keyboardShouldPersistTaps="handled">
+        <Animated.View entering={r[0]}>
           <T style={{ fontFamily: F.semibold, fontSize: 36, letterSpacing: -1.1, lineHeight: 42 }}>Apps</T>
-          <View style={[{ flexDirection: 'row', alignItems: 'center', height: 46, borderRadius: 23, paddingLeft: 16 }, glass]}>
-            <Icon name="search" size={18} color={C.sub} width={2} />
-            <Field value={text} onChangeText={setText} placeholder="Search or type a website" autoCapitalize="none" autoCorrect={false} keyboardType="web-search" returnKeyType="go" onSubmitEditing={() => text.trim() && open(toUrl(text))} style={{ flex: 1, backgroundColor: 'transparent', height: 46 }} />
-          </View>
-          <Chips value={cat} onChange={setCat} />
         </Animated.View>
 
-        {cat === 'all' && (
-          <Animated.View entering={r[1]} style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 14, columnGap: 10 }}>
-            {marks.map((b, i) => <Fav key={b.url} index={i} title={b.title} fixed={b.fixed} onPress={() => open(b.url)} />)}
-          </Animated.View>
-        )}
-
-        {cat === 'all' && (
-          <Animated.View entering={r[2]}>
-            <Feature width={cw} onPress={() => router.push('/apps-wallet')} />
-          </Animated.View>
-        )}
-
-        <Animated.View entering={r[3]} layout={LinearTransition.duration(DUR.base).easing(EASE_OUT)} style={{ gap: 14 }}>
-          {(cat === 'all' || cat === 'protect') && (
-            <View style={{ flexDirection: 'row', gap: 14 }}>
-              {vault}
-              <View style={{ gap: 16 }}>{jar}{cat === 'protect' ? imp : cap}</View>
-            </View>
-          )}
-          {cat === 'protect' && help}
-          {(cat === 'all' || cat === 'share') && sharedRow}
-          {cat === 'share' && (
-            <View style={{ flexDirection: 'row', gap: 14 }}>{gift}{cap}</View>
-          )}
-          {cat === 'all' && <View style={{ flexDirection: 'row', gap: 14 }}>{gift}{imp}</View>}
-          {(cat === 'all' || cat === 'create') && (
-            <View style={{ gap: 10 }}>
-              <Label>CREATE</Label>
-              {create}
-            </View>
-          )}
+        <Animated.View entering={r[1]} style={{ gap: 10 }}>
+          <CardCarousel
+            width={tallW}
+            height={tallH}
+            index={front}
+            onIndex={setFront}
+            cards={deck.map((d) => (
+              <Press key={d.id} onPress={() => lift.go(d.id, d.route)} scaleTo={0.985} accessibilityLabel={APP_NAME[d.id]}>
+                <View ref={lift.set(d.id)} collapsable={false}>{d.node}</View>
+              </Press>
+            ))}
+          />
+          <PillRow items={buttons[frontId]} />
         </Animated.View>
 
-        {cat === 'all' && contractsOn && (
-          <Animated.View layout={LinearTransition.duration(DUR.base).easing(EASE_OUT)} style={{ gap: 10 }}>
-            <Label>CONNECTED SITES</Label>
-            {connected.length === 0 ? (
-              <T v="sub" color={C.faint}>Sites you connect to show up here. You can cut them off any time.</T>
-            ) : (
-              <View style={[{ borderRadius: 26, paddingHorizontal: 16, paddingVertical: 4 }, glass]}>
-                {connected.map((s, i) => (
-                  <Animated.View key={s.origin} exiting={FadeOut} layout={LinearTransition.duration(DUR.base).easing(EASE_OUT)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 62, borderTopWidth: i ? 0.5 : 0, borderTopColor: 'rgba(255,255,255,0.08)' }}>
-                    <Press onPress={() => open(s.origin)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 }}>
-                      <View style={{ width: 42, height: 42, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' }}>
-                        <T style={{ fontFamily: F.semibold, fontSize: 13 }}>{s.origin.replace(/^https?:\/\/(www\.)?/, '').slice(0, 2).toUpperCase()}</T>
-                      </View>
-                      <View style={{ flex: 1, gap: 2 }}>
-                        <T v="callout" numberOfLines={1}>{s.origin.replace(/^https?:\/\//, '')}</T>
-                        <T v="caption" dim>Can see your address</T>
-                      </View>
-                    </Press>
-                    <Press onPress={() => sites.save((x) => x.filter((y) => !(y.origin === s.origin && y.address === me)))} style={{ paddingHorizontal: 12, height: 32, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', justifyContent: 'center' }}>
-                      <T v="caption" style={{ fontFamily: F.medium }}>Disconnect</T>
-                    </Press>
-                  </Animated.View>
-                ))}
+        <Animated.View entering={r[2]} layout={LinearTransition.duration(DUR.base).easing(EASE_OUT)} style={{ gap: 14 }}>
+          {wide('capsule', 'capsule', (
+            <AppCard kind="capsule" width={cw} height={WIDE_H} big={soonest ? niceLyx(soonest.amountLyx) : undefined} unit={soonest ? 'LYX' : undefined} small={soonest ? `opens in ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}` : 'Seal LYX until a day'} bar={capProgress !== undefined ? capProgress : undefined} />
+          ), 'Neptune time capsule', !contractsOn)}
+          {wide('gift', '/gift', (
+            <AppCard kind="gift" width={cw} height={WIDE_H - 30} small="Send a card to anyone" />
+          ), 'Gift cards')}
+          {wide('mint', null, (
+            <AppCard kind="mint" width={cw} height={WIDE_H - 30} small="Make your own coin">
+              <View style={{ position: 'absolute', right: 18, top: 16, flexDirection: 'row' }}>
+                {CHAINS.map((id, i) => <View key={id} style={{ marginLeft: i ? -8 : 0, borderRadius: 14, borderWidth: 2, borderColor: '#14161c', overflow: 'hidden' }}><Logo id={id} size={24} /></View>)}
               </View>
-            )}
-          </Animated.View>
-        )}
+            </AppCard>
+          ), 'Mint a token')}
+        </Animated.View>
 
-        <Sheet open={make} onClose={() => setMake(false)}>
-          <View style={{ gap: 12, paddingBottom: 8 }}>
-            <T v="title">Make a token</T>
-            <T v="sub" dim>Choose where your new coin will live.</T>
-            <Row3 rows={[
-              { glyph: 'token', name: 'On LOKYX', line: 'Quick and cheap. Ready in about a minute.', onPress: () => { setMake(false); router.push('/make-token'); }, dim: !contractsOn },
-              { glyph: 'token', name: 'On Ethereum', line: 'An ERC-20 coin. Costs a little ETH for network fees.', onPress: () => { setMake(false); router.push('/chain/make-token'); } },
-            ]} />
+        <Animated.View entering={r[3]} style={{ gap: 10 }}>
+          <Label>MORE</Label>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Tile glyph="jar" name="Savings jar" line={jars.length ? `${jars.length} ${jars.length === 1 ? 'jar' : 'jars'}` : 'Lock LYX until a date'} dim={!contractsOn} onPress={() => lift.go('jar', '/jar')} liftRef={lift.set('jar')} />
+            <Tile glyph="vault" name="Import" line="Move old money in" onPress={() => { setLift(null); router.push('/import'); }} />
           </View>
-        </Sheet>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Tile glyph="mining" name="Mining" line="Earn LYX" onPress={() => lift.go('mining', '/mining')} liftRef={lift.set('mining')} />
+            <Tile glyph="explorer" name="Explorer" line="Look up anything" onPress={() => { setLift(null); router.push(`/browser?url=${encodeURIComponent(`${siteUrl()}/#/explorer`)}`); }} />
+          </View>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Tile glyph="markets" name="Markets" line={FEATURES.predict ? 'Predict, play money' : 'Not on yet'} onPress={() => lift.go('markets', '/predict')} liftRef={lift.set('markets')} />
+            <Tile glyph="browser" name="Browser" line="Search and favourites" onPress={() => { setLift(null); router.push('/web'); }} />
+          </View>
+        </Animated.View>
       </KeyboardScroll>
+
+      <Sheet open={make} onClose={() => setMake(false)}>
+        <View style={{ gap: 12, paddingBottom: 8, padding: 4 }}>
+          <T v="title">Mint a token</T>
+          <T v="sub" dim>Choose where your new coin will live.</T>
+          {[
+            { name: 'On LOKYX', line: 'Quick and cheap. Ready in about a minute.', go: '/make-token', dim: !contractsOn },
+            { name: 'On Ethereum and other chains', line: 'An ERC-20 coin. Costs a little of that chain’s coin for fees.', go: '/chain/make-token', dim: false },
+          ].map((o) => (
+            <Press key={o.name} onPress={() => { setMake(false); router.push(o.go as never); }} accessibilityLabel={o.name} style={[{ borderRadius: 22, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, opacity: o.dim ? 0.55 : 1 }, glass]}>
+              <AppGlyph name="token" size={24} color="#fff" />
+              <View style={{ flex: 1 }}>
+                <T style={{ fontFamily: F.medium, fontSize: 16 }}>{o.name}</T>
+                <T v="caption" dim>{o.line}</T>
+              </View>
+              <Icon name="chevron" size={14} color={C.faint} width={2.2} />
+            </Press>
+          ))}
+        </View>
+      </Sheet>
+
+      <Sheet open={showSites} onClose={() => setShowSites(false)}>
+        <View style={{ gap: 12, paddingBottom: 8, padding: 4 }}>
+          <T v="title">Connected sites</T>
+          <T v="sub" dim>These sites can see your Apps wallet address. Disconnect one any time.</T>
+          {connected.length === 0 ? (
+            <T v="sub" color={C.faint}>No sites yet. Connect one from the Browser.</T>
+          ) : connected.map((s) => (
+            <Animated.View key={s.origin} exiting={FadeOut} layout={LinearTransition.duration(DUR.base).easing(EASE_OUT)} style={[{ borderRadius: 22, paddingHorizontal: 16, minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 12 }, glass]}>
+              <T style={{ flex: 1, fontFamily: F.medium, fontSize: 15 }} numberOfLines={1}>{s.origin.replace(/^https?:\/\//, '')}</T>
+              <Press onPress={() => sites.save((x) => x.filter((y) => !(y.origin === s.origin && y.address === me)))} accessibilityLabel={`Disconnect ${s.origin}`} style={{ paddingHorizontal: 12, height: 32, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', justifyContent: 'center' }}>
+                <T v="caption" style={{ fontFamily: F.medium }}>Disconnect</T>
+              </Press>
+            </Animated.View>
+          ))}
+        </View>
+      </Sheet>
     </View>
   );
 }
+
+const APP_NAME: Record<AppKind, string> = { apps: 'Apps wallet card', shared: 'Shared accounts card', vault: 'Vault card', capsule: 'Capsule', gift: 'Gift cards', mint: 'Mint a token', jar: 'Savings jar', mining: 'Mining', markets: 'Markets' };

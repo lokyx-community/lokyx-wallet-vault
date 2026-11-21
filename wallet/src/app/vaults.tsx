@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { PageHero } from '../ui/AppCard';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import { T } from '../ui/Text';
@@ -73,8 +74,9 @@ export default function Vaults() {
   const parts = useAsync<Record<string, boolean | null>>(async () => Object.fromEntries(await Promise.all(todo.map(async (n) => [n, (await partsStatus(n))?.ready ?? null]))), [todo.join(',')]);
 
   return (
-    <Screen title="Vault" large>
-      <T v="body" dim style={{ marginTop: -8 }}>A daily limit and a wait on big sends. One vault for each network.</T>
+    <Screen title="Vault">
+      <PageHero kind="vault" big={String(count)} small={count === 1 ? 'vault · a limit and a wait' : 'vaults · a limit and a wait'} />
+      <T v="body" dim style={{ marginTop: 2 }}>A daily limit and a wait on big sends. One vault for each network.</T>
 
       {count > 0 ? (
         <Group title="Your vaults">

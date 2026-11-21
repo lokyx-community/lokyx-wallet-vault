@@ -1,4 +1,5 @@
 import { Tutorial, HowItWorks } from '../../ui/Tutorial';
+import { PageHero } from '../../ui/AppCard';
 import { useTutorial } from '../../lib/tutorial';
 import { useState } from 'react';
 import { View } from 'react-native';
@@ -60,9 +61,9 @@ export default function AppsWallet() {
 
   if (!address)
     return (
-      <Screen title="Apps wallet" large>
+      <Screen title="Apps wallet">
         <Tutorial id="apps" open={tut.open} onClose={tut.close} />
-        <AppsCard />
+        <PageHero kind="apps" small="Make one to connect to websites" />
         <T v="sub" dim style={{ lineHeight: 21 }}>A small wallet just for websites. They can only reach what you put in it, so the worst a bad site can do is take that. Your vault and main wallet stay hidden.</T>
         <ErrorText>{err}</ErrorText>
         <Button title="Make my Apps wallet" onPress={make} busy={making} />
@@ -72,9 +73,9 @@ export default function AppsWallet() {
 
   const heldLogos = [...new Set((held.data ?? []).map((h) => logoFor(h.symbol)).filter((x): x is NonNullable<typeof x> => !!x))];
   return (
-    <Screen title="Apps wallet" large>
+    <Screen title="Apps wallet">
       <Tutorial id="apps" open={tut.open} onClose={tut.close} />
-      <AppsCard held={heldLogos} />
+      <PageHero kind="apps" big={shortAddr(address, 6, 4)} small="The only address websites see" />
       <Press onPress={async () => { await Clipboard.setStringAsync(address); toast('Address copied', 'copy'); }} style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, height: 34, paddingHorizontal: 14, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.16)' }}>
         <T style={{ fontFamily: F.medium, fontSize: 13, color: C.sub }}>{shortAddr(address, 6, 4)}</T>
         <Icon name="copy" size={13} color={C.sub} width={2} />

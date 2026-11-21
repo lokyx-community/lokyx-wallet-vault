@@ -1,6 +1,6 @@
 import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
 
-export type GlyphName = 'gift' | 'lock' | 'vault' | 'shared' | 'jar' | 'token' | 'mining' | 'explorer' | 'capsule';
+export type GlyphName = 'gift' | 'lock' | 'vault' | 'shared' | 'jar' | 'token' | 'mining' | 'explorer' | 'capsule' | 'markets' | 'browser';
 
 /** Hand-drawn two-tone marks for the Apps screen: a soft filled shape under a clean outline. */
 export function AppGlyph({ name, size = 24, color = '#fff', fill = 0.22 }: { name: GlyphName; size?: number; color?: string; fill?: number }) {
@@ -76,6 +76,20 @@ export function AppGlyph({ name, size = 24, color = '#fff', fill = 0.22 }: { nam
           <Circle cx={12} cy={12} r={5} {...f} />
           <Circle cx={12} cy={12} r={5} {...s} />
           <Path d="M3.5 14.5C6 9.5 15 6.5 20.5 9.5" {...s} />
+        </G>
+      )}
+      {name === 'markets' && (
+        <G>
+          <Path d="M4 17.5l5-6 4 3 7-8.5" {...s} />
+          <Path d="M15 6h5v5" {...s} />
+          <Path d="M4 20.5h16" {...s} strokeOpacity={0.45} />
+        </G>
+      )}
+      {name === 'browser' && (
+        <G>
+          <Circle cx={12} cy={12} r={8.2} {...f} />
+          <Circle cx={12} cy={12} r={8.2} {...s} />
+          <Path d="M3.8 12h16.4M12 3.8c2.6 2.7 2.6 13.7 0 16.4M12 3.8c-2.6 2.7-2.6 13.7 0 16.4" {...s} />
         </G>
       )}
     </Svg>

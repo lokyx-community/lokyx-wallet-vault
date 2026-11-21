@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { PageHero } from '../../ui/AppCard';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -75,9 +76,10 @@ function MarketsOn() {
   }, [list.data, held.data, tab]);
 
   return (
-    <Screen title="Markets" large right={<IconButton name="plus" label="Make a market" onPress={() => router.push('/predict/new')} />}>
+    <Screen title="Markets" right={<IconButton name="plus" label="Make a market" onPress={() => router.push('/predict/new')} />}>
+      <PageHero kind="markets" small="Bet on what happens next, with play money" />
       <Tutorial id="predict" open={tut.open} onClose={tut.close} />
-      <T v="sub" dim style={{ marginTop: -8 }}>Bet on what happens next. Test network, play money.</T>
+      <T v="sub" dim style={{ marginTop: 2 }}>Bet on what happens next. Test network, play money.</T>
       <View style={{ borderRadius: 26, backgroundColor: C.fill, padding: 18, gap: 14 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <View style={{ gap: 2 }}>

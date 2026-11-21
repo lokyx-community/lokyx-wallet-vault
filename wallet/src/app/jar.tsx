@@ -1,3 +1,4 @@
+import { PageHero } from '../ui/AppCard';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import Svg, { Circle, Path, Rect, ClipPath, Defs } from 'react-native-svg';
@@ -197,8 +198,9 @@ function JarScreen() {
   };
 
   return (
-    <Screen title="Savings jar" large>
-      <T v="sub" dim style={{ marginTop: -8 }}>Locked until the day you pick. Not even you can open it early.</T>
+    <Screen title="Savings jar">
+      <PageHero kind="jar" small="Not even you can open it early" />
+      <T v="sub" dim style={{ marginTop: 2 }}>Locked until the day you pick. Not even you can open it early.</T>
       {list.length === 0 ? (
         <View style={{ alignItems: 'center', paddingVertical: 20, gap: 8 }}>
           <CoinJar coins={0} size={190} id="e" />

@@ -1,4 +1,5 @@
 import { View, useWindowDimensions } from 'react-native';
+import { PageHero } from '../../ui/AppCard';
 import { router } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { T } from '../../ui/Text';
@@ -44,8 +45,8 @@ export default function Gifts() {
     return { kind: KIND[g.coin], logo: g.coin === 'lyx' ? undefined : g.coin, title: g.note || `${NAMES[g.coin]} gift`, sub: new Date(g.made).toLocaleDateString(), balance: n, unit: u ?? '' };
   };
   return (
-    <Screen title="Gift cards" large>
-      <Fan width={width} />
+    <Screen title="Gift cards">
+      <PageHero kind="gift" small="Send a card to anyone" />
       <T v="sub" dim style={{ lineHeight: 20, textAlign: 'center', paddingHorizontal: 8 }}>Put coins on a card and send it as a link or QR. Whoever has it can move them into their own wallet. Until they do, you can take them back.</T>
       <Primary title="Make a gift card" onPress={() => router.push('/gift/new')} />
       <Secondary title="Claim a gift card" onPress={() => router.push('/gift/claim')} />

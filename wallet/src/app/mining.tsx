@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { PageHero } from '../ui/AppCard';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -29,7 +30,8 @@ export default function Mining() {
   const earned = useMemo(() => mined.reduce((s, i) => s + Number(i.amountLyx), 0), [mined]);
 
   return (
-    <Screen title="Mining" large>
+    <Screen title="Mining">
+      <PageHero kind="mining" big={String(Math.round(earned * 100) / 100)} unit="LYX" small="mined by this address" />
       <T v="callout" dim style={{ lineHeight: 22 }}>LOKYX is mined with ordinary computers. Every block pays the miner who finds it, about once a minute across the network.</T>
 
       <Animated.View entering={FadeInDown.duration(DUR.base).easing(EASE_OUT)} style={{ borderRadius: 28, backgroundColor: C.fill, padding: 22, gap: 18 }}>

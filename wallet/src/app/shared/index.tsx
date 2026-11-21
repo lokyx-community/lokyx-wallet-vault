@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PageHero } from '../../ui/AppCard';
 import { View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { T } from '../../ui/Text';
@@ -55,8 +56,9 @@ export default function SharedList() {
     }
   };
   return (
-    <Screen title="Shared accounts" large>
-      <T v="sub" dim style={{ lineHeight: 20, marginTop: -8 }}>Money moves only when enough owners approve. Each person keeps their own key on their own phone.</T>
+    <Screen title="Shared accounts">
+      <PageHero kind="shared" small="Money moves when enough owners approve" />
+      <T v="sub" dim style={{ lineHeight: 20 }}>Money moves only when enough owners approve. Each person keeps their own key on their own phone.</T>
       <Press onPress={() => router.push(contractsOn ? '/shared/new' : '/shared/eth/new')} scaleTo={0.985} style={{ borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.14)', padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
         <ApprovalRing n={3} have={2} need={2} size={64} stroke={6}>
           <Icon name="people" size={22} color={C.text} width={1.9} />
