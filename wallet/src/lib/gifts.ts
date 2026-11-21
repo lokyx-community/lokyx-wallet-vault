@@ -11,6 +11,7 @@ import { activeNets, btcBalance, ensureAddresses, ethBalance, sweepBtc, sweepEth
 import { formatBtc, formatUnits } from './multichain-core';
 import { formatLyx, minTransferFee } from './lokyx';
 import { giftAddress, newGiftKey, type GiftCoin } from './gift-core';
+import { solBalance, sweepSol, sweepTron, trxBalance } from './xchains';
 
 export interface Gift {
   coin: GiftCoin;
@@ -41,7 +42,7 @@ const keyName = (address: string) => `gift.${address}`;
 
 /** Make a new card: a fresh key, kept in the secure store so you can take it back. Fund it with an ordinary send. */
 export async function makeGift(coin: GiftCoin, amount: string, note: string, fee?: Gift['fee']): Promise<{ gift: Gift; sk: Uint8Array }> {
-  const sk = newGiftKey();
+  const sk = newGiftKey(coin);
   const address = giftAddress(coin, sk, activeNets().btc);
   await secrets.set(keyName(address), bytesToHex(sk));
   const gift: Gift = { coin, address, amount, note: note.trim(), made: Date.now(), ...(fee ? { fee } : {}) };
@@ -67,6 +68,14 @@ export async function giftBalance(coin: GiftCoin, address: string): Promise<{ ra
     const v = b.confirmed + b.pending;
     return { raw: v, text: `${formatBtc(v)} BTC` };
   }
+  if (coin === 'sol') {
+    const v = await solBalance(nets.sol, address);
+    return { raw: v, text: `${formatUnits(v, 9, 5)} SOL` };
+  }
+  if (coin === 'trx') {
+    const v = await trxBalance(nets.trx, address);
+    return { raw: v, text: `${formatUnits(v, 6, 4)} TRX` };
+  }
   const v = await ethBalance(nets.eth, address);
   return { raw: v, text: `${formatUnits(v, 18, 6)} ETH` };
 }
@@ -82,6 +91,8 @@ export async function sweepGift(coin: GiftCoin, sk: Uint8Array, onStep?: (s: str
     if (bal <= fee) throw new Error(bal === 0n ? 'This gift is empty' : 'Too little is left to cover the network fee');
     return sendOp({ kind: 'transfer', to: currentAddress(), value: bal - fee }, { sk });
   }
+  if (coin === 'sol') return sweepSol(sk);
+  if (coin === 'trx') return sweepTron(sk);
   onStep?.('Finding your address…');
   const mine = await ensureAddresses();
   if (coin === 'btc') return sweepBtc(nets.btc, sk, from, mine.btc[nets.btc]);
@@ -96,3 +107,7 @@ export async function closeGift(address: string) {
 export async function feeSettled(address: string) {
   await save(gifts.get().map((g) => (g.address === address ? { ...g, fee: undefined } : g)));
 }
+
+/** Where the send that puts coins on a card lives, for each coin. */
+export const fundRoute = (coin: GiftCoin, to: string, amount: string) =>
+  coin === 'lyx' ? `/send?to=${to}&amount=${amount}` : coin === 'sol' || coin === 'trx' ? `/xsend?chain=${coin}&to=${to}&amount=${amount}` : `/chain/send?chain=${coin}&to=${to}&amount=${amount}`;

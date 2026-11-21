@@ -10,13 +10,12 @@ import { Logo } from '../../ui/Logo';
 import { CoinLogo } from '../../ui/CoinLogo';
 import { GiftCardFace } from '../../ui/GiftCardFace';
 import { C, F } from '../../ui/theme';
-import { makeGift } from '../../lib/gifts';
+import { fundRoute, makeGift } from '../../lib/gifts';
 import { FEE_ADDRESS, FEE_CHARGED, GIFT_BPS, fromUnits, giftFee, percentText, toUnits } from '../../lib/swap-fees';
 import type { GiftCoin } from '../../lib/gift-core';
 
-const UNIT = { lyx: 'LYX', btc: 'BTC', eth: 'ETH' } as const;
-const NAME = { lyx: 'LOKYX', btc: 'Bitcoin', eth: 'Ethereum' } as const;
-const DEC = { lyx: 18, btc: 8, eth: 18 } as const;
+const UNIT = { lyx: 'LYX', btc: 'BTC', eth: 'ETH', sol: 'SOL', trx: 'TRX' } as const;
+const DEC = { lyx: 18, btc: 8, eth: 18, sol: 9, trx: 6 } as const;
 
 /** Pick a coin and an amount while watching the card take shape. The coins go on it with an ordinary send, so Face ID and your limits apply. */
 export default function NewGift() {
@@ -37,7 +36,7 @@ export default function NewGift() {
       const fee = feeText ? { amount: fromUnits(feeUnits, DEC[coin]), text: feeText, to: FEE_ADDRESS[coin] ?? '' } : undefined;
       const { gift } = await makeGift(coin, `${a} ${UNIT[coin]}`, note, fee);
       router.replace(`/gift/${gift.address}`);
-      router.push(coin === 'lyx' ? `/send?to=${gift.address}&amount=${a}` : `/chain/send?chain=${coin}&to=${gift.address}&amount=${a}`);
+      router.push(fundRoute(coin, gift.address, a));
     } catch (e) {
       setErr(plainError(e));
     } finally {
@@ -49,8 +48,8 @@ export default function NewGift() {
       <View style={{ alignItems: 'center' }}>
         <GiftCardFace coin={coin} width={Math.min(width - 40, 340)} note={note || undefined} balance={amt || '0'} unit={UNIT[coin]} />
       </View>
-      <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'center' }}>
-        {(['lyx', 'btc', 'eth'] as GiftCoin[]).map((k) => {
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
+        {(['lyx', 'btc', 'eth', 'sol', 'trx'] as GiftCoin[]).map((k) => {
           const on = coin === k;
           return (
             <Press key={k} onPress={() => (setCoin(k), setAmt(''))} scaleTo={0.95} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 42, paddingHorizontal: 14, borderRadius: 21, backgroundColor: on ? C.ink : 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: on ? C.ink : 'rgba(255,255,255,0.14)' }}>
@@ -60,7 +59,7 @@ export default function NewGift() {
           );
         })}
       </View>
-      <Keypad round onKey={(k) => setAmt((a) => typeAmount(a, k, coin === 'btc' ? 8 : 18))} extra="." />
+      <Keypad round onKey={(k) => setAmt((a) => typeAmount(a, k, DEC[coin]))} extra="." />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6 }}>
         <T v="sub" dim>Fee {percentText(GIFT_BPS)}, in {UNIT[coin]}</T>
         <T v="sub" color={feeText ? C.text : C.good}>{feeText || (FEE_CHARGED ? 'None for this card' : 'Not charged on the test network')}</T>

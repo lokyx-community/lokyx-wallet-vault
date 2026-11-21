@@ -28,7 +28,7 @@ type Prepared = { lines: string[]; send: () => Promise<string>; watch: (id: stri
 /** Send SOL or TRX. Same safety as the other coins: new addresses wait, the last characters are typed back, and a
  *  freshly restored phone has a lower limit for two days. */
 export default function XSend() {
-  const { chain: raw, to: toParam } = useLocalSearchParams<{ chain: string; to?: string }>();
+  const { chain: raw, to: toParam, amount: amtParam } = useLocalSearchParams<{ chain: string; to?: string; amount?: string }>();
   const chain: 'sol' | 'trx' = raw === 'trx' ? 'trx' : 'sol';
   const isSol = chain === 'sol';
   useChainSettings();
@@ -37,7 +37,7 @@ export default function XSend() {
   const dec = isSol ? SOL_DECIMALS : TRX_DECIMALS;
   const netLabel = isSol ? SOL_NETS[nets.sol].label : TRON_NETS[nets.trx].label;
   const [to, setTo] = useState(toParam ?? '');
-  const [amt, setAmt] = useState('');
+  const [amt, setAmt] = useState(amtParam ?? '');
   const [known, setKnown] = useState<string[]>([]);
   const [own, setOwn] = useState('');
   const [guardOk, setGuardOk] = useState(false);

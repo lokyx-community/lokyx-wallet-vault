@@ -14,9 +14,11 @@ import type { GiftCoin } from '../lib/gift-core';
 const TONE: Record<GiftCoin, { lit: string; mid: string; deep: string; glow: string; shadow: string }> = {
   lyx: { lit: '#5C5F69', mid: '#26282F', deep: '#0B0C10', glow: 'rgba(160,165,185,0.22)', shadow: '#A0A5B9' },
   btc: { lit: '#8A5A2E', mid: '#4A2E16', deep: '#150C06', glow: 'rgba(214,150,80,0.24)', shadow: '#D69650' },
+  sol: { lit: '#3F6F73', mid: '#1D3A47', deep: '#091219', glow: 'rgba(90,190,190,0.22)', shadow: '#5ABEBE' },
+  trx: { lit: '#8A3E49', mid: '#4A1B24', deep: '#14070A', glow: 'rgba(225,100,115,0.22)', shadow: '#E16473' },
   eth: { lit: '#4E5690', mid: '#252A55', deep: '#0A0C22', glow: 'rgba(110,125,225,0.26)', shadow: '#6E7DE1' },
 };
-const NAME: Record<GiftCoin, string> = { lyx: 'LOKYX', btc: 'Bitcoin', eth: 'Ethereum' };
+const NAME: Record<GiftCoin, string> = { lyx: 'LOKYX', btc: 'Bitcoin', eth: 'Ethereum', sol: 'Solana', trx: 'Tron' };
 
 /**
  * A gift card: a calm surface in the coin's own tone, fine engraved circles, a thin bright edge, the coin's real logo,

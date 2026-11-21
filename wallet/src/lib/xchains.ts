@@ -3,6 +3,7 @@
 
 import { activeNets, chainSettings, ensureExtraAddresses, fetchT } from './multichain';
 import { assertAllowedX } from './xchains-core';
+import { giftAddress } from './gift-core';
 import { getItem, setItem } from './kv';
 import { store, useStore } from './store';
 import { readPhrase, wallet } from './wallet';
@@ -255,4 +256,36 @@ export async function tronTxBlock(net: TronNet, id: string): Promise<number | nu
   const r = await tronPost<{ blockNumber?: number; result?: string; resMessage?: string }>(net, '/wallet/gettransactioninfobyid', { value: id });
   if (r.result === 'FAILED') throw new Error(`The payment failed: ${r.resMessage ? unhex(r.resMessage) : 'no reason given'}`);
   return r.blockNumber ?? null;
+}
+
+// ---------- Gift cards: move everything on a card's key into this wallet ----------
+
+/** Solana: the whole balance less the 0.000005 fee. An account may end at zero, so nothing is left behind. */
+export async function sweepSol(sk: Uint8Array): Promise<string> {
+  const net = activeNets().sol;
+  const from = giftAddress('sol', sk);
+  const mine = (await ensureExtraAddresses()).sol!;
+  const [bal, toBal, bh] = await Promise.all([solBalance(net, from), solBalance(net, mine), solRpc<{ value: { blockhash: string } }>(net, 'getLatestBlockhash', [{ commitment: 'confirmed' }])]);
+  if (bal === 0n) throw new Error('This gift is empty');
+  if (bal <= SOL_FEE) throw new Error('Too little is left to cover the network fee');
+  const amount = bal - SOL_FEE;
+  if (toBal === 0n && amount < RENT_MIN) throw new Error('Your Solana address has never held SOL, and this gift is too small to open it (it needs 0.00089 SOL).');
+  return broadcastSol(net, signSolTransfer(sk, from, mine, amount, bh.value.blockhash).b64);
+}
+
+/** Tron: the whole balance less a small reserve for the network fee (about 0.3 TRX, or 1.1 TRX if your address is new). */
+export async function sweepTron(sk: Uint8Array): Promise<string> {
+  const net = activeNets().trx;
+  const from = giftAddress('trx', sk);
+  const mine = (await ensureExtraAddresses()).trx!;
+  const [bal, toAcct, block] = await Promise.all([
+    trxBalance(net, from),
+    tronPost<{ address?: string }>(net, '/wallet/getaccount', { address: mine, visible: true }),
+    tronPost<{ blockID: string; block_header: { raw_data: { number: number; timestamp: number } } }>(net, '/wallet/getnowblock', {}),
+  ]);
+  if (bal === 0n) throw new Error('This gift is empty');
+  const reserve = toAcct.address ? 300_000n : 1_100_000n;
+  if (bal <= reserve) throw new Error('Too little is left to cover the network fee');
+  const ref = { number: block.block_header.raw_data.number, id: block.blockID, timestamp: block.block_header.raw_data.timestamp };
+  return broadcastTron(net, signTronTransfer(sk, from, mine, bal - reserve, ref, Date.now()).hex);
 }

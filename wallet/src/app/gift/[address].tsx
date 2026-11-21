@@ -11,10 +11,10 @@ import { toast } from '../../ui/Toast';
 import { C } from '../../ui/theme';
 import { confirmIt } from '../../lib/auth';
 import { useAsync } from '../../lib/multichain';
-import { closeGift, feeSettled, giftBalance, giftKey, sweepGift, useGifts } from '../../lib/gifts';
+import { closeGift, feeSettled, fundRoute, giftBalance, giftKey, sweepGift, useGifts } from '../../lib/gifts';
 import { encodeGift } from '../../lib/gift-core';
 
-const NAMES = { lyx: 'LOKYX', btc: 'Bitcoin', eth: 'Ethereum' } as const;
+const NAMES = { lyx: 'LOKYX', btc: 'Bitcoin', eth: 'Ethereum', sol: 'Solana', trx: 'Tron' } as const;
 
 /** One card you made: what's on it, the code to hand over, and taking it back. */
 export default function GiftCard() {
@@ -61,7 +61,7 @@ export default function GiftCard() {
       <GiftCardFace coin={g.coin} width={Math.min(cw, 360)} note={g.note || undefined} balance={bal.data ? bal.data.text.split(' ')[0] : ''} unit={bal.data ? bal.data.text.split(' ')[1] : ''} tag={g.closed ? 'Closed' : empty ? 'Not funded yet' : 'Ready'} />
       {empty && !g.closed ? (
         <Panel>
-          <GRow icon="send" title="Put the coins on it" sub={`You meant to add ${g.amount}`} onPress={() => router.push(g.coin === 'lyx' ? `/send?to=${g.address}&amount=${g.amount.split(' ')[0]}` : `/chain/send?chain=${g.coin}&to=${g.address}&amount=${g.amount.split(' ')[0]}`)} />
+          <GRow icon="send" title="Put the coins on it" sub={`You meant to add ${g.amount}`} onPress={() => router.push(fundRoute(g.coin, g.address, g.amount.split(' ')[0]))} />
         </Panel>
       ) : null}
       {g.fee && !g.closed && !empty ? (
@@ -69,7 +69,7 @@ export default function GiftCard() {
           <GRow icon="send" title={`Pay the ${g.fee.text} fee`} sub="0.2% for making the card, in the same coin" onPress={() => {
             const f = g.fee!;
             feeSettled(g.address);
-            router.push(g.coin === 'lyx' ? `/send?to=${f.to}&amount=${f.amount}` : `/chain/send?chain=${g.coin}&to=${f.to}&amount=${f.amount}`);
+            router.push(fundRoute(g.coin, f.to, f.amount));
           }} />
         </Panel>
       ) : null}
