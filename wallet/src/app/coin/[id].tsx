@@ -85,7 +85,7 @@ function LyxToken({ t, owner, hide }: { t: Token; owner: string; hide: boolean }
 /** One coin on its own screen: its card at the top, the four things you do with it, then what happened. */
 // The card arrives from where it was on Home: slightly smaller and higher, then settles into place.
 const CARD_IN = new Keyframe({
-  0: { opacity: 0.4, transform: [{ translateY: -46 }, { scale: 0.9 }] },
+  0: { opacity: 0.6, transform: [{ translateY: 150 }, { scale: 1.08 }] },
   100: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }], easing: EASE_OUT },
 });
 
@@ -172,7 +172,7 @@ export default function CoinScreen() {
           <T style={{ flex: 1, textAlign: 'center', fontFamily: F.semibold, fontSize: 17, marginRight: 52 }} numberOfLines={1}>{card.title}</T>
         </View>
 
-        <Animated.View entering={CARD_IN.duration(520)} style={{ marginTop: 10 }}>
+        <Animated.View entering={CARD_IN.duration(640)} style={{ marginTop: 10 }}>
           <NeonCard c={neon} width={cw} hide={hide} />
         </Animated.View>
 

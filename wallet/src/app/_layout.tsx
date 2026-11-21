@@ -119,6 +119,8 @@ function Gate() {
         <Stack.Screen name="making" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="ring" options={{ presentation: 'fullScreenModal', animation: 'fade_from_bottom' }} />
         <Stack.Screen name="receive" options={{ presentation: 'fullScreenModal', animation: 'fade_from_bottom' }} />
+        <Stack.Screen name="coin/[id]" options={{ animation: 'fade', animationDuration: 220 }} />
+        <Stack.Screen name="xcoin/[chain]" options={{ animation: 'fade', animationDuration: 220 }} />
         <Stack.Screen name="coins" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="tap" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="blockchains" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />

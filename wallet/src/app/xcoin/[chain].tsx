@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T } from '../../ui/Text';
 import { Icon, type IconName } from '../../ui/Icon';
 import { IconButton, Press, success } from '../../ui/controls';
+import Animated, { Keyframe } from 'react-native-reanimated';
+import { EASE_OUT } from '../../ui/motion';
 import { NeonCard } from '../../ui/NeonCard';
 import { PriceGraph } from '../../ui/PriceGraph';
 import { useCurrency } from '../../lib/prices';
@@ -41,6 +43,11 @@ function Action({ icon, label, onPress }: { icon: IconName; label: string; onPre
 }
 
 const Head = ({ title }: { title: string }) => <T style={{ fontFamily: F.semibold, fontSize: 12, letterSpacing: 1.6, color: C.sub, paddingTop: 26, paddingBottom: 8, paddingHorizontal: 6 }}>{title}</T>;
+
+const CARD_UP = new Keyframe({
+  0: { opacity: 0.6, transform: [{ translateY: 150 }, { scale: 1.08 }] },
+  100: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }], easing: EASE_OUT },
+});
 
 /** Solana or Tron on its own screen: the card, send / receive / test coins, its tokens, and what happened. */
 export default function XCoinScreen() {
@@ -116,13 +123,13 @@ export default function XCoinScreen() {
           <T style={{ flex: 1, textAlign: 'center', fontFamily: F.semibold, fontSize: 17 }}>{c.title}</T>
           <View style={{ width: 40 }} />
         </View>
-        <View style={{ alignItems: 'center', paddingTop: 6 }}>
+        <Animated.View entering={CARD_UP.duration(640)} style={{ alignItems: 'center', paddingTop: 6 }}>
           <NeonCard
             c={{ rim: chain, title: c.title, sub: c.address ? netLabel : 'Not set up yet', balance: c.address ? c.balance : '—', unit: c.unit, note: real ? '' : 'Testnet · no market value', mark: { kind: 'logo', id: chain } }}
             width={cw - 24}
             hide={hide}
           />
-        </View>
+        </Animated.View>
 
         {c.address ? (
           <View style={{ paddingTop: 22 }}>

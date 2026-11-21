@@ -10,6 +10,7 @@ import { newMnemonic } from '../lib/lokyx';
 import { WordChoices } from '../ui/WordChoices';
 import { SetupSteps } from '../ui/SetupSteps';
 import { WordGrid } from '../ui/WordGrid';
+import { BlurView } from 'expo-blur';
 import { ScreenGuard } from '../ui/ScreenGuard';
 import { createFromPhrase } from '../lib/wallet';
 import { askVaultFirst } from '../lib/vaultfirst';
@@ -78,7 +79,9 @@ export default function Create() {
       <View>
         <WordGrid words={words} shown={shown} />
         {!shown && (
-          <Animated.View exiting={FadeOut.duration(200)} style={{ position: 'absolute', inset: 0, borderRadius: 24, backgroundColor: 'rgba(10,10,12,0.96)', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24 }}>
+          <Animated.View exiting={FadeOut.duration(200)} style={{ position: 'absolute', inset: 0, borderRadius: 24, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24 }}>
+            <BlurView intensity={40} tint="dark" experimentalBlurMethod="dimezisBlurView" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(8,8,10,0.55)' }} />
             <Animated.View entering={FadeIn.duration(DUR.base).easing(EASE_OUT)}>
               <Icon name="eyeOff" size={30} color={C.text} />
             </Animated.View>

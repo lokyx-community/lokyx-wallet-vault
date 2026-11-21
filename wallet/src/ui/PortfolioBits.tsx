@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Press } from './controls';
 import { Logo } from './Logo';
-import { TokenLogo } from './CoinLogo';
+import { CoinLogo, TokenLogo } from './CoinLogo';
 import { T } from './Text';
 import { C, F } from './theme';
 import { changeText, money, type Currency, type Line, type Portfolio } from '../lib/prices-core';
@@ -77,9 +77,10 @@ export function LineLogo({ l, size }: { l: Line; size: number }) {
 const trimAmt = (n: number) => (n >= 1000 ? n.toFixed(2) : n >= 1 ? n.toFixed(3) : n.toFixed(4)).replace(/\.?0+$/, '');
 
 /** The Assets panel under the buttons on Home: each coin with its amount, its value and today's change. */
-export function AssetsPanel({ p, cur, hide, onSeeAll, onCoin }: { p: Portfolio; cur: Currency; hide: boolean; onSeeAll: () => void; onCoin?: (l: Line) => void }) {
+export function AssetsPanel({ p, cur, hide, onSeeAll, onCoin, lyx, onLyx }: { p: Portfolio; cur: Currency; hide: boolean; onSeeAll: () => void; onCoin?: (l: Line) => void; lyx?: string; onLyx?: () => void }) {
   const lines = [...p.lines].sort((a, b) => b.value - a.value).slice(0, 5);
-  if (!lines.length) return null;
+  const hasLyx = !!lyx && amountOfStr(lyx) > 0;
+  if (!lines.length && !hasLyx) return null;
   return (
     <View style={{ marginTop: 20, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 6 }}>
@@ -104,6 +105,18 @@ export function AssetsPanel({ p, cur, hide, onSeeAll, onCoin }: { p: Portfolio; 
           </Press>
         );
       })}
+      {hasLyx ? (
+        <Press onPress={onLyx} disabled={!onLyx} haptic={false} scaleTo={0.985} accessibilityLabel="LOKYX" style={{ flexDirection: 'row', alignItems: 'center', gap: 13, minHeight: 62, borderTopWidth: lines.length ? 0.5 : 0, borderTopColor: 'rgba(255,255,255,0.08)' }}>
+          <CoinLogo chain="lyx" size={40} />
+          <View style={{ flex: 1, gap: 1 }}>
+            <T style={{ fontFamily: F.medium, fontSize: 16.5 }}>LOKYX</T>
+            <T v="caption" dim>{hide ? '•••' : `${lyx} LYX`}</T>
+          </View>
+          <T style={{ fontFamily: F.medium, fontSize: 12.5, color: C.faint }}>Test coin</T>
+        </Press>
+      ) : null}
     </View>
   );
 }
+
+const amountOfStr = (s: string) => Number(s.replace(/,/g, '')) || 0;

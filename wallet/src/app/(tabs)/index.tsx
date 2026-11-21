@@ -25,7 +25,9 @@ import { EthNets, netName } from "../../ui/ChainGroup";
 import { Logo } from "../../ui/Logo";
 import { TokenLogo } from "../../ui/CoinLogo";
 import { Sheet } from "../../ui/Sheet";
-import { ActivityRow } from "../../ui/ActivityRow";
+import { ActivityRow, FeedRow, PendingRow } from "../../ui/ActivityRow";
+import { useOtherFeed } from "../../lib/feed";
+import { usePending } from "../../lib/data";
 import { unreadCount, useInbox } from "../../lib/inbox";
 import { C, F } from "../../ui/theme";
 import { usePoll, type History } from "../../lib/rpc";
@@ -216,6 +218,13 @@ export default function Home() {
     8000,
   );
   const contractsOn = useContractsOn();
+  const otherFeed = useOtherFeed();
+  const pendingTx = usePending();
+  // the All coins card shows everything that happened, newest first, every coin together
+  const recentAll = [
+    ...(hist.data?.items ?? []).map((it) => ({ k: "lyx" as const, it, time: it.timestamp })),
+    ...(otherFeed.data ?? []).map((it) => ({ k: "x" as const, it, time: it.time || Math.floor(Date.now() / 1000) })),
+  ].sort((a, b) => b.time - a.time).slice(0, 4);
   const allCaps = useCapsules();
   const backupDue = useBackupDue();
   const readyCaps = contractsOn
@@ -394,7 +403,7 @@ export default function Home() {
             { icon: "swap", label: "Swap", onPress: () => router.push("/swap") },
           ]}
         />
-        {port ? <AssetsPanel p={port} cur={cur} hide={hide} onSeeAll={() => router.push("/portfolio")} /> : null}
+        {port ? <AssetsPanel p={port} cur={cur} hide={hide} onSeeAll={() => router.push("/portfolio")} lyx={coins.lyx.balance} onLyx={() => router.push("/coin/lyx")} /> : null}
         {port && port.total === 0 ? (
           <Press onPress={() => router.push(`/receive?coin=${actId}`)} haptic={false} scaleTo={0.985} accessibilityLabel="Get started" style={{ marginTop: 20, borderRadius: 28, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.12)", padding: 20, gap: 4 }}>
             <T style={{ fontFamily: F.semibold, fontSize: 18, letterSpacing: -0.3 }}>Get started</T>
@@ -458,6 +467,14 @@ export default function Home() {
           </Press>
         )}
 
+        {frontId === "portfolio" ? (
+          <View style={{ paddingTop: 26 }}>
+            <SectionHead title="RECENT" action="See all" onAction={() => router.push("/(tabs)/activity")} />
+            {pendingTx.map((p) => <PendingRow key={p.hash} p={p} hide={hide} />)}
+            {recentAll.map((r, i) => (r.k === "lyx" ? <ActivityRow key={`l${i}`} item={r.it} i={i} hide={hide} /> : <FeedRow key={r.it.id} item={r.it} i={i} hide={hide} />))}
+            {!recentAll.length && !pendingTx.length ? <T v="caption" dim style={{ paddingHorizontal: 6, paddingTop: 6 }}>Nothing yet. Payments you send and receive show here.</T> : null}
+          </View>
+        ) : null}
         {frontId === "lyx" ? (
           <View style={{ paddingTop: 26 }}>
             <SectionHead title="RECENT" action="See all" onAction={() => router.push("/(tabs)/activity")} />
