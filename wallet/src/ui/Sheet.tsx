@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, FadeInDown, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C } from './theme';
-import { SOFT } from './motion';
+import { DUR, EASE_OUT, SOFT } from './motion';
 
 /** A card that rises from the bottom over a dimmed screen. Drag it down or tap outside to close. */
 export function Sheet({ open, onClose, children, dismissable = true }: { open: boolean; onClose: () => void; children: ReactNode; dismissable?: boolean }) {
@@ -57,15 +57,15 @@ export function Sheet({ open, onClose, children, dismissable = true }: { open: b
         </Animated.View>
         <View style={{ flex: 1 }} pointerEvents="box-none" />
         <GestureDetector gesture={drag}>
-          <Animated.View style={[{ borderTopLeftRadius: 36, borderTopRightRadius: 36, backgroundColor: C.raised, borderTopWidth: 1, borderColor: C.line2, paddingHorizontal: 24, paddingTop: 12, paddingBottom: (kb > 0 ? kb : insets.bottom) + 24, width: '100%', maxWidth: 560, alignSelf: 'center' }, card]}>
-            <View style={{ alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: C.line2, marginBottom: 18 }} />
+          <Animated.View style={[{ borderTopLeftRadius: 36, borderTopRightRadius: 36, backgroundColor: 'rgba(22,24,28,0.99)', borderTopWidth: 0.6, borderColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 24, paddingTop: 12, paddingBottom: (kb > 0 ? kb : insets.bottom) + 24, width: '100%', maxWidth: 560, alignSelf: 'center' }, card]}>
+            <View style={{ alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', marginBottom: 18 }} />
             <ScrollView
               style={{ maxHeight: Math.max(220, screenH - kb - insets.top - 64) }}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               bounces={false}
             >
-              {children}
+              <Animated.View key={open ? 'in' : 'out'} entering={FadeInDown.delay(160).duration(DUR.slow).easing(EASE_OUT)}>{children}</Animated.View>
             </ScrollView>
           </Animated.View>
         </GestureDetector>

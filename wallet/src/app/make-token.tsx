@@ -15,6 +15,7 @@ import { currentAddress, sendContract } from '../lib/wallet';
 import { addPending, amountText, parseUnits, resolveDeploy, tokens } from '../lib/data';
 import { confirmIt } from '../lib/auth';
 import { niceLyx, shortAddr } from '../lib/format';
+import { FlipCoin } from '../ui/FlipCoin';
 import { ContractsOnly } from '../ui/ContractsOnly';
 import { DUR, EASE_OUT } from '../ui/motion';
 
@@ -104,6 +105,7 @@ function MakeToken() {
             <T style={{ fontFamily: F.semibold, fontSize: 30, color: TINTS[tint][2], letterSpacing: -1 }}>{sym}</T>
           </Animated.View>
           <Animated.View entering={FadeInDown.delay(200).duration(DUR.base).easing(EASE_OUT)} style={{ alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 28, paddingHorizontal: 12, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.12)' }}><Icon name="check" size={14} color={C.text} width={2.4} /><T style={{ fontFamily: F.semibold, fontSize: 13 }}>Done</T></View>
             <T v="display">{name.trim()} is live</T>
             <Note center>All {supply} {sym} are in your wallet. Send some to a friend; they add it with this address.</Note>
             <T v="mono" color={C.soft}>{shortAddr(made, 12, 8)}</T>
@@ -139,11 +141,7 @@ function MakeToken() {
     <Screen title="Make a token" large>
       <T v="sub" dim style={{ marginTop: -8 }}>Points, shares, rewards: yours to name.</T>
       <Animated.View entering={FadeIn} style={{ alignItems: 'center', paddingVertical: 10 }}>
-        <View style={{ width: 112, height: 112, borderRadius: 56, backgroundColor: edge, alignItems: 'center', justifyContent: 'center', shadowColor: edge, shadowOpacity: 0.35, shadowRadius: 26, shadowOffset: { width: 0, height: 8 } }}>
-          <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: face, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' }}>
-            {sym ? <T style={{ fontFamily: F.semibold, fontSize: sym.length > 4 ? 20 : 28, color: ink, letterSpacing: -0.8 }}>{sym}</T> : <Icon name="plus" size={34} color={ink} />}
-          </View>
-        </View>
+        <FlipCoin sym={sym} face={face} edge={edge} ink={ink} />
       </Animated.View>
       <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 14, marginTop: -4 }}>
         {TINTS.map((t, i) => (

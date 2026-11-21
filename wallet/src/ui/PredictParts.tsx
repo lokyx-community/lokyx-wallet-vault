@@ -4,6 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { Easing, runOnJS, useAnimatedProps, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from 'react-native-svg';
 import { T } from './Text';
+import { OddsRing } from './OddsRing';
 import { Press } from './controls';
 import { Spark } from './Spark';
 import { C, F } from './theme';
@@ -165,8 +166,8 @@ export function MarketCard({ m, ladder, spark, line, onPress }: { m: Market; lad
     <Press onPress={onPress} scaleTo={0.985} style={{ borderRadius: 26, backgroundColor: C.fill, padding: 18, gap: 14 }}>
       <T style={{ fontFamily: F.semibold, fontSize: 18, letterSpacing: -0.3, lineHeight: 23 }} numberOfLines={3}>{m.title}</T>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <View style={{ gap: 2 }}>
-          <T style={{ fontFamily: F.semibold, fontSize: 34, letterSpacing: -1, lineHeight: 38 }}>{ch === null ? '—' : `${Math.round(ch)}%`}</T>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <OddsRing pct={ch} />
           <T v="caption" dim>chance of Yes</T>
         </View>
         <Spark data={spark} width={118} height={44} color={spark.length > 1 && spark[spark.length - 1] < spark[0] ? RED : GREEN} fill="rgba(255,255,255,0.04)" />
