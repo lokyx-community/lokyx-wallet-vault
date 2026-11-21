@@ -414,7 +414,7 @@ export default function Home() {
             { icon: "swap", label: "Swap", onPress: () => router.push("/swap") },
           ]}
         />
-        {port ? <AssetsPanel p={port} cur={cur} hide={hide} onSeeAll={() => router.push("/portfolio")} lyx={coins.lyx.balance} onLyx={() => router.push("/coin/lyx")} /> : null}
+        {port ? <AssetsPanel p={port} cur={cur} hide={hide} onSeeAll={() => router.push("/portfolio")} onCoin={(l) => { const t = coins.tokens.find((x) => x.symbol.toUpperCase() === l.symbol); if (l.symbol === "BTC") open("btc"); else if (l.symbol === "ETH") open("eth"); else if (l.symbol === "SOL" || l.symbol === "TRX") open(l.symbol.toLowerCase()); else if (t) open(t.contract); }} lyx={coins.lyx.balance} onLyx={() => router.push("/coin/lyx")} /> : null}
         {port && port.total === 0 ? (
           <Press onPress={() => router.push(`/receive?coin=${actId}`)} haptic={false} scaleTo={0.985} accessibilityLabel="Get started" style={{ marginTop: 20, borderRadius: 28, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.12)", padding: 20, gap: 4 }}>
             <T style={{ fontFamily: F.semibold, fontSize: 18, letterSpacing: -0.3 }}>Get started</T>
