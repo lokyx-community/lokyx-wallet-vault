@@ -59,8 +59,9 @@ export interface Portfolio {
   series: number[];
 }
 
-export const marketsUrl = (ids: string[], cur: Currency) =>
-  `https://api.coingecko.com/api/v3/coins/markets?vs_currency=${cur}&ids=${[...new Set(ids)].sort().join(',')}&sparkline=true&price_change_percentage=24h&per_page=250`;
+export const marketsPath = (ids: string[], cur: Currency) =>
+  `/api/v3/coins/markets?vs_currency=${cur}&ids=${[...new Set(ids)].sort().join(',')}&sparkline=true&price_change_percentage=24h&per_page=250`;
+export const marketsUrl = (ids: string[], cur: Currency) => `https://api.coingecko.com${marketsPath(ids, cur)}`;
 
 /** The price feed's answer, as quotes by coin id. Anything that does not look right is left out. */
 export function parseMarkets(json: unknown): Record<string, Quote> {

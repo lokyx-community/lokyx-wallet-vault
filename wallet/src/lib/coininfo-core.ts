@@ -13,8 +13,9 @@ export interface CoinInfo {
   links: { label: string; url: string }[];
 }
 
-export const infoUrl = (id: string) =>
-  `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false`;
+export const infoPath = (id: string) =>
+  `/api/v3/coins/${encodeURIComponent(id)}?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false`;
+export const infoUrl = (id: string) => `https://api.coingecko.com${infoPath(id)}`;
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
 const url = (v: unknown): string | null => (typeof v === 'string' && /^https:\/\/[^\s]+$/.test(v.trim()) ? v.trim() : null);

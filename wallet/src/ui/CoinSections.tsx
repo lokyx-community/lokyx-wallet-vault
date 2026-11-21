@@ -102,6 +102,7 @@ export function MarketBlock({ info, cur }: { info: CoinInfo; cur: Currency }) {
         </View>
       ))}
       {info.circulating && info.maxSupply ? <SupplyBar have={info.circulating} max={info.maxSupply} /> : null}
+      <T style={{ fontSize: 11.5, color: C.faint, paddingHorizontal: 6, paddingTop: 2 }}>Market data from CoinGecko</T>
     </View>
   );
 }

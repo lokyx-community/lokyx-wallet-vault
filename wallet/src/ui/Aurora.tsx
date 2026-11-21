@@ -2,9 +2,10 @@ import { useEffect, useId } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import Animated, { Easing, cancelAnimation, makeMutable, useAnimatedStyle, useReducedMotion, withRepeat, withTiming } from 'react-native-reanimated';
+import { tiltX, tiltY } from './Tilt';
 
 /**
- * The light behind every page: a few soft colours drifting slowly on black, fading to black at the bottom so the
+ * The light behind every page: three slow bands of colour on black that drift by themselves and lean with how the phone is held (see Tilt.tsx), fading to black at the bottom so the
  * content always sits on a calm dark. It is painted, not blurred (soft gradients, no blur filter), so it looks the
  * same on iPhone and Android and costs almost nothing.
  *
@@ -26,50 +27,63 @@ const stop = () => {
   if (--users === 0) cancelAnimation(clock);
 };
 
-interface Blob {
-  /** where it sits, as a fraction of the page width and height */
+interface Ribbon {
+  /** where it sits and how big, in points on a 390-wide phone (scaled to the real width) */
   x: number;
   y: number;
-  /** how far it drifts, in points */
-  dx: number;
-  dy: number;
-  /** whole turns per cycle, and a start angle */
+  w: number;
+  h: number;
+  /** resting angle, degrees */
+  rot: number;
+  /** how far it follows the tilt: sideways and up-down in points, and in degrees of turn. Farther layers move less. */
+  px: number;
+  py: number;
+  pr: number;
+  /** whole turns per cycle, so the slow drift never jumps when the clock starts over */
   fx: number;
   fy: number;
-  p: number;
-  /** size as a fraction of the page width */
-  s: number;
-  color: string;
-  a: number;
+  /** the colours along it: where (0 to 1), colour, strength */
+  parts: { at: number; c: string; a: number }[];
 }
 
-// The colours are the chain colours seen through glass: blue, green, teal and a little violet.
-const BLOBS: Blob[] = [
-  { x: 0.0, y: 0.0, dx: 80, dy: 60, fx: 3, fy: 2, p: 0, s: 1.15, color: '10,132,255', a: 0.5 },
-  { x: 1.0, y: 0.16, dx: 85, dy: 80, fx: 2, fy: 3, p: 2, s: 1.05, color: '61,214,140', a: 0.42 },
-  { x: 0.5, y: 0.42, dx: 120, dy: 60, fx: 2, fy: 3, p: 3, s: 0.95, color: '30,190,210', a: 0.26 },
-  { x: 0.55, y: 0.02, dx: 90, dy: 50, fx: 1, fy: 2, p: 4, s: 0.7, color: '150,130,255', a: 0.2 },
+// Three slow bands, far to near: blue, violet and teal across the top, teal and blue under them, a warm band low.
+const RIBBONS: Ribbon[] = [
+  { x: -120, y: -70, w: 620, h: 200, rot: -14, px: 26, py: 9, pr: 2.6, fx: 8, fy: 7, parts: [{ at: 0.25, c: '40,120,255', a: 0.75 }, { at: 0.55, c: '120,80,255', a: 0.7 }, { at: 0.8, c: '40,220,190', a: 0.65 }] },
+  { x: -150, y: 70, w: 660, h: 150, rot: -9, px: 44, py: 14, pr: 1.8, fx: 7, fy: 6, parts: [{ at: 0.3, c: '60,200,170', a: 0.5 }, { at: 0.65, c: '60,120,255', a: 0.55 }, { at: 0.9, c: '150,90,255', a: 0.25 }] },
+  { x: -80, y: 190, w: 560, h: 120, rot: -5, px: 62, py: 19, pr: 1.2, fx: 6, fy: 5, parts: [{ at: 0.4, c: '255,150,60', a: 0.3 }, { at: 0.7, c: '255,90,120', a: 0.22 }] },
 ];
 
-function Light({ b, w, h, strength }: { b: Blob; w: number; h: number; strength: number }) {
+function Band({ r, k, strength, still }: { r: Ribbon; k: number; strength: number; still: boolean }) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
-  const size = Math.round(w * b.s * 1.3);
-  const st = useAnimatedStyle(() => ({
-    transform: [{ translateX: b.dx * Math.sin(clock.value * b.fx + b.p) }, { translateY: b.dy * Math.sin(clock.value * b.fy + b.p * 0.7) }],
-    opacity: 0.88 + 0.12 * Math.sin(clock.value * 4 + b.p),
-  }));
+  const W = r.w * k;
+  const H = r.h * k;
+  const st = useAnimatedStyle(() => {
+    const tx = still ? 0 : tiltX.value;
+    const ty = still ? 0 : tiltY.value;
+    const c = clock.value;
+    return {
+      transform: [
+        { translateX: -tx * r.px * k + 7 * k * Math.sin(c * r.fx + r.px) },
+        { translateY: ty * r.py * k + 8 * k * Math.cos(c * r.fy + r.px) },
+        { rotate: `${r.rot - tx * r.pr * 1.3 + 1.2 * Math.sin(c * 6 + r.px)}deg` },
+      ],
+    };
+  });
+  const pw = W * 0.55;
   return (
-    <Animated.View style={[{ position: 'absolute', left: b.x * w - size / 2, top: b.y * h - size / 2, width: size, height: size }, st]}>
-      <Svg width={size} height={size}>
-        <Defs>
-          <RadialGradient id={`b${id}`} cx="0.5" cy="0.5" rx="0.5" ry="0.5">
-            <Stop offset="0" stopColor={`rgb(${b.color})`} stopOpacity={b.a * strength} />
-            <Stop offset="0.45" stopColor={`rgb(${b.color})`} stopOpacity={b.a * strength * 0.45} />
-            <Stop offset="1" stopColor={`rgb(${b.color})`} stopOpacity="0" />
-          </RadialGradient>
-        </Defs>
-        <Rect width={size} height={size} fill={`url(#b${id})`} />
-      </Svg>
+    <Animated.View style={[{ position: 'absolute', left: r.x * k, top: r.y * k, width: W, height: H }, st]}>
+      {r.parts.map((p, i) => (
+        <Svg key={i} width={pw} height={H} style={{ position: 'absolute', left: p.at * W - pw / 2, top: 0 }}>
+          <Defs>
+            <RadialGradient id={`r${id}${i}`} cx="0.5" cy="0.5" rx="0.5" ry="0.5">
+              <Stop offset="0" stopColor={`rgb(${p.c})`} stopOpacity={p.a * strength} />
+              <Stop offset="0.45" stopColor={`rgb(${p.c})`} stopOpacity={p.a * strength * 0.45} />
+              <Stop offset="1" stopColor={`rgb(${p.c})`} stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          <Rect width={pw} height={H} fill={`url(#r${id}${i})`} />
+        </Svg>
+      ))}
     </Animated.View>
   );
 }
@@ -86,8 +100,8 @@ export function Aurora({ strength = 0.6 }: { strength?: number }) {
   }, [still]);
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#000', overflow: 'hidden' }]}>
-      {BLOBS.map((b, i) => (
-        <Light key={i} b={b} w={width} h={height} strength={strength} />
+      {RIBBONS.map((r, i) => (
+        <Band key={i} r={r} k={width / 390} strength={strength} still={still} />
       ))}
       <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
         <Defs>

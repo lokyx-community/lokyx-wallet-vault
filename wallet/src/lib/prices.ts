@@ -3,9 +3,10 @@
 import { useEffect, useMemo } from 'react';
 import { getItem, setItem } from './kv';
 import { store, useStore } from './store';
-import { activeNets, fetchT, useAsync, useChainSettings } from './multichain';
+import { fetchMarket } from './market';
+import { activeNets, useAsync, useChainSettings } from './multichain';
 import { ETH_NETS, EVM_FAMILIES } from './multichain-core';
-import { amountOf, marketsUrl, parseMarkets, portfolio, PRICED, type Currency, type Holding, type Portfolio, type Quote } from './prices-core';
+import { amountOf, marketsPath, parseMarkets, portfolio, PRICED, type Currency, type Holding, type Portfolio, type Quote } from './prices-core';
 import type { Coins } from './coins';
 
 const currencyStore = store<Currency>('usd');
@@ -28,7 +29,7 @@ export function useCurrency(): [Currency, (c: Currency) => void] {
 export async function fetchQuotes(ids: string[], cur: Currency): Promise<Record<string, Quote>> {
   const key = `w.prices.${cur}`;
   try {
-    const r = await fetchT(marketsUrl(ids, cur), undefined, 12_000);
+    const r = await fetchMarket(marketsPath(ids, cur));
     if (!r.ok) throw new Error(String(r.status));
     const q = parseMarkets(await r.json());
     if (Object.keys(q).length) {

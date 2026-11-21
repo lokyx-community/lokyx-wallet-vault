@@ -14,6 +14,7 @@ import { NeonCard } from '../../ui/NeonCard';
 import { PriceGraph } from '../../ui/PriceGraph';
 import { AboutCard, KvPanel, LinkChips, MarketBlock, SafetyList, SectionHead } from '../../ui/CoinSections';
 import { useCoinInfo } from '../../lib/coininfo';
+import { aboutFrom, factsFor } from '../../lib/coinfacts';
 import { useCurrency } from '../../lib/prices';
 import { Logo } from '../../ui/Logo';
 import { TokenLogo } from '../../ui/CoinLogo';
@@ -58,6 +59,7 @@ export default function XCoinScreen() {
   const cw = Math.min(sw - 32, 420);
   const [cur] = useCurrency();
   const { info } = useCoinInfo(chain === 'sol' ? 'solana' : 'tron', cur);
+  const ab = aboutFrom(info, factsFor(chain === 'sol' ? 'solana' : 'tron'));
   const hide = useWallet().settings.hideBalance;
   useChainSettings();
   const nets = activeNets();
@@ -194,7 +196,7 @@ export default function XCoinScreen() {
         {c.address ? (
           <>
             <SectionHead title={`ABOUT ${c.title.toUpperCase()}`} />
-            {info?.about ? <AboutCard text={info.about} /> : null}
+            {ab.about ? <AboutCard text={ab.about} /> : null}
             {info ? <SectionHead title="MARKET" /> : null}
             {info ? <MarketBlock info={info} cur={cur} /> : null}
             <SectionHead title="SAFETY" />
@@ -205,8 +207,8 @@ export default function XCoinScreen() {
                 { title: 'The address is checked before every send', text: 'A wrong chain or a look-alike address is stopped first.' },
               ]}
             />
-            {info?.links.length ? <SectionHead title="LINKS" /> : null}
-            {info ? <LinkChips links={info.links} /> : null}
+            {ab.links.length ? <SectionHead title="LINKS" /> : null}
+            <LinkChips links={ab.links} />
           </>
         ) : null}
       </ScrollView>

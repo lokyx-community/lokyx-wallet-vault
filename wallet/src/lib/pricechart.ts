@@ -1,14 +1,15 @@
 // A coin's price over a chosen stretch of time, from CoinGecko's free chart feed. The last answer is kept so the graph still draws offline.
 import { getItem, setItem } from './kv';
-import { fetchT } from './multichain';
+import { fetchMarket } from './market';
 import type { Currency } from './prices-core';
 
 export type Span = '1D' | '1W' | '1M' | '1Y' | 'All';
 export const SPANS: Span[] = ['1D', '1W', '1M', '1Y', 'All'];
 const DAYS: Record<Span, string> = { '1D': '1', '1W': '7', '1M': '30', '1Y': '365', All: 'max' };
 
-export const chartUrl = (id: string, cur: Currency, span: Span) =>
-  `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}/market_chart?vs_currency=${cur}&days=${DAYS[span]}`;
+export const chartPath = (id: string, cur: Currency, span: Span) =>
+  `/api/v3/coins/${encodeURIComponent(id)}/market_chart?vs_currency=${cur}&days=${DAYS[span]}`;
+export const chartUrl = (id: string, cur: Currency, span: Span) => `https://api.coingecko.com${chartPath(id, cur, span)}`;
 
 export type Point = [number, number]; // [unix ms, price]
 
@@ -25,7 +26,7 @@ export function parseChart(json: unknown, max = 120): Point[] {
 export async function fetchChart(id: string, cur: Currency, span: Span): Promise<Point[]> {
   const key = `w.chart2.${id}.${cur}.${span}`;
   try {
-    const r = await fetchT(chartUrl(id, cur, span), undefined, 12_000);
+    const r = await fetchMarket(chartPath(id, cur, span));
     if (!r.ok) throw new Error(String(r.status));
     const v = parseChart(await r.json());
     if (v.length > 1) {

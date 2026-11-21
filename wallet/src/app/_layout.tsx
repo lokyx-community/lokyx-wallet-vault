@@ -4,6 +4,9 @@ import { loadApps } from '../lib/appswallet';
 import { loadVaultFirst, vaultFirst } from '../lib/vaultfirst';
 import { loadTowers } from '../lib/tower';
 import { useEffect, useRef } from 'react';
+import { useReducedMotion } from 'react-native-reanimated';
+import { TiltDriver } from '../ui/Tilt';
+import { useMotionBg } from '../lib/motionbg';
 import { AppState, ScrollView, View } from 'react-native';
 import { Stack, router, useGlobalSearchParams, usePathname, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -108,9 +111,12 @@ function Gate() {
     return () => sub.remove();
   }, []);
 
+  const [motion] = useMotionBg();
+  const still = useReducedMotion();
   return (
     <>
       <StatusBar style="light" />
+      {motion && !still ? <TiltDriver /> : null}
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg }, animation: 'ios_from_right', gestureEnabled: true, fullScreenGestureEnabled: true }}>
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="welcome" options={{ animation: 'fade' }} />

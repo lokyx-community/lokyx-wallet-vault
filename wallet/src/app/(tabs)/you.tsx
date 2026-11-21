@@ -8,7 +8,8 @@ import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { T } from '../../ui/Text';
-import { Group, Press, Row, success } from '../../ui/controls';
+import { Group, Press, Row, Switch, success } from '../../ui/controls';
+import { useMotionBg } from '../../lib/motionbg';
 import { Avatar } from '../../ui/RingCode';
 import { Segmented } from '../../ui/Segmented';
 import { WalletCard } from '../../ui/WalletCards';
@@ -48,6 +49,7 @@ export default function You() {
   };
 
   const { width: sw } = useWindowDimensions();
+  const [motion, setMotion] = useMotionBg();
   const [tab, setTab] = useState<'wallet' | 'safety' | 'advanced'>('wallet');
   const cw = Math.min(sw, 560) - 40;
   const ch = Math.round(cw / 1.586);
@@ -130,6 +132,11 @@ export default function You() {
           <Row icon="globe" title="Networks" sub="Test or real money, per coin" detail={chain.allowMainnet ? "Real money" : "Test"} onPress={() => router.push('/chains-settings')} />
           <Row icon="server" title="Network" detail={node.replace(/^https?:\/\//, '').replace(/\/rpc$/, '')} onPress={() => router.push('/node')} />
           <Row icon="key" title="Developer" sub="Private keys, networks, app details" onPress={() => router.push('/developer')} />
+        </Group>
+      )}
+      {tab === 'advanced' && (
+        <Group>
+          <Row icon="flash" title="Motion in background" sub="The light leans as you tilt your phone" right={<Switch on={motion} onChange={setMotion} label="Motion in background" />} />
         </Group>
       )}
 

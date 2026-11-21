@@ -1,0 +1,6 @@
+name = "lokyx-market"
+main = "worker.mjs"
+compatibility_date = "2025-01-01"
+
+# Optional: your own address instead of lokyx-market.<you>.workers.dev
+# routes = [{ pattern = "market.example.com", custom_domain = true }]

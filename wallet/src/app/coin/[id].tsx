@@ -31,6 +31,7 @@ import { LiftCard } from '../../ui/LiftCard';
 import { PriceGraph } from '../../ui/PriceGraph';
 import { AboutCard, KvPanel, LinkChips, MarketBlock, NoMarket, SafetyList, SectionHead } from '../../ui/CoinSections';
 import { useCoinInfo } from '../../lib/coininfo';
+import { aboutFrom, factsFor } from '../../lib/coinfacts';
 import { CoinLogo } from '../../ui/CoinLogo';
 import { useCurrency, usePortfolio } from '../../lib/prices';
 import { PRICED, money } from '../../lib/prices-core';
@@ -117,6 +118,7 @@ export default function CoinScreen() {
   // the market id for the graph; LOKYX and unlisted tokens have none
   const marketId = tok ? PRICED[tok.symbol.toUpperCase()]?.id : coin === 'btc' ? 'bitcoin' : coin === 'eth' ? PRICED[card.unit.toUpperCase()]?.id ?? 'ethereum' : undefined;
   const { info } = useCoinInfo(marketId, cur);
+  const ab = aboutFrom(info, factsFor(coin === 'lyx' ? 'lyx' : marketId));
   const priced = port?.lines.find((x) => x.symbol === (tok ? tok.symbol.toUpperCase() : card.unit.toUpperCase()));
   // true only on a real-money network; every test coin says so plainly
   const real = coin === 'lyx' ? false : coin === 'btc' && !tok ? !coins.btc.tag : ethNet.real;
@@ -296,8 +298,8 @@ export default function CoinScreen() {
           )}
         </Panel>
 
-        {info?.about || marketId ? <SectionHead title={`ABOUT ${card.title.toUpperCase()}`} /> : null}
-        {info?.about ? <AboutCard text={info.about} /> : marketId ? <NoMarket text="Needs a connection to load. It shows here once you are online." /> : null}
+        {ab.about || marketId ? <SectionHead title={`ABOUT ${card.title.toUpperCase()}`} /> : null}
+        {ab.about ? <AboutCard text={ab.about} /> : marketId ? <NoMarket text="Needs a connection to load. It shows here once you are online." /> : null}
 
         {info ? <SectionHead title="MARKET" /> : null}
         {info ? <MarketBlock info={info} cur={cur} /> : null}
@@ -318,8 +320,8 @@ export default function CoinScreen() {
           ]}
         />
 
-        {info?.links.length ? <SectionHead title="LINKS" /> : null}
-        {info ? <LinkChips links={info.links} /> : null}
+        {ab.links.length ? <SectionHead title="LINKS" /> : null}
+        <LinkChips links={ab.links} />
       </Animated.ScrollView>
 
       <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, top: 0, paddingTop: insets.top + 8, paddingHorizontal: 16, height: insets.top + 60 }}>
