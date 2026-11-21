@@ -1,6 +1,6 @@
 import { useEffect, useId } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Svg, { Circle, ClipPath, Defs, Ellipse, G, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Defs, Ellipse, G, Path, RadialGradient, Stop } from 'react-native-svg';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
 
 // The one place the wallet uses colour: Neptune, a deep blue planet that capsules circle while they wait.
@@ -54,12 +54,14 @@ export function Planet({ size }: { size: number }) {
         <Animated.View style={[{ position: 'absolute', left: -size, top: 0, width: size * 2, height: size }, drift]}>
           <Svg width={size * 2} height={size}>
             {[0, 1].map((k) => (
-              <G key={k} opacity={0.2}>
+              <G key={k} opacity={0.3}>
                 <Ellipse cx={size * (k + 0.5)} cy={r * 0.55} rx={size * 0.62} ry={r * 0.06} fill="#fff" />
                 <Ellipse cx={size * (k + 0.5)} cy={r * 0.92} rx={size * 0.62} ry={r * 0.045} fill="#fff" />
                 <Ellipse cx={size * (k + 0.5)} cy={r * 1.25} rx={size * 0.62} ry={r * 0.07} fill={PLANET.edge} />
                 <Ellipse cx={size * (k + 0.5)} cy={r * 1.5} rx={size * 0.62} ry={r * 0.04} fill="#fff" />
-                <Ellipse cx={size * (k + 0.28)} cy={r * 1.1} rx={r * 0.26} ry={r * 0.13} fill={PLANET.edge} opacity={1.6} />
+                <Ellipse cx={size * (k + 0.28)} cy={r * 1.1} rx={r * 0.3} ry={r * 0.15} fill={PLANET.edge} opacity={1.6} />
+                <Ellipse cx={size * (k + 0.28) + r * 0.34} cy={r * 1.03} rx={r * 0.2} ry={r * 0.035} fill="#fff" opacity={2.2} />
+                <Ellipse cx={size * (k + 0.74)} cy={r * 0.7} rx={r * 0.3} ry={r * 0.04} fill="#fff" opacity={1.4} />
               </G>
             ))}
           </Svg>
@@ -114,10 +116,25 @@ function Rider({ angle, rx, ry, cx, cy, offset }: { angle: SharedValue<number>; 
   );
 }
 
+/** Neptune's rings are faint and thin, with one broken arc. `back` is the half behind the planet, `front` the half across it. */
+function PlanetRings({ W, H, cx, cy, P, back }: { W: number; H: number; cx: number; cy: number; P: number; back: boolean }) {
+  const arc = (rx: number, ry: number) => `M ${-rx} 0 A ${rx} ${ry} 0 0 ${back ? 1 : 0} ${rx} 0`;
+  const a = back ? 0.55 : 1;
+  return (
+    <Svg width={W} height={H} style={[StyleSheet.absoluteFill, { zIndex: back ? 0 : 3 }]} pointerEvents="none">
+      <G transform={`translate(${cx} ${cy}) rotate(-12)`} fill="none" strokeLinecap="round">
+        <Path d={arc(P * 0.74, P * 0.17)} stroke="rgba(160,190,255,0.30)" strokeWidth={1.2} opacity={a} />
+        <Path d={arc(P * 0.64, P * 0.14)} stroke="rgba(160,190,255,0.22)" strokeWidth={2.4} strokeDasharray={`${P * 0.2} ${P * 0.06} ${P * 0.03} ${P * 0.1}`} opacity={a} />
+        <Path d={arc(P * 0.57, P * 0.12)} stroke="rgba(190,210,255,0.12)" strokeWidth={4.5} opacity={a} />
+      </G>
+    </Svg>
+  );
+}
+
 function Moon({ angle, rx, ry, cx, cy }: { angle: SharedValue<number>; rx: number; ry: number; cx: number; cy: number }) {
   // the little moon goes round the other way
   const a = useOrbitStyle(angle, rx, ry, cx, cy, 8, 8, 1.2, -2);
-  return <Animated.View style={[{ position: 'absolute', left: 0, top: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#D8DAE4', shadowColor: '#fff', shadowOpacity: 0.5, shadowRadius: 4, shadowOffset: { width: 0, height: 0 } }, a]} />;
+  return <Animated.View style={[{ position: 'absolute', left: 0, top: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#E6CFC8', shadowColor: '#FFD9CF', shadowOpacity: 0.55, shadowRadius: 4, shadowOffset: { width: 0, height: 0 } }, a]} />;
 }
 
 /**
@@ -143,9 +160,11 @@ export function OrbitScene({ size, riders, speed = 1, planet = 0.34 }: { size: n
           <Ellipse key={rx} cx={cx} cy={cy} rx={rx} ry={rx * 0.34} stroke="rgba(255,255,255,0.12)" strokeWidth={1} fill="none" />
         ))}
       </Svg>
+      <PlanetRings W={W} H={H} cx={cx} cy={cy} P={P} back />
       <View style={{ position: 'absolute', left: cx - P / 2, top: cy - P / 2, zIndex: 2 }}>
         <Planet size={P} />
       </View>
+      <PlanetRings W={W} H={H} cx={cx} cy={cy} P={P} back={false} />
       <Moon angle={angle} rx={P * 0.78} ry={P * 0.26} cx={cx} cy={cy} />
       {riders.map((p, i) => (
         <Rider key={i} angle={angle} rx={orbits[i].rx} ry={orbits[i].ry} cx={cx} cy={cy} offset={p * Math.PI * 2 + Math.PI / 2} />

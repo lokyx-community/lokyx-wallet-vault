@@ -85,12 +85,20 @@ function Opening({ amount, note, onDone }: { amount: string; note: string | null
   const whole = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
   const left = useAnimatedStyle(() => ({ transform: [{ translateX: -split.value * 90 }, { translateY: split.value * 30 }, { rotate: `${-split.value * 40}deg` }], opacity: Math.max(0, 1 - split.value * 1.3) }));
   const right = useAnimatedStyle(() => ({ transform: [{ translateX: split.value * 90 }, { translateY: split.value * 30 }, { rotate: `${split.value * 40}deg` }], opacity: Math.max(0, 1 - split.value * 1.3) }));
+  const wave = useSharedValue(0);
+  useEffect(() => {
+    wave.value = withDelay(950, withTiming(1, { duration: 1600, easing: EASE_OUT }));
+  }, [wave]);
+  const ringA = useAnimatedStyle(() => ({ opacity: wave.value > 0 ? 0.9 * (1 - wave.value) : 0, transform: [{ scale: 1 + wave.value * 1.8 }] }));
+  const ringB = useAnimatedStyle(() => ({ opacity: wave.value > 0.16 ? 0.7 * (1 - wave.value) : 0, transform: [{ scale: 1 + Math.max(0, wave.value - 0.16) * 2 }] }));
   const glow = useAnimatedStyle(() => ({ opacity: flash.value, transform: [{ scale: 0.4 + flash.value * 2.6 }] }));
   const sparks = Array.from({ length: 14 }, (_, i) => (i / 14) * Math.PI * 2);
   return (
     <View style={{ alignItems: 'center', gap: 22 }}>
       <View style={{ width, height: 170, alignItems: 'center', justifyContent: 'center' }}>
         <Animated.View style={[{ position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: PLANET.light }, glow]} />
+        <Animated.View style={[{ position: 'absolute', width: 120, height: 120, borderRadius: 60, borderWidth: 1.5, borderColor: PLANET.light }, ringA]} />
+        <Animated.View style={[{ position: 'absolute', width: 120, height: 120, borderRadius: 60, borderWidth: 1.5, borderColor: PLANET.light }, ringB]} />
         {sparks.map((a, i) => (
           <Spark key={i} angle={a} go={stage >= 1} />
         ))}
