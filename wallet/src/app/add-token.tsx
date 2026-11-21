@@ -15,6 +15,7 @@ import { C, F } from '../ui/theme';
 import { activeNets, useChainSettings } from '../lib/multichain';
 import { ETH_NETS, presetsFor } from '../lib/multichain-core';
 import { CoinMark } from '../ui/CoinMark';
+import { TokenPicker } from '../ui/TokenPicker';
 import { plainError } from '../lib/plain-error';
 import { CHAIN_NAME, TOKEN_CHAINS, asChain, canAdd, cardKindFor, guessChain, shortId, verdictFor, type TokenChain } from '../lib/add-token-core';
 import { lookupFor, netLabel, type Looked } from '../lib/add-token';
@@ -38,6 +39,7 @@ function Body() {
   const [chain, setChain] = useState<TokenChain>(asChain(raw));
   // opened from a chain's own page: the chain is fixed, tokens are added under it
   const locked = !!raw && !address;
+  const [custom, setCustom] = useState(false);
   const [text, setText] = useState('');
   const [found, setFound] = useState<Looked | null>(null);
   const [busy, setBusy] = useState(false);
@@ -74,6 +76,8 @@ function Body() {
     Clipboard.getStringAsync().then((s) => { const t = (s ?? '').trim(); if (t && guessChain(t) && t !== address) setCopied(t); }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  if (locked && !custom) return <TokenPicker chain={chain} onCustom={(t) => { setCustom(true); if (t) change(t); }} />;
 
   const v = found ? verdictFor(found.known, found.lookalike) : null;
   const ok = canAdd(!!found, found?.known ?? null, checked);

@@ -31,13 +31,10 @@ import { solAirdrop, solHistory, tronHistory } from '../../lib/xchains';
 import { plainError } from '../../lib/plain-error';
 import { shortAddr, timeAgo } from '../../lib/format';
 
-function Action({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
+function Action({ label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
   return (
-    <Press onPress={onPress} accessibilityLabel={label} scaleTo={0.94} style={{ alignItems: 'center', gap: 8, flex: 1 }}>
-      <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name={icon} size={22} color={C.text} width={2} />
-      </View>
-      <T style={{ fontFamily: F.medium, fontSize: 12.5, color: C.soft }}>{label}</T>
+    <Press onPress={onPress} accessibilityLabel={label} scaleTo={0.95} style={{ flex: 1, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.14)' }}>
+      <T style={{ fontFamily: F.medium, fontSize: 14, color: C.text }}>{label}</T>
     </Press>
   );
 }
@@ -146,7 +143,7 @@ export default function XCoinScreen() {
           </View>
         ) : (
           <>
-            <View style={{ flexDirection: 'row', paddingTop: 22 }}>
+            <View style={{ flexDirection: 'row', gap: 8, paddingTop: 16 }}>
               <Action icon="send" label="Send" onPress={() => router.push(`/xsend?chain=${chain}`)} />
               <Action icon="receive" label="Receive" onPress={() => router.push(`/receive?coin=${chain}`)} />
               {!real ? <Action icon="drop" label={isSol ? 'Test SOL' : 'Test TRX'} onPress={faucet} /> : null}
@@ -172,7 +169,7 @@ export default function XCoinScreen() {
               <T v="caption" dim style={{ paddingHorizontal: 6 }}>{isSol ? 'Tokens you hold on Solana show here.' : 'USDT and other tokens you hold on Tron show here.'}</T>
             )}
 
-            <Head title="RECENT" />
+            <Head title="ACTIVITY" />
             {(hist.data ?? []).length ? (
               (hist.data ?? []).map((r) => (
                 <Press key={r.id} haptic={false} onPress={() => openPayment((isSol ? solItems(nets.sol, [r as never]) : trxItems(nets.trx, [r as never]))[0])} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 58, paddingHorizontal: 6, borderBottomWidth: 0.5, borderBottomColor: C.line }}>

@@ -28,16 +28,13 @@ import { toast } from '../../ui/Toast';
 import { useCoins, type CoinId } from '../../lib/coins';
 import { DUR, EASE_OUT } from '../../ui/motion';
 import { PriceGraph } from '../../ui/PriceGraph';
-import { useCurrency } from '../../lib/prices';
-import { PRICED } from '../../lib/prices-core';
+import { useCurrency, usePortfolio } from '../../lib/prices';
+import { PRICED, money } from '../../lib/prices-core';
 
-function Action({ icon, label, onPress, solid }: { icon: IconName; label: string; onPress: () => void; solid?: boolean }) {
+function Action({ icon: _i, label, onPress }: { icon: IconName; label: string; onPress: () => void; solid?: boolean }) {
   return (
-    <Press onPress={onPress} accessibilityLabel={label} scaleTo={0.94} style={{ alignItems: 'center', gap: 8, flex: 1 }}>
-      <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: solid ? C.ink : 'rgba(255,255,255,0.07)', borderWidth: solid ? 0 : 0.5, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name={icon} size={22} color={solid ? C.inkText : C.text} width={2} />
-      </View>
-      <T style={{ fontFamily: F.medium, fontSize: 12.5, color: C.soft }}>{label}</T>
+    <Press onPress={onPress} accessibilityLabel={label} scaleTo={0.95} style={{ flex: 1, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.14)' }}>
+      <T style={{ fontFamily: F.medium, fontSize: 14, color: C.text }}>{label}</T>
     </Press>
   );
 }
@@ -104,6 +101,8 @@ export default function CoinScreen() {
   const ethNet = ETH_NETS[activeNets().eth];
   const onList = tok ? KNOWN_TOKENS.some((k) => tokenId(k) === tokenId({ chainId: ethNet.chainId, contract: tok.contract })) : false;
   // a token wears its own card: its name, its mark, its colour. Ether stays on the Ethereum card.
+  const [cur] = useCurrency();
+  const { p: port } = usePortfolio(coins);
   const card: CardData = tok
     ? { kind: kindFor(tok.logo), logo: tok.logo ?? undefined, title: tok.name, sub: `${tok.symbol} on ${ethNet.label}`, unit: tok.symbol, balance: tok.balance, address: coins.eth.address, tag: ethNet.real ? '' : 'Test network' }
     : coins[coin];
@@ -114,10 +113,9 @@ export default function CoinScreen() {
     sub: card.sub,
     balance: card.balance,
     unit: card.unit,
-    note: card.tag && card.tag !== 'Tap to open' ? 'Testnet · no market value' : coin === 'lyx' ? 'Testnet · no market value' : '',
+    note: (() => { const l = port?.lines.find((x) => x.symbol === (tok ? tok.symbol.toUpperCase() : card.unit.toUpperCase())); return l ? `${money(l.value, cur)} · ${l.pct >= 0 ? '+' : '−'}${Math.abs(l.pct).toFixed(1)}%` : ''; })() || (card.tag && card.tag !== 'Tap to open' ? 'Testnet · no market value' : coin === 'lyx' ? 'Testnet · no market value' : ''),
     mark: coin === 'lyx' ? { kind: 'lyx' } : tok && !tok.logo ? { kind: 'token', symbol: tok.symbol, seed: tok.contract } : { kind: 'logo', id: (tok?.logo ?? (coin === 'btc' ? 'btc' : (coins.eth.logo as LogoId))) as LogoId },
   };
-  const [cur] = useCurrency();
   // the market id for the graph; LOKYX and unlisted tokens have none
   const marketId = tok ? PRICED[tok.symbol.toUpperCase()]?.id : coin === 'btc' ? 'bitcoin' : coin === 'eth' ? PRICED[card.unit.toUpperCase()]?.id ?? 'ethereum' : undefined;
   const hist = usePoll<History>('lyx_getAddressHistory', coin === 'lyx' && address ? { address, limit: 20 } : null, 8000);
@@ -184,9 +182,10 @@ export default function CoinScreen() {
           )}
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(110).duration(DUR.slow).easing(EASE_OUT)} style={{ flexDirection: 'row', paddingTop: 24 }}>
-          <Action icon="receive" label="Receive" solid onPress={receive} />
+        <Animated.View entering={FadeInDown.delay(110).duration(DUR.slow).easing(EASE_OUT)} style={{ flexDirection: 'row', gap: 8, paddingTop: 16 }}>
           <Action icon="send" label="Send" onPress={send} />
+          <Action icon="receive" label="Receive" onPress={receive} />
+          <Action icon="scan" label="Scan" onPress={() => router.push('/ring?mode=scan')} />
           {!tok && <Action icon="swap" label="Swap" onPress={() => router.push('/swap')} />}
           {coin === 'lyx' ? <Action icon="drop" label="Test LYX" onPress={faucet} /> : null}
         </Animated.View>

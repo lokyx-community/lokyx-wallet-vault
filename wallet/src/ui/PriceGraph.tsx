@@ -52,7 +52,7 @@ export function PriceGraph({ coinId, cur, width, price }: { coinId: string; cur:
         <T style={{ fontFamily: F.medium, fontSize: 22, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>{price !== undefined ? money(price, cur) : last ? money(last, cur) : ''}</T>
         {last ? <T style={{ fontFamily: F.medium, fontSize: 13.5, color: C.sub, fontVariant: ['tabular-nums'] }}>{`${up ? '+' : '−'}${Math.abs(pct).toFixed(2)}% · ${span}`}</T> : null}
       </View>
-      <View style={{ height: h, justifyContent: 'center' }}>
+      <View style={{ height: h + 20, justifyContent: 'center', borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden', paddingVertical: 10 }}>
         {data === null ? (
           <Skeleton w={width} h={60} r={14} />
         ) : line ? (
@@ -73,8 +73,8 @@ export function PriceGraph({ coinId, cur, width, price }: { coinId: string; cur:
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 12 }}>
         {SPANS.map((s) => (
           <Press key={s} haptic={false} scaleTo={0.94} onPress={() => setSpan(s)} accessibilityLabel={`Show ${s}`} style={{ flex: 1, alignItems: 'center' }}>
-            <View style={{ paddingHorizontal: 14, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: s === span ? 'rgba(255,255,255,0.14)' : 'transparent' }}>
-              <T style={{ fontFamily: F.medium, fontSize: 12.5, color: s === span ? C.text : C.sub }}>{s}</T>
+            <View style={{ paddingHorizontal: 14, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: s === span ? '#fff' : 'transparent' }}>
+              <T style={{ fontFamily: F.medium, fontSize: 12.5, color: s === span ? '#000' : C.sub }}>{s}</T>
             </View>
           </Press>
         ))}
