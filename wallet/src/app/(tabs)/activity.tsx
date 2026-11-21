@@ -23,6 +23,8 @@ import { useAccountRef, useWallet } from '../../lib/wallet';
 import { usePending } from '../../lib/data';
 import { dayLabel, nameFor, timeAgo } from '../../lib/format';
 import { useOtherFeed } from '../../lib/feed';
+import { SignsWeek, weekLetters } from '../../ui/SignsWeek';
+import { SegPill } from '../../ui/SegPill';
 import { FEED_COINS, type FeedCoin, type FeedItem } from '../../lib/feed-core';
 
 type Filter = 'all' | 'sent' | 'received' | 'mined' | 'events';
@@ -113,51 +115,22 @@ export default function Activity() {
     return monthTotals(rows, worth, cur);
   }, [other.data, worth, cur]);
   const summary = useMemo(() => {
-    if (month.sentN + month.gotN > 0) {
-      return (
-        <View style={{ paddingHorizontal: 18, paddingVertical: 16, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)', gap: 5 }}>
-          <T v="caption" dim>This month</T>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-            <T style={{ fontFamily: F.regular, fontSize: 30, letterSpacing: -1, fontVariant: ['tabular-nums'] }}>{hide ? '•••' : money(month.spent, cur)}</T>
-            <T style={{ fontFamily: F.regular, fontSize: 14, color: C.sub }}>spent</T>
-          </View>
-          <T v="caption" dim>{hide ? '' : `${month.sentN} sent · ${money(month.got, cur)} received`}{month.unpriced ? ` · ${month.unpriced} earlier without a price` : ''}</T>
-        </View>
-      );
-    }
-    const week = Date.now() / 1000 - 7 * 86400;
+    const day = 86400;
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const first = start.getTime() / 1000 - 6 * day;
     const all: { t: number; inn: boolean }[] = [];
     for (const it of items) all.push({ t: it.timestamp, inn: it.kind === 'received' || it.kind === 'mined' });
-    for (const it of other.data ?? []) all.push({ t: it.time, inn: it.kind === 'received' });
-    const w = all.filter((x) => x.t >= week);
-    const inn = w.filter((x) => x.inn).length;
-    const out = w.length - inn;
+    for (const it of other.data ?? []) all.push({ t: it.time || Date.now() / 1000, inn: it.kind === 'received' });
+    const w = all.filter((x) => x.t >= first);
+    const letters = weekLetters();
     const days = Array.from({ length: 7 }, (_, d) => {
-      const lo = week + d * 86400;
-      const here = w.filter((x) => x.t >= lo && x.t < lo + 86400);
-      return { a: here.filter((x) => x.inn).length, b: here.filter((x) => !x.inn).length };
+      const lo = first + d * day;
+      const here = w.filter((x) => x.t >= lo && x.t < lo + day);
+      return { inn: here.some((x) => x.inn), out: here.some((x) => !x.inn), letter: letters[d] };
     });
-    const top = Math.max(1, ...days.map((d) => d.a + d.b));
-    return (
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 16, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' }}>
-        <View style={{ gap: 6 }}>
-          <T v="caption" dim>This week</T>
-          <View style={{ flexDirection: 'row', gap: 20, alignItems: 'baseline' }}>
-            <T style={{ fontFamily: F.medium, fontSize: 22, letterSpacing: -0.4, color: '#9BE5BD' }}>{inn} in</T>
-            <T style={{ fontFamily: F.medium, fontSize: 22, letterSpacing: -0.4, color: C.soft }}>{out} out</T>
-          </View>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 5, width: 120, alignItems: 'flex-end', height: 34 }}>
-          {days.map((d, i) => (
-            <View key={i} style={{ flex: 1, justifyContent: 'flex-end', gap: 2, height: 34 }}>
-              <View style={{ height: Math.max(d.a ? 4 : 0, (d.a / top) * 30), backgroundColor: '#9BE5BD', borderRadius: 2, opacity: 0.9 }} />
-              <View style={{ height: Math.max(d.b ? 4 : 0, (d.b / top) * 30), backgroundColor: '#4A4A54', borderRadius: 2 }} />
-              {!d.a && !d.b && <View style={{ height: 3, backgroundColor: '#25252b', borderRadius: 2 }} />}
-            </View>
-          ))}
-        </View>
-      </View>
-    );
+    const inn = w.filter((x) => x.inn).length;
+    const note = !hide && month.sentN > 0 ? `${money(month.spent, cur)} spent this month` : undefined;
+    return <SignsWeek inn={inn} out={w.length - inn} days={days} note={note} />;
   }, [items, other.data, month, cur, hide]);
   const loading = busy || (!other.data && !other.error);
   const anyItems = items.length > 0 || (other.data ?? []).length > 0 || evs.length > 0;
@@ -179,18 +152,12 @@ export default function Activity() {
             {found.last ? <T v="caption" dim>Last one {timeAgo(found.last)}</T> : null}
           </View>
         ) : summary}
-        <View style={{ flexDirection: 'row', gap: 26, paddingHorizontal: 4 }}>
-          {([['all', 'All'], ['sent', 'Sent'], ['received', 'Received'], ['mined', 'Mined'], ['events', 'Account']] as [Filter, string][]).map(([id, name]) => (
-            <Press key={id} onPress={() => setFilter(id)} haptic={false} accessibilityLabel={name} style={{ paddingBottom: 8, borderBottomWidth: 1.5, borderBottomColor: filter === id ? C.text : 'transparent' }}>
-              <T style={{ fontFamily: F.medium, fontSize: 15, color: filter === id ? C.text : C.sub }}>{name}</T>
-            </Press>
-          ))}
-        </View>
+        <SegPill value={filter} onChange={setFilter} options={[['all', 'All'], ['sent', 'Sent'], ['received', 'Received'], ['mined', 'Mined'], ['events', 'Account']]} />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ marginHorizontal: -20 }} contentInset={{ left: 20, right: 20 }}>
           <View style={{ width: 12 }} />
           {([{ id: 'all', name: 'All coins' }, ...FEED_COINS] as { id: FeedCoin | 'all'; name: string }[]).map((c) => (
-            <Press key={c.id} onPress={() => setCoin(c.id)} accessibilityLabel={c.name} style={{ height: 34, paddingHorizontal: 14, borderRadius: 17, justifyContent: 'center', backgroundColor: coin === c.id ? C.ink : C.fill2 }}>
-              <T style={{ fontFamily: F.medium, fontSize: 13.5, color: coin === c.id ? C.inkText : C.soft }}>{c.name}</T>
+            <Press key={c.id} onPress={() => setCoin(c.id)} accessibilityLabel={c.name} style={{ height: 34, paddingHorizontal: 14, borderRadius: 17, justifyContent: 'center', backgroundColor: coin === c.id ? '#fff' : 'rgba(255,255,255,0.06)', borderWidth: coin === c.id ? 0 : 0.5, borderColor: 'rgba(255,255,255,0.14)' }}>
+              <T style={{ fontFamily: F.medium, fontSize: 13.5, color: coin === c.id ? '#000' : C.soft }}>{c.name}</T>
             </Press>
           ))}
           <View style={{ width: 12 }} />
@@ -222,7 +189,7 @@ export default function Activity() {
             </View>
           ) : null
         }
-        renderSectionHeader={({ section }) => <T v="sub" dim style={{ paddingTop: 22, paddingBottom: 9, paddingHorizontal: 6 }}>{section.title}</T>}
+        renderSectionHeader={({ section }) => <T style={{ fontFamily: F.medium, fontSize: 11.5, letterSpacing: 1.8, color: C.sub, paddingTop: 22, paddingBottom: 9, paddingHorizontal: 8 }}>{section.title.toUpperCase()}</T>}
         renderItem={({ item, index, section }) => {
           const n = section.data.length;
           const pos = n === 1 ? 'only' : index === 0 ? 'first' : index === n - 1 ? 'last' : 'mid';
