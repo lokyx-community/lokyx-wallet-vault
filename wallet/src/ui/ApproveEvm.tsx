@@ -18,7 +18,7 @@ import { signPersonal, signTyped } from '../lib/evm-dapp';
 import { describeData, messageText } from '../lib/evm-dapp-core';
 import { checkTransaction, failedCheck, type ContractCheck } from '../lib/contract-check';
 import { ContractCheckCard } from './ContractCheckCard';
-import { SignVerdict } from './SignGuard';
+import { SignRequest } from './SignRequest';
 import { judgeRequest } from '../lib/signing';
 import { useWallet } from '../lib/wallet';
 import { ensureApps, useApps } from '../lib/appswallet';
@@ -77,7 +77,7 @@ export function ApproveEvm({ ask, onDone, rejected }: { ask: EvmAsk | null; onDo
     if (!ask || (ask.kind !== 'send' && ask.kind !== 'typed')) return;
     const req: Request = ask.kind === 'send' ? { kind: 'send', to: ask.to, data: ask.data, value: ask.value } : { kind: 'typed', json: ask.json };
     let live = true;
-    judgeRequest(req, activeNets().eth, [...w.accounts.map((a) => a.address), me, appsAddr ?? ''].filter(Boolean)).then((a) => live && setAss(a)).catch(() => {});
+    judgeRequest(req, activeNets().eth, [...w.accounts.map((a) => a.address), me, appsAddr ?? ''].filter(Boolean)).then((a) => live && setAss(a)).catch(() => live && setAss({ level: 'review', skipped: false, headline: "We couldn't finish checking this", sub: 'Only continue if you know this site well.', reasons: [], token: '', amountText: '', endsText: '', why: 'The check did not complete.' }));
     return () => { live = false; };
   }, [ask]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -89,7 +89,7 @@ export function ApproveEvm({ ask, onDone, rejected }: { ask: EvmAsk | null; onDo
   const reject = () => onDone(ask.id, null, rejected);
   const data = ask.kind === 'send' ? describeData(ask.data) : null;
 
-  const approve = async (): Promise<boolean> => {
+  const approve = async (override?: string): Promise<boolean> => {
     setErr('');
     try {
       if (ask.kind === 'connect') {
@@ -103,7 +103,7 @@ export function ApproveEvm({ ask, onDone, rejected }: { ask: EvmAsk | null; onDo
       if (!(await confirmIt(ask.kind === 'send' ? `Approve for ${host(ask.site.origin)}` : `Sign for ${host(ask.site.origin)}`, { keyFollows: true }))) return false;
       setBusy(true);
       if (ask.kind === 'send') {
-        const h = await sendEthCall(ask.to, ask.data as `0x${string}`, ask.value, undefined, ask.index);
+        const h = await sendEthCall(ask.to, (override ?? ask.data) as `0x${string}`, ask.value, undefined, ask.index);
         success();
         onDone(ask.id, h);
         return true;
@@ -128,6 +128,15 @@ export function ApproveEvm({ ask, onDone, rejected }: { ask: EvmAsk | null; onDo
   const stopped = guarded && ass!.level === 'stop';
   const verdictOnly = guarded && ass!.level !== 'review' && !details;
   const checking = judged && !ass;
+
+  if (ask.kind === 'send' || ask.kind === 'typed') {
+    return (
+      <Sheet open={!!ask} onClose={reject}>
+        <SignRequest ask={ask} chk={ask.kind === 'send' ? chk : null} ass={ass} unit={unit} explorer={`${ETH_NETS[net].explorer}/address/`} busy={busy} onApprove={approve} onReject={reject} />
+        <ErrorText>{err}</ErrorText>
+      </Sheet>
+    );
+  }
 
   return (
     <Sheet open={!!ask} onClose={reject}>
@@ -162,8 +171,6 @@ export function ApproveEvm({ ask, onDone, rejected }: { ask: EvmAsk | null; onDo
             <T v="sub" dim>Vaults never connect to websites. The site can ask you to approve payments and signatures, and can't move anything without you saying yes each time.</T>
           </>
         )}
-
-        {guarded && (ass!.level === 'review' || verdictOnly) ? <SignVerdict a={ass!} me={me} /> : null}
 
         {ask.kind === 'send' && !verdictOnly && (
           <>
