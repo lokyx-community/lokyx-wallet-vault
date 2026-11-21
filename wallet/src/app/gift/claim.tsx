@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { T } from '../../ui/Text';
 import { Field, Group, Row, Screen, success, ErrorText } from '../../ui/controls';
 import { Primary, Secondary } from '../../ui/Glass';
-import { WalletCard } from '../../ui/WalletCards';
+import { GiftCardFace } from '../../ui/GiftCardFace';
+import { Scratch } from '../../ui/Scratch';
 import { toast } from '../../ui/Toast';
 import { C } from '../../ui/theme';
 import { useAsync, activeNets } from '../../lib/multichain';
@@ -12,10 +13,8 @@ import { giftBalance, sweepGift } from '../../lib/gifts';
 import { giftAddress, parseGift } from '../../lib/gift-core';
 import { plainError } from '../../lib/plain-error';
 import { ETH_NETS } from '../../lib/multichain-core';
-import { useWindowDimensions } from 'react-native';
+import { View, useWindowDimensions } from 'react-native';
 
-const NAMES = { lyx: 'LOKYX', btc: 'Bitcoin', eth: 'Ethereum' } as const;
-const KIND = { lyx: 'lyx', btc: 'btc', eth: 'eth' } as const;
 
 /** Someone gave you a card: paste or scan its code, see what's on it, move it into your wallet. */
 export default function Claim() {
@@ -25,7 +24,9 @@ export default function Claim() {
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState('');
   const [done, setDone] = useState(false);
+  const [shown, setShown] = useState(false);
   const g = useMemo(() => parseGift(text), [text]);
+  useEffect(() => setShown(false), [text]);
   const addr = g ? giftAddress(g.coin, g.sk, activeNets().btc) : '';
   const bal = useAsync(async () => (g ? giftBalance(g.coin, addr) : null), [addr], 15_000);
 
@@ -52,8 +53,12 @@ export default function Claim() {
       <ErrorText hint>{text.length > 10 && !g ? "That isn't a LOKYX gift card code. It starts with lokyx-gift:" : ''}</ErrorText>
       {g ? (
         <>
-          <WalletCard c={{ kind: KIND[g.coin], logo: g.coin === 'lyx' ? undefined : g.coin, title: `Gift · ${NAMES[g.coin]}`, balance: bal.data ? bal.data.text.split(' ')[0] : '', unit: bal.data ? bal.data.text.split(' ')[1] : '', address: addr, tag: done ? 'Claimed' : '' }} width={Math.min(width - 40, 420)} height={180} />
-          {bal.data && bal.data.raw > 0n ? (
+          <View style={{ alignItems: 'center' }}>
+            <Scratch width={Math.min(width - 40, 340)} height={Math.round(Math.min(width - 40, 340) / 1.6)} onRevealed={() => setShown(true)}>
+              <GiftCardFace coin={g.coin} width={Math.min(width - 40, 340)} balance={bal.data ? bal.data.text.split(' ')[0] : ''} unit={bal.data ? bal.data.text.split(' ')[1] : ''} tag={done ? 'Claimed' : ''} />
+            </Scratch>
+          </View>
+          {shown && bal.data && bal.data.raw > 0n ? (
             <Group>
               <Row title="On the card" detail={bal.data.text} />
               <Row title="Network fee" detail="Taken from the gift" />

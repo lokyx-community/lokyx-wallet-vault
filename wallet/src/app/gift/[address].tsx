@@ -5,7 +5,7 @@ import { plainError } from '../../lib/plain-error';
 import { T } from '../../ui/Text';
 import { Screen, success, ErrorText } from '../../ui/controls';
 import { Primary, Secondary, Panel, GRow } from '../../ui/Glass';
-import { WalletCard } from '../../ui/WalletCards';
+import { GiftCardFace } from '../../ui/GiftCardFace';
 import { Qr } from '../../ui/Qr';
 import { toast } from '../../ui/Toast';
 import { C } from '../../ui/theme';
@@ -15,7 +15,6 @@ import { closeGift, feeSettled, giftBalance, giftKey, sweepGift, useGifts } from
 import { encodeGift } from '../../lib/gift-core';
 
 const NAMES = { lyx: 'LOKYX', btc: 'Bitcoin', eth: 'Ethereum' } as const;
-const KIND = { lyx: "lyx", btc: "btc", eth: "eth" } as const;
 
 /** One card you made: what's on it, the code to hand over, and taking it back. */
 export default function GiftCard() {
@@ -59,7 +58,7 @@ export default function GiftCard() {
 
   return (
     <Screen title={g.note || 'Gift card'}>
-      <WalletCard c={{ kind: KIND[g.coin], logo: g.coin === 'lyx' ? undefined : g.coin, title: `Gift · ${NAMES[g.coin]}`, sub: g.note || undefined, balance: bal.data ? bal.data.text.split(' ')[0] : '', unit: bal.data ? bal.data.text.split(' ')[1] : '', address: g.address, tag: g.closed ? 'Closed' : empty ? 'Not funded yet' : 'Ready' }} width={cw} height={190} />
+      <GiftCardFace coin={g.coin} width={Math.min(cw, 360)} note={g.note || undefined} balance={bal.data ? bal.data.text.split(' ')[0] : ''} unit={bal.data ? bal.data.text.split(' ')[1] : ''} tag={g.closed ? 'Closed' : empty ? 'Not funded yet' : 'Ready'} />
       {empty && !g.closed ? (
         <Panel>
           <GRow icon="send" title="Put the coins on it" sub={`You meant to add ${g.amount}`} onPress={() => router.push(g.coin === 'lyx' ? `/send?to=${g.address}&amount=${g.amount.split(' ')[0]}` : `/chain/send?chain=${g.coin}&to=${g.address}&amount=${g.amount.split(' ')[0]}`)} />

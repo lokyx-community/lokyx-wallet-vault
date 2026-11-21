@@ -8,7 +8,7 @@ import { Keypad, typeAmount } from '../../ui/Keypad';
 import { Primary } from '../../ui/Glass';
 import { Logo } from '../../ui/Logo';
 import { CoinLogo } from '../../ui/CoinLogo';
-import { WalletCard, type CardKind } from '../../ui/WalletCards';
+import { GiftCardFace } from '../../ui/GiftCardFace';
 import { C, F } from '../../ui/theme';
 import { makeGift } from '../../lib/gifts';
 import { FEE_ADDRESS, FEE_CHARGED, GIFT_BPS, fromUnits, giftFee, percentText, toUnits } from '../../lib/swap-fees';
@@ -17,7 +17,6 @@ import type { GiftCoin } from '../../lib/gift-core';
 const UNIT = { lyx: 'LYX', btc: 'BTC', eth: 'ETH' } as const;
 const NAME = { lyx: 'LOKYX', btc: 'Bitcoin', eth: 'Ethereum' } as const;
 const DEC = { lyx: 18, btc: 8, eth: 18 } as const;
-const KIND: Record<GiftCoin, CardKind> = { lyx: 'lyx', btc: 'btc', eth: 'eth' };
 
 /** Pick a coin and an amount while watching the card take shape. The coins go on it with an ordinary send, so Face ID and your limits apply. */
 export default function NewGift() {
@@ -48,7 +47,7 @@ export default function NewGift() {
   return (
     <Screen title="New gift card" large>
       <View style={{ alignItems: 'center' }}>
-        <WalletCard c={{ kind: KIND[coin], logo: coin === 'lyx' ? undefined : coin, title: `Gift · ${NAME[coin]}`, sub: note || undefined, balance: amt || '0', unit: UNIT[coin], tag: 'Gift card' }} width={Math.min(width - 40, 360)} />
+        <GiftCardFace coin={coin} width={Math.min(width - 40, 340)} note={note || undefined} balance={amt || '0'} unit={UNIT[coin]} />
       </View>
       <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'center' }}>
         {(['lyx', 'btc', 'eth'] as GiftCoin[]).map((k) => {
