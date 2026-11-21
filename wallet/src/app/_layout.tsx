@@ -33,6 +33,7 @@ import { loadNode } from '../lib/rpc';
 import { keysLost } from '../lib/secrets';
 import { startWatching, check } from '../lib/watch';
 import { loadChains, loadTokens } from '../lib/multichain';
+import { loadRisk, refreshRisk } from '../lib/risk-lists';
 import { loadWatchedX } from '../lib/xchains';
 import { loadPendingFeed } from '../lib/feed-pending';
 import { loadBookmarks } from '../lib/bookmarks';
@@ -163,9 +164,11 @@ export default function Root() {
   const [fonts] = useFonts({ Geist_400Regular, Geist_500Medium, Geist_600SemiBold, GeistMono_500Medium });
   const w = useWallet();
   useEffect(() => {
-    Promise.all([loadNode(), loadAll(), loadCapsules(), loadChains(), loadTokens(), loadWatchedX(), loadPendingFeed(), loadBookmarks(), loadGifts(), loadBtcShared(), loadEthShared(), loadSwaps(), loadSwapSettings(), loadGuard(), loadSigning(), loadApps(), loadVaultFirst(), loadTowers()])
+    Promise.all([loadNode(), loadAll(), loadCapsules(), loadChains(), loadTokens(), loadWatchedX(), loadPendingFeed(), loadBookmarks(), loadGifts(), loadBtcShared(), loadEthShared(), loadSwaps(), loadSwapSettings(), loadGuard(), loadSigning(), loadApps(), loadVaultFirst(), loadTowers(), loadRisk()])
       .finally(() => {
         load();
+        // the scam lists: pick up newer ones in the background, never holding up the start
+        refreshRisk().catch(() => {});
         // a board this phone was making: pick it up in the background, never holding up the start
         settleBoard().catch(() => {});
       });

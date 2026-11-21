@@ -13,7 +13,9 @@ import { toUrl, PROVIDER_JS, READ_METHODS, NOT_CONNECTED, REJECTED, reply } from
 import { rpc } from '../lib/rpc';
 import { toggleBookmark, useBookmarks } from '../lib/bookmarks';
 import { currentAddress, useAccountRef } from '../lib/wallet';
-import { evmSites, isConnected, isEvmConnected } from '../lib/data';
+import { evmSites, isConnected, isEvmConnected, useBlockedSites } from '../lib/data';
+import { siteRisk, unblockSite, type SiteRisk } from '../lib/risk-lists';
+import { BlockedSite } from '../ui/BlockedSite';
 import { appsAddress } from '../lib/appswallet';
 import { accountIndexFor } from '../lib/appswallet-core';
 import { ApproveEvm, type EvmAsk } from '../ui/ApproveEvm';
@@ -52,10 +54,18 @@ export default function Browser() {
   const [text, setText] = useState('');
   const [ask, setAsk] = useState<Ask | null>(null);
   const [evmAsk, setEvmAsk] = useState<EvmAsk | null>(null);
+  const [stopped, setStopped] = useState<{ url: string; why: NonNullable<SiteRisk> } | null>(null);
+  useBlockedSites(); // so a change to the block list shows at once
   const evmMethod = useRef(new Map<number, string>());
   const chainCfg = useChainSettings();
   const progress = useSharedValue(0);
   const bar = useAnimatedStyle(() => ({ width: `${progress.value * 100}%`, opacity: progress.value >= 0.999 ? 0 : 1 }));
+
+  // a site on a scam list, or one you blocked, is never opened
+  useEffect(() => {
+    const why = siteRisk(originOf(url));
+    setStopped(why ? { url, why } : null);
+  }, [url]);
 
   const current = nav?.url ?? url;
   const marks = useBookmarks();
@@ -83,6 +93,10 @@ export default function Browser() {
     const refuse = (code: number, message: string) => answer(m.id, null, { code, message });
     try {
       const kind = evmKind(m.method);
+      if (siteRisk(origin) && !['chainId', 'netVersion', 'read', 'permissions', 'accounts'].includes(kind)) {
+        toast('Blocked a request from a risky site', 'info');
+        return refuse(4001, 'LOKYX Wallet blocked this site: it is on a scam list or you blocked it.');
+      }
       // the address this site was connected with: the Apps wallet or the main address
       const main = (await ensureAddresses()).eth;
       const entry = evmSites.get().find((x) => x.origin === origin && (x.address.toLowerCase() === main.toLowerCase() || x.address.toLowerCase() === (appsAddress() ?? '').toLowerCase()));
@@ -97,7 +111,7 @@ export default function Browser() {
         case 'read':
           return answer(m.id, await ethPass(net, m.method, params));
         case 'accounts':
-          return answer(m.id, connected ? [me] : []);
+          return answer(m.id, connected && !siteRisk(origin) ? [me] : []);
         case 'connect':
           if (connected) return answer(m.id, m.method === 'wallet_requestPermissions' ? [{ parentCapability: 'eth_accounts' }] : [me]);
           evmMethod.current.set(m.id, m.method);
@@ -256,22 +270,39 @@ export default function Browser() {
       <View style={{ height: 2, backgroundColor: 'transparent' }}>
         <Animated.View style={[{ height: 2, backgroundColor: C.text }, bar]} />
       </View>
-      <WebView
-        ref={web}
-        source={{ uri: url }}
-        style={{ flex: 1, backgroundColor: C.bg }}
-        // window.lokyx is for LOKYX contracts; window.ethereum (and EIP-6963) is for Ethereum websites on the wallet's own networks.
-        injectedJavaScriptBeforeContentLoaded={`${contractsOn ? PROVIDER_JS : ''}\n${EVM_PROVIDER_JS}`}
-        onMessage={onMessage}
-        onNavigationStateChange={setNav}
-        onLoadProgress={(e) => (progress.value = withTiming(e.nativeEvent.progress, { duration: 150 }))}
-        onLoadStart={() => (progress.value = 0.05)}
-        allowsBackForwardNavigationGestures
-        pullToRefreshEnabled
-        setSupportMultipleWindows={false}
-        forceDarkOn
-        originWhitelist={['https://*', 'http://*']}
-      />
+      {stopped ? (
+        <BlockedSite
+          host={host(stopped.url)}
+          why={stopped.why}
+          onBack={() => (stopped.url === url ? router.back() : setStopped(null))}
+          onUnblock={() => void unblockSite(stopped.url).then(() => setStopped(null))}
+        />
+      ) : (
+        <WebView
+          ref={web}
+          source={{ uri: url }}
+          style={{ flex: 1, backgroundColor: C.bg }}
+          // window.lokyx is for LOKYX contracts; window.ethereum (and EIP-6963) is for Ethereum websites on the wallet's own networks.
+          injectedJavaScriptBeforeContentLoaded={`${contractsOn ? PROVIDER_JS : ''}\n${EVM_PROVIDER_JS}`}
+          onMessage={onMessage}
+          onNavigationStateChange={setNav}
+          onLoadProgress={(e) => (progress.value = withTiming(e.nativeEvent.progress, { duration: 150 }))}
+          onLoadStart={() => (progress.value = 0.05)}
+          allowsBackForwardNavigationGestures
+          pullToRefreshEnabled
+          setSupportMultipleWindows={false}
+          forceDarkOn
+          originWhitelist={['https://*', 'http://*']}
+          onShouldStartLoadWithRequest={(r) => {
+            const why = siteRisk(originOf(r.url));
+            if (why && (r as { isTopFrame?: boolean }).isTopFrame !== false) {
+              setStopped({ url: r.url, why });
+              return false;
+            }
+            return true;
+          }}
+        />
+      )}
       <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingTop: 8, paddingBottom: insets.bottom + 6, borderTopWidth: 0.5, borderColor: C.line }}>
         <Press onPress={() => web.current?.goBack()} disabled={!nav?.canGoBack} accessibilityLabel="Back" style={{ padding: 10 }}>
           <Icon name="back" size={22} color={C.text} />

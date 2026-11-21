@@ -138,6 +138,9 @@ export const isConnected = (origin: string, address: string) => sites.get().some
 /** Websites allowed to see the Ethereum address (window.ethereum), kept apart from the LOKYX-chain ones. */
 export const evmSites = saved<Site[]>('w.evmsites', []);
 export const useEvmSites = () => useStore(evmSites);
+/** Websites the person blocked themselves (host names). The wallet refuses everything from them. */
+export const blockedSites = saved<string[]>('w.blocksites', []);
+export const useBlockedSites = () => useStore(blockedSites);
 export const isEvmConnected = (origin: string, address: string) => evmSites.get().some((s) => s.origin === origin && s.address.toLowerCase() === address.toLowerCase());
 
 // ---------- savings jars ----------
@@ -201,7 +204,7 @@ export async function resolveDeploy(tx: string): Promise<string | null> {
 }
 
 export async function loadAll() {
-  await Promise.all([tokens.load(), contacts.load(), recent.load(), pending.load(), sites.load(), jars.load(), shared.load(), boardPosts.load(), tokenLocks.load()]);
+  await Promise.all([tokens.load(), contacts.load(), recent.load(), pending.load(), sites.load(), jars.load(), shared.load(), boardPosts.load(), tokenLocks.load(), blockedSites.load()]);
 }
 
 /** Forget everything in memory too, after the wallet is removed from the phone. */
@@ -215,4 +218,5 @@ export function resetData() {
   shared.set([]);
   boardPosts.set([]);
   tokenLocks.set([]);
+  blockedSites.set([]);
 }

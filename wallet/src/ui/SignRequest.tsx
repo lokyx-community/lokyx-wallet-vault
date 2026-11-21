@@ -6,7 +6,7 @@ import Animated, { Easing, FadeIn, FadeInDown, runOnJS, useAnimatedStyle, useRed
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { T } from './Text';
-import { Button, Field, Press } from './controls';
+import { Button, Field, Press, Switch } from './controls';
 import { Icon } from './Icon';
 import { Avatar } from './RingCode';
 import { SlideToPay } from './SlideToPay';
@@ -15,6 +15,9 @@ import { DUR, EASE_OUT } from './motion';
 import { shortAddr } from '../lib/format';
 import { Logo, logoFor } from './Logo';
 import { TokenLogo } from './CoinLogo';
+import { addressRisk, blockSite, siteRisk, unblockSite } from '../lib/risk-lists';
+import { useBlockedSites } from '../lib/data';
+import { hostChain } from '../lib/risk-lists-core';
 import { previewSend, type Shown, type ShownPreview } from '../lib/preview';
 import { previewTone, previewWords, type Preview } from '../lib/preview-core';
 import { activeNets, lookupToken } from '../lib/multichain';
@@ -231,7 +234,13 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
   const ready = scanned && chk !== 'busy' && ass !== null && pv !== 'busy';
   const base: Tone | null = ready ? combineTone(ass && !ass.skipped ? ass.level : null, chk && chk !== 'busy' ? chk.verdict.level : null) : null;
   const pvTone = pvDone && ask.kind === 'send' ? previewTone(pvDone.raw, { value: ask.value, data: ask.data }) : null;
-  const tone: Tone | null = base ? raiseTone(base, pvTone) : null;
+  // scam lists and the person's own block list: a hit stops the request whatever else looks fine
+  const blockedList = useBlockedSites();
+  const siteWhy = siteRisk(ask.site.origin);
+  const addrHit = ask.kind === 'send' && [ask.to, data?.spender, ass?.main?.spender].some((a) => addressRisk(a));
+  const riskTone: Tone | null = siteWhy || addrHit ? 'stop' : null;
+  const tone: Tone | null = base ? raiseTone(raiseTone(base, pvTone), riskTone) : null;
+  const youBlocked = hostChain(ask.site.origin).some((h) => blockedList.includes(h));
   const pvCaused = !!pvTone && tone === pvTone && base !== tone;
   const t = tone ? TONE[tone] : null;
   const host = ask.site.origin.replace(/^https?:\/\//, '').replace(/^www\./, '');
@@ -244,7 +253,10 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
   if (tone) {
     const symbol = tok?.symbol ?? 'tokens';
     const pw = pvCaused && pvDone ? previewWords(tone, pvDone.raw, unit) : null;
-    if (pw) {
+    if (riskTone) {
+      headline = siteWhy === 'list' ? 'This site is on a scam list' : siteWhy === 'you' ? 'You blocked this site' : 'This address is on a scam list';
+      says = siteWhy === 'list' ? "Security teams have reported it for stealing coins. Don't approve anything here." : siteWhy === 'you' ? 'You told the wallet to block it. Reject this, and unblock it only if you trust it again.' : "Coins sent to it, or allowed for it, have been reported stolen. Don't approve.";
+    } else if (pw) {
       headline = pw.headline;
       says = pw.says;
     } else if (guarded && ass!.level !== 'allow') {
@@ -278,6 +290,13 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
   void key;
 
   const spender = data?.spender ?? ass?.main?.spender;
+  // "Block this site from now on": the wallet then refuses everything from it. A site already on a public list stays blocked.
+  const blockRow = siteWhy === 'list' ? null : (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 2 }}>
+      <T v="sub" color={C.soft}>Block this site from now on</T>
+      <Switch on={youBlocked} onChange={(v) => void (v ? blockSite(ask.site.origin) : unblockSite(ask.site.origin))} label="Block this site from now on" />
+    </View>
+  );
   return (
     <View style={{ gap: 0 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
@@ -370,11 +389,13 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
         <View style={{ gap: 12 }}>
           <Button title="Don't approve" onPress={onReject} disabled={busy} />
           <HoldButton label="Hold to approve anyway" onDone={() => void go()} disabled={busy || !approveReady} />
+          {blockRow}
           <Press onPress={() => setDetails(!details)} haptic={false}><T v="caption" dim style={{ textAlign: 'center' }}>{details ? 'Hide details' : 'Why?'}</T></Press>
         </View>
       ) : tone === 'stop' ? (
         <View style={{ gap: 10 }}>
           <Button title="Reject" onPress={onReject} disabled={busy} />
+          {blockRow}
           <Press onPress={() => setDetails(!details)} haptic={false}><T v="caption" dim style={{ textAlign: 'center' }}>{details ? 'Hide details' : 'Show details'}</T></Press>
         </View>
       ) : (
