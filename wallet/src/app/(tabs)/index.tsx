@@ -48,6 +48,7 @@ import { useArrivals } from "../../ui/useArrivals";
 import { usePortfolio } from "../../lib/prices";
 import { changeText, money } from "../../lib/prices-core";
 import { AssetsPanel, PortfolioCard } from "../../ui/PortfolioBits";
+import { setLift } from "../../lib/lift";
 import { AddChainSheet } from "../../ui/AddChainSheet";
 import {
   activeNets,
@@ -289,6 +290,16 @@ export default function Home() {
     fresh.forEach((i) => addInbox({ id: `rx:${receiptKey(address, i)}`, kind: "receive", title: `Received ${niceLyx(i.amountLyx)} LYX`, body: i.from ? `From ${shortAddr(i.from, 10, 6)}.` : "A payment arrived.", route: "/(tabs)/activity" }).catch(() => {}));
   }, [hist.data, address]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // each card remembers where it sits on screen, so its page can lift it from exactly there
+  const cardRefs = useRef<Record<string, View | null>>({});
+  const openFrom = (id: string) => {
+    const v = cardRefs.current[id];
+    if (!v) return open(id);
+    v.measureInWindow((x, y, w, h) => {
+      setLift(w && h ? { x, y, w, h } : null);
+      open(id);
+    });
+  };
   const open = (id: string) => {
     if (id === "portfolio") {
       router.push("/portfolio");
@@ -382,13 +393,13 @@ export default function Home() {
             cards={[
               ...(port ? [<Press key="portfolio" onPress={() => open("portfolio")} scaleTo={0.985} accessibilityLabel="Portfolio card"><PortfolioCard p={port} cur={cur} width={tallW} height={tallH} hide={hide} /></Press>] : []),
               ...deck.filter((d) => d.id !== "lyx").map((d) => (
-                <Press key={d.id} onPress={() => open(d.id)} scaleTo={0.985} accessibilityLabel={`${d.c.title} card`}>
-                  <NeonCard c={d.c} width={tallW} height={tallH} hide={hide} />
+                <Press key={d.id} onPress={() => openFrom(d.id)} scaleTo={0.985} accessibilityLabel={`${d.c.title} card`}>
+                  <View ref={(r) => { cardRefs.current[d.id] = r; }} collapsable={false}><NeonCard c={d.c} width={tallW} height={tallH} hide={hide} /></View>
                 </Press>
               )),
               ...deck.filter((d) => d.id === "lyx").map((d) => (
-                <Press key={d.id} onPress={() => open(d.id)} scaleTo={0.985} accessibilityLabel={`${d.c.title} card`}>
-                  <NeonCard c={d.c} width={tallW} height={tallH} hide={hide} />
+                <Press key={d.id} onPress={() => openFrom(d.id)} scaleTo={0.985} accessibilityLabel={`${d.c.title} card`}>
+                  <View ref={(r) => { cardRefs.current[d.id] = r; }} collapsable={false}><NeonCard c={d.c} width={tallW} height={tallH} hide={hide} /></View>
                 </Press>
               )),
             ]}
