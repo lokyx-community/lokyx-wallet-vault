@@ -1,10 +1,10 @@
 import { Aurora } from '../../ui/Aurora';
 import { useEffect, useState } from 'react';
-import { Linking, ScrollView, View, useWindowDimensions } from 'react-native';
+import { Linking, View, useWindowDimensions } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, Keyframe } from 'react-native-reanimated';
+import Animated, { FadeInDown, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { T } from '../../ui/Text';
 import { Icon, type IconName } from '../../ui/Icon';
 import { Press, IconButton, success } from '../../ui/controls';
@@ -29,6 +29,9 @@ import { useCoins, type CoinId } from '../../lib/coins';
 import { DUR, EASE_OUT } from '../../ui/motion';
 import { LiftCard } from '../../ui/LiftCard';
 import { PriceGraph } from '../../ui/PriceGraph';
+import { AboutCard, KvPanel, LinkChips, MarketBlock, NoMarket, SafetyList, SectionHead } from '../../ui/CoinSections';
+import { useCoinInfo } from '../../lib/coininfo';
+import { CoinLogo } from '../../ui/CoinLogo';
 import { useCurrency, usePortfolio } from '../../lib/prices';
 import { PRICED, money } from '../../lib/prices-core';
 
@@ -81,12 +84,6 @@ function LyxToken({ t, owner, hide }: { t: Token; owner: string; hide: boolean }
 }
 
 /** One coin on its own screen: its card at the top, the four things you do with it, then what happened. */
-// The card arrives from where it was on Home: slightly smaller and higher, then settles into place.
-const CARD_IN = new Keyframe({
-  0: { opacity: 0.6, transform: [{ translateY: 150 }, { scale: 1.08 }] },
-  100: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }], easing: EASE_OUT },
-});
-
 export default function CoinScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const isToken = /^0x[0-9a-fA-F]{40}$/.test(id ?? '');
@@ -119,6 +116,21 @@ export default function CoinScreen() {
   };
   // the market id for the graph; LOKYX and unlisted tokens have none
   const marketId = tok ? PRICED[tok.symbol.toUpperCase()]?.id : coin === 'btc' ? 'bitcoin' : coin === 'eth' ? PRICED[card.unit.toUpperCase()]?.id ?? 'ethereum' : undefined;
+  const { info } = useCoinInfo(marketId, cur);
+  const priced = port?.lines.find((x) => x.symbol === (tok ? tok.symbol.toUpperCase() : card.unit.toUpperCase()));
+  // true only on a real-money network; every test coin says so plainly
+  const real = coin === 'lyx' ? false : coin === 'btc' && !tok ? !coins.btc.tag : ethNet.real;
+  const sy = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => { sy.value = e.contentOffset.y; });
+  const titleFade = useAnimatedStyle(() => ({ opacity: Math.max(0, Math.min(1, 1 - (sy.value - 150) / 40)) }));
+  const miniFade = useAnimatedStyle(() => ({ opacity: Math.max(0, Math.min(1, (sy.value - 190) / 50)), transform: [{ translateY: 6 * (1 - Math.max(0, Math.min(1, (sy.value - 190) / 50))) }] }));
+  const barFade = useAnimatedStyle(() => ({ opacity: Math.max(0, Math.min(0.94, (sy.value - 110) / 90)) }));
+  const copyAddr = async () => {
+    if (!card.address) return;
+    await Clipboard.setStringAsync(card.address);
+    success();
+    toast('Address copied', 'copy');
+  };
   const hist = usePoll<History>('lyx_getAddressHistory', coin === 'lyx' && address ? { address, limit: 20 } : null, 8000);
   const pend = usePending();
   const contractsOn = useContractsOn();
@@ -165,25 +177,12 @@ export default function CoinScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Aurora />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 48, paddingHorizontal: 16 }} showsVerticalScrollIndicator={false}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, height: 52 }}>
-          <IconButton name="back" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
-          <T style={{ flex: 1, textAlign: 'center', fontFamily: F.semibold, fontSize: 17, marginRight: 52 }} numberOfLines={1}>{card.title}</T>
-        </View>
-
+      <Animated.ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: insets.top + 68, paddingBottom: insets.bottom + 48, paddingHorizontal: 16 }} showsVerticalScrollIndicator={false}>
         <View style={{ marginTop: 10 }}>
           <LiftCard c={neon} width={cw} hide={hide} />
         </View>
 
-        <Animated.View entering={FadeInDown.delay(40).duration(DUR.slow).easing(EASE_OUT)} style={{ marginTop: 22 }}>
-          {marketId ? (
-            <PriceGraph coinId={marketId} cur={cur} width={cw - 8} />
-          ) : (
-            <T v="sub" dim style={{ textAlign: 'center', paddingVertical: 14 }}>{coin === 'lyx' ? 'LOKYX is a test coin. It has no market price yet.' : 'No market price for this token'}</T>
-          )}
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(110).duration(DUR.slow).easing(EASE_OUT)} style={{ flexDirection: 'row', gap: 8, paddingTop: 16 }}>
+        <Animated.View entering={FadeInDown.delay(110).duration(DUR.slow).easing(EASE_OUT)} style={{ flexDirection: 'row', gap: 8, paddingTop: 18 }}>
           <Action icon="send" label="Send" onPress={send} />
           <Action icon="receive" label="Receive" onPress={receive} />
           <Action icon="scan" label="Scan" onPress={() => router.push('/ring?mode=scan')} />
@@ -191,22 +190,29 @@ export default function CoinScreen() {
           {coin === 'lyx' ? <Action icon="drop" label="Test LYX" onPress={faucet} /> : null}
         </Animated.View>
 
-        <View style={{ marginTop: 22, gap: 10 }}>
-          {coin === 'lyx' && (
-            <Panel>
-              <Row icon="lock" title="Vault" sub="A daily allowance, a delay on big sends" onPress={() => router.push('/vault')} />
-            </Panel>
+        <Animated.View entering={FadeInDown.delay(40).duration(DUR.slow).easing(EASE_OUT)} style={{ marginTop: 18 }}>
+          {marketId ? (
+            <PriceGraph coinId={marketId} cur={cur} width={cw - 8} />
+          ) : (
+            <NoMarket text={coin === 'lyx' ? 'LOKYX is a test coin for now, so it has no market price.' : 'The price feed does not list this token, so there is no market price to show.'} />
           )}
+        </Animated.View>
+
+        <SectionHead title={`YOUR ${card.title.toUpperCase()}`} />
+        <KvPanel
+          rows={[
+            { k: 'Balance', v: hide ? '••••' : `${card.balance || '0'} ${card.unit}` },
+            ...(priced && !hide ? [{ k: 'Value', v: money(priced.value, cur) }] : []),
+            { k: 'Network', v: tok ? ethNet.label : card.sub || card.title },
+            ...(card.address ? [{ k: 'Address', v: shortAddr(card.address, 6, 4), onPress: copyAddr, icon: 'copy' as const }] : []),
+            ...(tok ? [{ k: 'Contract', v: shortAddr(tok.contract, 6, 4), onPress: copyContract, icon: 'copy' as const }] : []),
+          ]}
+        />
+
+        <View style={{ marginTop: 10, gap: 10 }}>
           {tok && (
             <Panel>
-              <Row icon="copy" title="Token contract" sub={`${tok.contract.slice(0, 10)}…${tok.contract.slice(-8)}`} onPress={copyContract} />
-              <Row icon="shield" title={onList ? 'On the token list' : 'Added by contract'} sub={onList ? 'The real contract, checked by the app' : 'You added this one yourself'} onPress={copyContract} />
               <Row icon="trash" title={`Hide ${tok.symbol}`} sub="Removes it from Home. The coins stay yours." onPress={remove} />
-            </Panel>
-          )}
-          {coin === 'eth' && !tok && (
-            <Panel>
-              <Row icon="lock" title="Vault protection" sub="Experimental · test ETH only" onPress={() => router.push('/ethvault')} />
             </Panel>
           )}
           {coin === 'lyx' && contractsOn && tokens.length > 0 && (
@@ -289,7 +295,50 @@ export default function CoinScreen() {
             </>
           )}
         </Panel>
-      </ScrollView>
+
+        {info?.about || marketId ? <SectionHead title={`ABOUT ${card.title.toUpperCase()}`} /> : null}
+        {info?.about ? <AboutCard text={info.about} /> : marketId ? <NoMarket text="Needs a connection to load. It shows here once you are online." /> : null}
+
+        {info ? <SectionHead title="MARKET" /> : null}
+        {info ? <MarketBlock info={info} cur={cur} /> : null}
+
+        <SectionHead title="SAFETY" />
+        <SafetyList
+          lines={[
+            coin === 'lyx'
+              ? { title: 'The LOKYX test network', text: 'Test coins. They carry no money value, so nothing real is at risk.' }
+              : real
+                ? { title: `The real ${tok ? 'Ethereum' : card.title} network`, text: 'Sends go straight to the main network, nothing in between.' }
+                : { title: 'A test network', text: 'Coins here have no money value. A good place to try things.' },
+            { title: 'Your keys stay on this phone', text: 'LOKYX never sees your 24 words or your keys.' },
+            { title: 'The address is checked before every send', text: 'A wrong chain or a look-alike address is stopped first.' },
+            ...(tok ? [{ title: onList ? 'On the checked token list' : 'Added by contract', text: onList ? 'The real contract, checked by the app.' : 'You added this one yourself. Check the contract before you send a lot.', onPress: copyContract }] : []),
+            ...(coin === 'lyx' ? [{ title: 'Vault', text: 'A daily allowance and a delay on big sends.', onPress: () => router.push('/vault') }] : []),
+            ...(coin === 'eth' && !tok ? [{ title: 'Vault protection', text: 'Experimental, test ETH only.', onPress: () => router.push('/ethvault') }] : []),
+          ]}
+        />
+
+        {info?.links.length ? <SectionHead title="LINKS" /> : null}
+        {info ? <LinkChips links={info.links} /> : null}
+      </Animated.ScrollView>
+
+      <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, top: 0, paddingTop: insets.top + 8, paddingHorizontal: 16, height: insets.top + 60 }}>
+        <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: C.bg }, barFade]} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, height: 52 }}>
+          <IconButton name="back" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+          <View style={{ flex: 1, height: 44, justifyContent: 'center' }}>
+            <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }, titleFade]}>
+              <T style={{ fontFamily: F.semibold, fontSize: 17 }} numberOfLines={1}>{card.title}</T>
+            </Animated.View>
+            <Animated.View pointerEvents="none" style={[{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 40, paddingLeft: 6, paddingRight: 14, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.16)' }, miniFade]}>
+              {neon.mark.kind === 'lyx' ? <CoinLogo chain="lyx" size={28} /> : neon.mark.kind === 'logo' ? <Logo id={neon.mark.id} size={28} /> : <TokenLogo symbol={neon.mark.symbol} seed={neon.mark.seed} size={28} />}
+              <T style={{ fontFamily: F.medium, fontSize: 14.5, flex: 1 }} numberOfLines={1}>{hide ? '••••' : `${card.balance || '0'} ${card.unit}`}</T>
+              {priced && !hide ? <T style={{ fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] }}>{money(priced.value, cur)}</T> : null}
+            </Animated.View>
+          </View>
+          <View style={{ width: 40 }} />
+        </View>
+      </View>
     </View>
   );
 }

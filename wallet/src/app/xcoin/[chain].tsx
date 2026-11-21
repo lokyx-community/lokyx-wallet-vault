@@ -12,6 +12,8 @@ import { EASE_OUT } from '../../ui/motion';
 import { LiftCard } from '../../ui/LiftCard';
 import { NeonCard } from '../../ui/NeonCard';
 import { PriceGraph } from '../../ui/PriceGraph';
+import { AboutCard, KvPanel, LinkChips, MarketBlock, SafetyList, SectionHead } from '../../ui/CoinSections';
+import { useCoinInfo } from '../../lib/coininfo';
 import { useCurrency } from '../../lib/prices';
 import { Logo } from '../../ui/Logo';
 import { TokenLogo } from '../../ui/CoinLogo';
@@ -55,6 +57,7 @@ export default function XCoinScreen() {
   const { width: sw } = useWindowDimensions();
   const cw = Math.min(sw - 32, 420);
   const [cur] = useCurrency();
+  const { info } = useCoinInfo(chain === 'sol' ? 'solana' : 'tron', cur);
   const hide = useWallet().settings.hideBalance;
   useChainSettings();
   const nets = activeNets();
@@ -187,6 +190,25 @@ export default function XCoinScreen() {
             )}
           </>
         )}
+
+        {c.address ? (
+          <>
+            <SectionHead title={`ABOUT ${c.title.toUpperCase()}`} />
+            {info?.about ? <AboutCard text={info.about} /> : null}
+            {info ? <SectionHead title="MARKET" /> : null}
+            {info ? <MarketBlock info={info} cur={cur} /> : null}
+            <SectionHead title="SAFETY" />
+            <SafetyList
+              lines={[
+                real ? { title: `The real ${c.title} network`, text: 'Sends go straight to the main network, nothing in between.' } : { title: 'A test network', text: 'Coins here have no money value. A good place to try things.' },
+                { title: 'Your keys stay on this phone', text: 'LOKYX never sees your 24 words or your keys.' },
+                { title: 'The address is checked before every send', text: 'A wrong chain or a look-alike address is stopped first.' },
+              ]}
+            />
+            {info?.links.length ? <SectionHead title="LINKS" /> : null}
+            {info ? <LinkChips links={info.links} /> : null}
+          </>
+        ) : null}
       </ScrollView>
 
       <Sheet open={recv} onClose={() => setRecv(false)}>
