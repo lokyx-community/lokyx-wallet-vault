@@ -23,7 +23,7 @@ Anything else is refused. Only `usd` and `inr` and a short list of chart spans a
    npx wrangler deploy
    ```
 4. It prints an address like `https://lokyx-market.<you>.workers.dev`. Open `<address>/health` in a browser: it should say `{"ok":true,...}`.
-5. Put that address in `wallet/src/lib/market.ts` as `DEFAULT_MARKET` and make a new build.
+5. Put that address in `wallet/src/lib/market.ts` as `DEFAULT_MARKET` and make a new build. (Done: https://lokyx-market.lokyx.workers.dev)
 
 Until step 5 the wallet asks CoinGecko directly, as before. If the relay ever stops answering, the wallet quietly does the same.
 

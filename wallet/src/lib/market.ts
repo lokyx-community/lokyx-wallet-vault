@@ -8,7 +8,7 @@ import { fetchT } from './multichain';
 export const GECKO = 'https://api.coingecko.com';
 
 /** Where the market relay lives. Empty until it is deployed (market-relay/README.md); then put its https address here. */
-export const DEFAULT_MARKET = '';
+export const DEFAULT_MARKET = 'https://lokyx-market.lokyx.workers.dev';
 
 /** The relay to use: `w.marketUrl` if it is a proper https address, otherwise the default. Empty means "none". */
 export async function marketBase(): Promise<string> {
