@@ -13,6 +13,7 @@ import {
   tokenId, KNOWN_TOKENS, BLOCKSCOUT, parseEthTxs, parseTokenTxs, type EthTxRow, type BtcNet, type ChainSettings, type EthNet, type EthToken, type Fees, type Speed, type Utxo,
 } from './multichain-core.ts';
 import { decodeFunctionResult, encodeFunctionData, type Hex } from 'viem';
+import { parseSimulate, parseTrace, type Run } from './preview-core';
 import { privateKeyToAccount } from 'viem/accounts';
 
 // ---------- settings ----------
@@ -345,6 +346,27 @@ export async function ethRead(net: EthNet, to: string, data: Hex): Promise<Hex> 
 export async function ethCode(net: EthNet, at: string): Promise<Hex> {
   await checkEth(net);
   return eth<Hex>(net, 'eth_getCode', [at, 'latest']);
+}
+
+/**
+ * Run a call on the node without signing or sending it, and say what it did. Tries eth_simulateV1 (with coin transfers
+ * traced), then debug_traceCall with the call tracer. A node that has neither, or answers in a shape we do not know,
+ * gives { ok: false }: the sheet then says it cannot preview. Nothing here is ever guessed.
+ */
+export async function ethSimulate(net: EthNet, from: string, to: string | null, data: string, value: bigint): Promise<Run> {
+  await checkEth(net);
+  const call = { from, ...(to ? { to } : {}), data, value: `0x${value.toString(16)}` };
+  try {
+    const r = parseSimulate(await eth<unknown>(net, 'eth_simulateV1', [{ blockStateCalls: [{ calls: [call] }], traceTransfers: true, validation: false }, 'latest']));
+    if (r.ok) return r;
+  } catch {
+    /* this node does not do it: try the next way */
+  }
+  try {
+    return parseTrace(await eth<unknown>(net, 'debug_traceCall', [call, 'latest', { tracer: 'callTracer', tracerConfig: { withLog: true } }]));
+  } catch {
+    return { ok: false };
+  }
 }
 
 /** Sign a contract call with the key from your words and send it. Returns the transaction hash. */

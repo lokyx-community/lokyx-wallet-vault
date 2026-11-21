@@ -13,8 +13,12 @@ import { SlideToPay } from './SlideToPay';
 import { C, F } from './theme';
 import { DUR, EASE_OUT } from './motion';
 import { shortAddr } from '../lib/format';
+import { Logo, logoFor } from './Logo';
+import { TokenLogo } from './CoinLogo';
+import { previewSend, type Shown, type ShownPreview } from '../lib/preview';
+import { previewTone, previewWords, type Preview } from '../lib/preview-core';
 import { activeNets, lookupToken } from '../lib/multichain';
-import { combineTone, capApproval, typedAmount, type Tone } from '../lib/sign-view-core';
+import { combineTone, raiseTone, capApproval, typedAmount, type Tone } from '../lib/sign-view-core';
 import { describeData } from '../lib/evm-dapp-core';
 import { formatUnits } from '../lib/multichain-core';
 import type { ContractCheck } from '../lib/contract-check';
@@ -110,8 +114,64 @@ function Card({ small, children, sub }: { small: string; children: React.ReactNo
 }
 const Big = ({ children }: { children: string }) => <T style={{ fontFamily: F.semibold, fontSize: 18, letterSpacing: -0.4, textAlign: 'center' }} numberOfLines={2}>{children}</T>;
 
+/** A real coin mark: the chain's coin, a known token, or a quiet lettered coin; an item gets a tile. */
+function MoveLogo({ m, unit, size = 40 }: { m: { token: string; nft?: boolean; id?: bigint; symbol?: string }; unit: string; size?: number }) {
+  if (m.nft || (m.id !== undefined && m.token !== 'native')) {
+    return (
+      <View style={{ width: size, height: size, borderRadius: size * 0.28, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' }}>
+        <T style={{ fontFamily: F.semibold, fontSize: size * 0.3 }}>NFT</T>
+      </View>
+    );
+  }
+  const sym = m.token === 'native' ? unit : m.symbol ?? '';
+  const id = logoFor(sym) ?? (m.token === 'native' && /ETH/i.test(sym) ? logoFor('ETH') : null);
+  return id ? <Logo id={id} size={size} /> : <TokenLogo symbol={sym || '?'} seed={m.token} size={size} />;
+}
+const amountOf = (m: Shown, unit: string) => (m.nft ? `${m.symbol} #${shortId(m.id)}` : `${formatUnits(m.amount, m.decimals, 6)} ${m.token === 'native' ? unit : m.symbol || shortAddr(m.token)}`);
+const shortId = (id?: bigint) => { const s = String(id ?? ''); return s.length > 8 ? `${s.slice(0, 4)}…${s.slice(-3)}` : s; };
+
+/** One side of the preview: the first thing, big, and how many more. */
+function MoveCard({ small, moves, unit, none }: { small: string; moves: Shown[]; unit: string; none: string }) {
+  const m = moves[0];
+  return (
+    <Card small={small} sub={moves.length > 1 ? `and ${moves.length - 1} more` : undefined}>
+      {m ? (
+        <>
+          <MoveLogo m={m} unit={unit} />
+          <Big>{amountOf(m, unit)}</Big>
+        </>
+      ) : (
+        <Big>{none}</Big>
+      )}
+    </Card>
+  );
+}
+
+/** Many things moving: a short list reads better than two cards. */
+function MoveList({ out, inn, unit }: { out: Shown[]; inn: Shown[]; unit: string }) {
+  const rows = [...out.map((m) => ({ m, out: true })), ...inn.map((m) => ({ m, out: false }))];
+  return (
+    <View style={{ borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+      {rows.slice(0, 6).map(({ m, out: o }, i) => (
+        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 14, borderTopWidth: i ? 0.5 : 0, borderTopColor: 'rgba(255,255,255,0.07)' }}>
+          <MoveLogo m={m} unit={unit} size={26} />
+          <T v="sub" style={{ flex: 1 }} numberOfLines={1}>{amountOf(m, unit)}</T>
+          <T v="caption" color={o ? ROSE : C.good}>{o ? 'leaves' : 'arrives'}</T>
+        </View>
+      ))}
+      {rows.length > 6 ? <T v="caption" dim style={{ padding: 12, textAlign: 'center' }}>{`and ${rows.length - 6} more`}</T> : null}
+      {!inn.length ? (
+        <View style={{ flexDirection: 'row', paddingVertical: 11, paddingHorizontal: 14, borderTopWidth: 0.5, borderTopColor: 'rgba(255,255,255,0.07)' }}>
+          <T v="sub" style={{ flex: 1 }}>You receive</T>
+          <T v="caption" dim>nothing</T>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export type SignProps = {
-  ask: { kind: 'send'; to: string | null; value: bigint; data: string; site: { origin: string } } | { kind: 'typed'; json: string; primaryType: string; site: { origin: string } };
+  ask: { kind: 'send'; to: string | null; value: bigint; data: string; index: number; site: { origin: string } } | { kind: 'typed'; json: string; primaryType: string; site: { origin: string } };
   chk: ContractCheck | null | 'busy';
   ass: Assessment | null;
   unit: string;
@@ -133,6 +193,7 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
   const [more, setMore] = useState(false);
   const [typed, setTyped] = useState('');
   const [tok, setTok] = useState<{ symbol: string; decimals: number } | null>(null);
+  const [pv, setPv] = useState<'busy' | { raw: Preview; shown: ShownPreview } | null>(null);
   const key = useRef(0);
   useEffect(() => {
     setScanned(false);
@@ -140,6 +201,7 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
     setMore(false);
     setTyped('');
     setTok(null);
+    setPv(null);
     const t = setTimeout(() => setScanned(true), MIN_SCAN);
     return () => clearTimeout(t);
   }, [ask]);
@@ -155,8 +217,22 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
     };
   }, [ask, isApprove]);
 
-  const ready = scanned && chk !== 'busy' && (ask.kind === 'typed' || true) && ass !== null;
-  const tone: Tone | null = ready ? combineTone(ass && !ass.skipped ? ass.level : null, chk && chk !== 'busy' ? chk.verdict.level : null) : null;
+  const wantsPreview = ask.kind === 'send' && data?.kind === 'other';
+  useEffect(() => {
+    if (!wantsPreview || ask.kind !== 'send') return;
+    let live = true;
+    setPv('busy');
+    previewSend(ask, unit).then((r) => live && setPv(r));
+    return () => {
+      live = false;
+    };
+  }, [ask, wantsPreview, unit]);
+  const pvDone = pv && pv !== 'busy' ? pv : null;
+  const ready = scanned && chk !== 'busy' && ass !== null && pv !== 'busy';
+  const base: Tone | null = ready ? combineTone(ass && !ass.skipped ? ass.level : null, chk && chk !== 'busy' ? chk.verdict.level : null) : null;
+  const pvTone = pvDone && ask.kind === 'send' ? previewTone(pvDone.raw, { value: ask.value, data: ask.data }) : null;
+  const tone: Tone | null = base ? raiseTone(base, pvTone) : null;
+  const pvCaused = !!pvTone && tone === pvTone && base !== tone;
   const t = tone ? TONE[tone] : null;
   const host = ask.site.origin.replace(/^https?:\/\//, '').replace(/^www\./, '');
 
@@ -167,7 +243,11 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
   let says = '';
   if (tone) {
     const symbol = tok?.symbol ?? 'tokens';
-    if (guarded && ass!.level !== 'allow') {
+    const pw = pvCaused && pvDone ? previewWords(tone, pvDone.raw, unit) : null;
+    if (pw) {
+      headline = pw.headline;
+      says = pw.says;
+    } else if (guarded && ass!.level !== 'allow') {
       headline = ass!.headline;
       says = ass!.sub ?? ass!.why;
     } else if (verdictWords && tone !== 'allow') {
@@ -221,6 +301,7 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
           {ask.kind === 'send' && isApprove ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Card small="YOU ALLOW" sub={tok ? `to use, up to` : undefined}>
+                {ask.to ? <MoveLogo m={{ token: ask.to, symbol: tok?.symbol }} unit={unit} /> : null}
                 <Big>{data!.unlimited ? `All your ${tok?.symbol ?? 'tokens'}` : `${tok ? formatUnits(data!.amount ?? 0n, tok.decimals, 6) : String(data!.amount)} ${tok?.symbol ?? ''}`}</Big>
               </Card>
               <Icon name="forward" size={16} color={C.sub} />
@@ -228,13 +309,24 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
                 <Avatar address={spender ?? ''} size={36} />
               </Card>
             </View>
+          ) : ask.kind === 'send' && data?.kind === 'other' && pvDone?.shown.state === 'ready' && !pvDone.shown.reverted ? (
+            pvDone.shown.out.length > 1 || pvDone.shown.in.length > 1 || (!pvDone.shown.in.length && pvDone.shown.out.length > 1) ? (
+              <MoveList out={pvDone.shown.out} inn={pvDone.shown.in} unit={unit} />
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <MoveCard small="YOU GIVE" moves={pvDone.shown.out} unit={unit} none="Nothing" />
+                <Icon name="forward" size={16} color={C.sub} />
+                <MoveCard small="YOU GET" moves={pvDone.shown.in} unit={unit} none="Nothing" />
+              </View>
+            )
           ) : ask.kind === 'send' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Card small="YOU GIVE">
+                {ask.value > 0n ? <MoveLogo m={{ token: 'native' }} unit={unit} /> : null}
                 <Big>{ask.value > 0n ? `${formatEther(ask.value)} ${unit}` : 'No coins'}</Big>
               </Card>
               <Icon name="forward" size={16} color={C.sub} />
-              <Card small={data?.kind === 'other' ? 'YOU GET' : 'TO'} sub={data?.kind === 'other' ? 'The wallet can’t preview this yet' : undefined}>
+              <Card small={data?.kind === 'other' ? 'YOU GET' : 'TO'} sub={data?.kind === 'other' ? (pvDone?.shown.state === 'ready' ? 'The request would fail' : 'No preview: the node can’t test this') : undefined}>
                 {data?.kind === 'other' ? <Big>?</Big> : <Avatar address={ask.to ?? ''} size={36} />}
                 {data?.kind !== 'other' ? <T v="caption" dim>{shortAddr(ask.to ?? '')}</T> : null}
               </Card>
@@ -288,7 +380,7 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
       ) : (
         <Button title="Reject" kind="plain" onPress={onReject} />
       )}
-      <T v="caption" dim style={{ textAlign: 'center', marginTop: 12 }}>The wallet looks the contract up in public code registries and on this phone. Your keys never leave it.</T>
+      <T v="caption" dim style={{ textAlign: 'center', marginTop: 12 }}>The wallet tests the request on a node, looks the contract up in public code registries, and checks the rest on this phone. Your keys never leave it.</T>
     </View>
   );
 }

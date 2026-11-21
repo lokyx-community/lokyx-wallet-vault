@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { capApproval, combineTone, typedAmount } from '../src/lib/sign-view-core.ts';
+import { raiseTone, capApproval, combineTone, typedAmount } from '../src/lib/sign-view-core.ts';
 
 test('the worse of the two checks wins', () => {
   assert.equal(combineTone('allow', 'ok'), 'allow');
@@ -28,4 +28,10 @@ test('typed amounts', () => {
   assert.equal(typedAmount('1.1234567', 6), null);
   assert.equal(typedAmount('abc', 6), null);
   assert.equal(typedAmount('', 6), null);
+});
+
+test('raiseTone only ever raises', () => {
+  assert.equal(raiseTone('allow', 'stop'), 'stop');
+  assert.equal(raiseTone('stop', 'review'), 'stop');
+  assert.equal(raiseTone('review', null), 'review');
 });

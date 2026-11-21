@@ -35,3 +35,8 @@ export function typedAmount(text: string, decimals: number): bigint | null {
   if (f.length > decimals) return null;
   return BigInt(w + f.padEnd(decimals, '0'));
 }
+
+/** The worse of two colours (a null adds nothing). */
+export function raiseTone(a: Tone, b: Tone | null): Tone {
+  return b && RANK[b] > RANK[a] ? b : a;
+}
