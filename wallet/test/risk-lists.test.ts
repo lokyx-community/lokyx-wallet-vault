@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { addressesFrom, domainsFrom, fromB64, has, hostChain, normAddress, normDomain, pack, siteInList, toB64 } from '../src/lib/risk-lists-core.ts';
 // @ts-ignore plain JS worker
-import { SOURCES, handle, refresh } from '../risk-relay/worker.mjs';
+import { handle } from '../risk-relay/worker.mjs';
+// @ts-ignore plain JS
+import { SOURCES, refresh } from '../risk-relay/build-core.mjs';
+// @ts-ignore plain JS
+import { fileStore, upload } from '../risk-relay/build-lists.mjs';
 
 const sha = (s: string) => new Uint8Array(createHash('sha256').update(s).digest());
 
@@ -112,9 +116,30 @@ test('a broken source keeps its last good copy; a collapsed one is not believed'
   assert.equal(shrunk.domains, 400);
 });
 
-test('the admin refresh needs the secret', async () => {
+test('the worker has no way to rebuild lists or be told to', async () => {
   const env = { LISTS: kv(), ADMIN_KEY: 'k' };
-  assert.equal((await handle(new Request('https://r/admin/refresh', { method: 'POST' }), env)).status, 403);
-  assert.equal((await handle(new Request('https://r/admin/refresh', { method: 'POST' }), { LISTS: kv() })).status, 403);
-  assert.equal((await handle(new Request('https://r/admin/refresh', { method: 'POST', headers: { 'x-admin': 'k' } }), env, feed({}))).status, 200);
+  assert.equal((await handle(new Request('https://r/admin/refresh', { method: 'POST', headers: { 'x-admin': 'k' } }), env, feed({}))).status, 405);
+});
+
+test('the server script keeps last-good copies in files and uploads meta last', async () => {
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = join(mkdtempSync(join(tmpdir(), 'rl-')), 'state');
+  const a = fileStore(dir);
+  const big = Array.from({ length: 400 }, (_, i) => `bad${i}.com`);
+  await refresh({ LISTS: a }, feed({ [url('metamask-phishing')]: { blocklist: big } }), 1);
+  const b = fileStore(dir); // a later run, fresh process
+  const meta = await refresh({ LISTS: b }, feed({}), 2);
+  assert.equal(meta.domains, 400, 'last good copy survived on disk');
+  let sent: { url: string; body: { key: string; value: string; base64: boolean }[]; auth: string } | null = null;
+  await upload(b.written, { token: 'T', account: 'A', namespace: 'N' }, async (u: string, init: { body: string; headers: Record<string, string> }) => {
+    sent = { url: u, body: JSON.parse(init.body), auth: init.headers.authorization };
+    return new Response(JSON.stringify({ success: true }));
+  });
+  assert.match(sent!.url, /accounts\/A\/storage\/kv\/namespaces\/N\/bulk$/);
+  assert.equal(sent!.auth, 'Bearer T');
+  assert.deepEqual(sent!.body.map((x) => x.key), ['domains.bin', 'addresses.bin', 'meta']);
+  assert.ok(sent!.body.every((x) => x.base64));
+  await assert.rejects(upload(b.written, { token: 'T', account: 'A', namespace: 'N' }, async () => new Response('{"success":false}', { status: 403 })), /upload failed/);
 });

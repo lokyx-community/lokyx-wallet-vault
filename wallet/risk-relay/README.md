@@ -1,7 +1,8 @@
 # LOKYX risk relay
 
-A small Cloudflare Worker. Every 6 hours it downloads public scam lists (phishing sites and scam addresses), boils them
-down to a compact file of fingerprints and hands the same file to every phone. The phone checks sites and addresses itself.
+A small Cloudflare Worker plus a script that runs on your own server. The script (`build-lists.mjs`) downloads public scam lists
+(phishing sites and scam addresses) every 6 hours, boils them down to a compact file of fingerprints and uploads it. The Worker
+hands the same file to every phone. (The building is too heavy for a free-plan Worker, which gets only 10 ms of CPU per run.) The phone checks sites and addresses itself.
 **The relay never sees which site or contract anyone is looking at.** It stores no accounts and keeps no logs of who asks.
 
 | Question | Answer |
@@ -12,17 +13,26 @@ down to a compact file of fingerprints and hands the same file to every phone. T
 | `/risk/address?chain=1&address=0x…` | what GoPlus says about an address or contract (danger / caution / ok / unknown) |
 | `/risk/token?chain=1&address=0x…` | what GoPlus says about a token (can it be sold, hidden code, big fees) |
 
-Sources (see `SOURCES` in `worker.mjs`): MetaMask's phishing list, ScamSniffer's public scam database and MyEtherWallet's
+Sources (see `SOURCES` in `build-core.mjs`): MetaMask's phishing list, ScamSniffer's public scam database and MyEtherWallet's
 ethereum-lists darklists. If one source breaks, its last good copy is kept and `/lists/meta` says which one failed.
 
 ## Put it online (about 10 minutes, free plan is enough)
 
-1. In this folder: `npx wrangler login`
+1. In this folder: `npx wrangler login` (or set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in your terminal).
 2. Make the storage: `npx wrangler kv namespace create LISTS`. It prints an `id`; paste it into `wrangler.toml`.
 3. `npx wrangler deploy`. It prints an address like `https://lokyx-risk.<you>.workers.dev`.
-4. Build the lists once now instead of waiting up to 6 hours: `npx wrangler secret put ADMIN_KEY` (type any long random text),
-   then `curl -X POST -H "x-admin: <that text>" https://lokyx-risk.<you>.workers.dev/admin/refresh`.
-   Skip this and the first build happens at the next 6-hour mark.
+4. Build the lists on your server. Put the three settings in a private file, never in chat:
+   ```
+   umask 077
+   cat > ~/.lokyx-risk.env <<'X'
+   export CLOUDFLARE_API_TOKEN=...      # a token allowed to edit Workers KV Storage
+   export CLOUDFLARE_ACCOUNT_ID=...
+   export KV_NAMESPACE_ID=...           # the id from step 2
+   X
+   . ~/.lokyx-risk.env && node --experimental-strip-types build-lists.mjs
+   ```
+   It prints one line per source. Then repeat it every 6 hours with cron:
+   `0 */6 * * * . $HOME/.lokyx-risk.env && cd <this folder> && node --experimental-strip-types build-lists.mjs >> $HOME/lokyx-risk.log 2>&1`
 5. Open `<address>/lists/meta`. Every source should say `"ok": true`. A source with `"ok": false` has a wrong address or changed
    its format; the error says why.
 6. Put the address in `wallet/src/lib/risk-lists.ts` as `DEFAULT_RISK` and make a new build.
