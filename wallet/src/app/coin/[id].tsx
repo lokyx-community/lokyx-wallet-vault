@@ -27,7 +27,7 @@ import { shortAddr, niceLyx, timeAgo } from '../../lib/format';
 import { toast } from '../../ui/Toast';
 import { useCoins, type CoinId } from '../../lib/coins';
 import { DUR, EASE_OUT } from '../../ui/motion';
-import { useLift } from '../../ui/useLift';
+import { LiftCard } from '../../ui/LiftCard';
 import { PriceGraph } from '../../ui/PriceGraph';
 import { useCurrency, usePortfolio } from '../../lib/prices';
 import { PRICED, money } from '../../lib/prices-core';
@@ -91,7 +91,6 @@ export default function CoinScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const isToken = /^0x[0-9a-fA-F]{40}$/.test(id ?? '');
   const coin: CoinId = isToken || id === 'eth' ? 'eth' : id === 'btc' ? 'btc' : 'lyx';
-  const lift = useLift();
   const insets = useSafeAreaInsets();
   const { width: sw } = useWindowDimensions();
   const cw = Math.min(sw - 32, 420);
@@ -172,9 +171,9 @@ export default function CoinScreen() {
           <T style={{ flex: 1, textAlign: 'center', fontFamily: F.semibold, fontSize: 17, marginRight: 52 }} numberOfLines={1}>{card.title}</T>
         </View>
 
-        <Animated.View ref={lift.ref} collapsable={false} onLayout={lift.onLayout} entering={lift.lifted ? undefined : CARD_IN.duration(640)} style={[{ marginTop: 10, zIndex: 2 }, lift.style]}>
-          <NeonCard c={neon} width={cw} hide={hide} />
-        </Animated.View>
+        <View style={{ marginTop: 10 }}>
+          <LiftCard c={neon} width={cw} hide={hide} />
+        </View>
 
         <Animated.View entering={FadeInDown.delay(40).duration(DUR.slow).easing(EASE_OUT)} style={{ marginTop: 22 }}>
           {marketId ? (

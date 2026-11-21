@@ -9,7 +9,7 @@ import { Icon, type IconName } from '../../ui/Icon';
 import { IconButton, Press, success } from '../../ui/controls';
 import Animated, { Keyframe } from 'react-native-reanimated';
 import { EASE_OUT } from '../../ui/motion';
-import { useLift } from '../../ui/useLift';
+import { LiftCard } from '../../ui/LiftCard';
 import { NeonCard } from '../../ui/NeonCard';
 import { PriceGraph } from '../../ui/PriceGraph';
 import { useCurrency } from '../../lib/prices';
@@ -49,7 +49,6 @@ const CARD_UP = new Keyframe({
 
 /** Solana or Tron on its own screen: the card, send / receive / test coins, its tokens, and what happened. */
 export default function XCoinScreen() {
-  const lift = useLift();
   const { chain: raw } = useLocalSearchParams<{ chain: string }>();
   const chain: XCoin = raw === 'trx' ? 'trx' : 'sol';
   const insets = useSafeAreaInsets();
@@ -123,13 +122,7 @@ export default function XCoinScreen() {
           <View style={{ width: 40 }} />
         </View>
         <View style={{ alignItems: 'center', paddingTop: 6, zIndex: 2 }}>
-          <Animated.View ref={lift.ref} collapsable={false} onLayout={lift.onLayout} entering={lift.lifted ? undefined : CARD_UP.duration(640)} style={lift.style}>
-          <NeonCard
-            c={{ rim: chain, title: c.title, sub: c.address ? netLabel : 'Not set up yet', balance: c.address ? c.balance : '—', unit: c.unit, note: real ? '' : 'Testnet · no market value', mark: { kind: 'logo', id: chain } }}
-            width={cw - 24}
-            hide={hide}
-          />
-          </Animated.View>
+          <LiftCard c={{ rim: chain, title: c.title, sub: c.address ? netLabel : 'Not set up yet', balance: c.address ? c.balance : '—', unit: c.unit, note: real ? '' : 'Testnet · no market value', mark: { kind: 'logo', id: chain } }} width={cw - 24} hide={hide} />
         </View>
 
         {c.address ? (
