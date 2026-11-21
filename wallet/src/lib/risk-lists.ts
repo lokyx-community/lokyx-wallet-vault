@@ -21,7 +21,7 @@ export const useRiskInfo = () => useStore(riskInfo);
 
 const file = (name: string) => new File(Paths.document, `lokyx-risk-${name}.b64`);
 
-async function base(): Promise<string> {
+export async function riskBase(): Promise<string> {
   let v = DEFAULT_RISK;
   try {
     const s = ((await getItem('w.riskUrl')) ?? '').trim().replace(/\/+$/, '');
@@ -57,7 +57,7 @@ async function get(url: string): Promise<Response> {
 /** Fetch newer lists if the relay has any (at most every 6 hours). Never throws and never blocks the app. */
 export async function refreshRisk(force = false): Promise<void> {
   try {
-    const url = await base();
+    const url = await riskBase();
     if (!url) return;
     const last = Number((await getItem('w.riskcheck')) ?? 0);
     if (!force && Date.now() - last < EVERY) return;

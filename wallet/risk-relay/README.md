@@ -9,6 +9,8 @@ down to a compact file of fingerprints and hands the same file to every phone. T
 | `/lists/meta` | when the lists were built, how many entries, and whether each source worked |
 | `/lists/domains.bin` | fingerprints of scam sites (6 bytes each, sorted) |
 | `/lists/addresses.bin` | fingerprints of scam addresses |
+| `/risk/address?chain=1&address=0x…` | what GoPlus says about an address or contract (danger / caution / ok / unknown) |
+| `/risk/token?chain=1&address=0x…` | what GoPlus says about a token (can it be sold, hidden code, big fees) |
 
 Sources (see `SOURCES` in `worker.mjs`): MetaMask's phishing list, ScamSniffer's public scam database and MyEtherWallet's
 ethereum-lists darklists. If one source breaks, its last good copy is kept and `/lists/meta` says which one failed.
@@ -24,6 +26,23 @@ ethereum-lists darklists. If one source breaks, its last good copy is kept and `
 5. Open `<address>/lists/meta`. Every source should say `"ok": true`. A source with `"ok": false` has a wrong address or changed
    its format; the error says why.
 6. Put the address in `wallet/src/lib/risk-lists.ts` as `DEFAULT_RISK` and make a new build.
+
+## The security service (GoPlus)
+
+The phone asks `/risk/…` only about a contract that its own lists and checks could not judge. The relay asks GoPlus once per
+contract and keeps the answer for 6 hours, so the free plan goes a long way. The relay and GoPlus see the contract address
+and nothing else; the screen says so.
+
+Put your GoPlus key in as secrets, from your own terminal, **never in chat or in a file**:
+
+```
+npx wrangler secret put GOPLUS_APP_KEY
+npx wrangler secret put GOPLUS_APP_SECRET
+```
+
+Without them the relay still asks GoPlus without a key (lower limits). If a key is wrong it falls back to that, so a bad key never
+switches the check off. GoPlus's licence asks for attribution outside personal use, so the sheet shows "Security data: GoPlus"
+wherever its answer is used. Read their licence before launch.
 
 Read each list's terms before launch: ScamSniffer says its public database is free for commercial use, ethereum-lists is MIT,
 and MetaMask's repository carries its own licence. This file does not replace reading them.

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, View } from 'react-native';
 import { formatEther } from 'viem';
 import Svg, { Circle } from 'react-native-svg';
@@ -16,6 +16,8 @@ import { shortAddr } from '../lib/format';
 import { Logo, logoFor } from './Logo';
 import { TokenLogo } from './CoinLogo';
 import { addressRisk, blockSite, siteRisk, unblockSite } from '../lib/risk-lists';
+import { askRisk, apiCovers } from '../lib/risk-api';
+import { flagText, worstVerdict, type ApiVerdict } from '../lib/risk-api-core';
 import { useBlockedSites } from '../lib/data';
 import { hostChain } from '../lib/risk-lists-core';
 import { previewSend, type Shown, type ShownPreview } from '../lib/preview';
@@ -23,7 +25,7 @@ import { previewTone, previewWords, type Preview } from '../lib/preview-core';
 import { activeNets, lookupToken } from '../lib/multichain';
 import { combineTone, raiseTone, capApproval, typedAmount, type Tone } from '../lib/sign-view-core';
 import { describeData } from '../lib/evm-dapp-core';
-import { formatUnits } from '../lib/multichain-core';
+import { ETH_NETS, formatUnits } from '../lib/multichain-core';
 import type { ContractCheck } from '../lib/contract-check';
 import type { Assessment } from '../lib/signing-core';
 
@@ -231,7 +233,31 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
     };
   }, [ask, wantsPreview, unit]);
   const pvDone = pv && pv !== 'busy' ? pv : null;
-  const ready = scanned && chk !== 'busy' && ass !== null && pv !== 'busy';
+  // the security service: only for what the wallet's own checks could not judge
+  const eth = activeNets().eth;
+  const chainId = ETH_NETS[eth].chainId;
+  const targets = useMemo(() => {
+    if (ask.kind !== 'send' || chk === 'busy' || pv === 'busy' || !apiCovers(chainId)) return [] as { kind: 'address' | 'token'; addr: string }[];
+    const out: { kind: 'address' | 'token'; addr: string }[] = [];
+    if (!(chk && chk.verdict.level === 'ok')) for (const a of [ask.to, data?.spender]) if (a) out.push({ kind: 'address', addr: a });
+    const got = pv && pv !== 'busy' && pv.shown.state === 'ready' ? pv.shown.in : [];
+    for (const m of got) if (!m.nft && m.id === undefined && m.token !== 'native' && !logoFor(m.symbol) && out.length < 4) out.push({ kind: 'token', addr: m.token });
+    return out;
+  }, [ask, chk, pv, chainId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const apiKey = targets.map((t) => `${t.kind}:${t.addr}`).join(',');
+  const [apiRes, setApiRes] = useState<{ key: string; v: ApiVerdict | null } | null>(null);
+  useEffect(() => {
+    if (!apiKey) return;
+    let live = true;
+    Promise.all(targets.map((t) => askRisk(t.kind, chainId, t.addr))).then((vs) => live && setApiRes({ key: apiKey, v: worstVerdict(vs) }));
+    return () => {
+      live = false;
+    };
+  }, [apiKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const apiBusy = !!apiKey && apiRes?.key !== apiKey;
+  const api = apiKey && apiRes?.key === apiKey ? apiRes.v : null;
+  const apiTone: Tone | null = api?.level === 'danger' ? 'stop' : api?.level === 'caution' ? 'review' : null;
+  const ready = scanned && chk !== 'busy' && ass !== null && pv !== 'busy' && !apiBusy;
   const base: Tone | null = ready ? combineTone(ass && !ass.skipped ? ass.level : null, chk && chk !== 'busy' ? chk.verdict.level : null) : null;
   const pvTone = pvDone && ask.kind === 'send' ? previewTone(pvDone.raw, { value: ask.value, data: ask.data }) : null;
   // scam lists and the person's own block list: a hit stops the request whatever else looks fine
@@ -239,7 +265,7 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
   const siteWhy = siteRisk(ask.site.origin);
   const addrHit = ask.kind === 'send' && [ask.to, data?.spender, ass?.main?.spender].some((a) => addressRisk(a));
   const riskTone: Tone | null = siteWhy || addrHit ? 'stop' : null;
-  const tone: Tone | null = base ? raiseTone(raiseTone(base, pvTone), riskTone) : null;
+  const tone: Tone | null = base ? raiseTone(raiseTone(raiseTone(base, pvTone), riskTone), apiTone) : null;
   const youBlocked = hostChain(ask.site.origin).some((h) => blockedList.includes(h));
   const pvCaused = !!pvTone && tone === pvTone && base !== tone;
   const t = tone ? TONE[tone] : null;
@@ -256,6 +282,9 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
     if (riskTone) {
       headline = siteWhy === 'list' ? 'This site is on a scam list' : siteWhy === 'you' ? 'You blocked this site' : 'This address is on a scam list';
       says = siteWhy === 'list' ? "Security teams have reported it for stealing coins. Don't approve anything here." : siteWhy === 'you' ? 'You told the wallet to block it. Reject this, and unblock it only if you trust it again.' : "Coins sent to it, or allowed for it, have been reported stolen. Don't approve.";
+    } else if (apiTone && tone === apiTone && api) {
+      headline = api.level === 'danger' ? 'A security service flags this' : 'A security service has concerns';
+      says = api.flags.slice(0, 2).map(flagText).join(' ');
     } else if (pw) {
       headline = pw.headline;
       says = pw.says;
@@ -312,6 +341,7 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
         <Animated.View entering={FadeInDown.duration(DUR.slow).easing(EASE_OUT)} key={headline}>
           <T style={{ fontFamily: F.semibold, fontSize: 26, letterSpacing: -0.8, lineHeight: 31, textAlign: 'center', marginTop: 6 }}>{headline}</T>
           {says ? <T v="sub" style={{ textAlign: 'center', color: C.soft, lineHeight: 21, marginTop: 8, paddingHorizontal: 6 }}>{says}</T> : null}
+          {api && api.level !== 'unknown' ? <T v="caption" dim style={{ textAlign: 'center', marginTop: 6 }}>Security data: GoPlus</T> : null}
         </Animated.View>
       ) : null}
 
@@ -401,7 +431,7 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
       ) : (
         <Button title="Reject" kind="plain" onPress={onReject} />
       )}
-      <T v="caption" dim style={{ textAlign: 'center', marginTop: 12 }}>The wallet tests the request on a node, looks the contract up in public code registries, and checks the rest on this phone. Your keys never leave it.</T>
+      <T v="caption" dim style={{ textAlign: 'center', marginTop: 12 }}>The wallet tests the request on a node, looks the contract up in public code registries and, for contracts it cannot judge, asks a security service (GoPlus). Your keys never leave this phone.</T>
     </View>
   );
 }
