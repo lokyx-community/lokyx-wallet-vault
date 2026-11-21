@@ -56,6 +56,7 @@ export async function handle(request, env, ctx, cache, fetchFn) {
   const hit = await cache.match(fresh);
   if (hit) return new Response(hit.body, { status: 200, headers: { 'content-type': 'application/json', 'x-lokyx-cache': 'hit' } });
 
+  let why = 'no answer';
   try {
     const headers = { accept: 'application/json' };
     if (env.CG_KEY) headers['x-cg-demo-api-key'] = env.CG_KEY;
@@ -67,10 +68,13 @@ export async function handle(request, env, ctx, cache, fetchFn) {
       ctx.waitUntil(Promise.all([keep(fresh, TTL[r.kind]), keep(stale, STALE)]));
       return json(body, 200, { 'x-lokyx-cache': 'miss' });
     }
-  } catch {}
+    why = `CoinGecko said ${up.status}`;
+  } catch (e) {
+    why = e instanceof SyntaxError ? 'CoinGecko sent something that is not JSON' : 'could not reach CoinGecko';
+  }
   const old = await cache.match(stale);
   if (old) return new Response(old.body, { status: 200, headers: { 'content-type': 'application/json', 'x-lokyx-stale': '1' } });
-  return json({ error: 'the price feed is busy' }, 502);
+  return json({ error: 'the price feed is busy', why }, 502);
 }
 
 export default {
