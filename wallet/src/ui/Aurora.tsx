@@ -89,7 +89,7 @@ function Band({ r, k, strength, still }: { r: Ribbon; k: number; strength: numbe
 }
 
 /** Sits behind a page's content, taps pass through it. `strength` 1 is Home; pages with a lot of text use less. */
-export function Aurora({ strength = 0.6 }: { strength?: number }) {
+export function Aurora({ strength = 1 }: { strength?: number }) {
   const { width, height } = useWindowDimensions();
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
   const still = useReducedMotion();

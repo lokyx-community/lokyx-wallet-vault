@@ -65,10 +65,10 @@ export default function PaymentDetails() {
   const self = item.kind === 'self';
   const conf = m?.confirmations ?? 0;
   const state = item.failed ? 'failed' : pending ? 'pending' : conf >= 6 || (item.coin !== 'btc' && item.coin !== 'eth') ? 'settled' : 'block';
+  const other = item.other || (out ? m?.to : m?.from) || '';
   // only plain coin payments can be repeated: a token or another coin has its own send screen
   const nativeUnit = item.coin === 'btc' ? BTC_NETS[activeNets().btc].unit : item.coin === 'eth' ? ETH_NETS[activeNets().eth].unit : '';
   const again = out && other && (item.coin === 'btc' || item.coin === 'eth') && item.unit === nativeUnit ? () => router.push(`/chain/send?chain=${item.coin}&to=${other}&amount=${item.amount.replace(/,/g, '')}`) : undefined;
-  const other = item.other || (out ? m?.to : m?.from) || '';
   const known = nameFor(other) ?? nameIn(shared, other);
   const line = self ? 'To yourself' : other ? `${out ? 'to' : 'from'} ${known ?? shortAddr(other, 8, 6)}` : out ? 'Sent' : 'Received';
   const copyId = async () => {

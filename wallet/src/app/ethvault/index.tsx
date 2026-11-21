@@ -1,7 +1,7 @@
 import { Tutorial, HowItWorks } from '../../ui/Tutorial';
 import { useTutorial } from '../../lib/tutorial';
 import { useEffect, useState } from "react";
-import { View, useWindowDimensions } from "react-native";
+import { View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { toast } from "../../ui/Toast";
@@ -10,11 +10,14 @@ import { T } from "../../ui/Text";
 import { C, F } from "../../ui/theme";
 import { VaultRing } from "../../ui/VaultRing";
 import { ActionRow } from "../../ui/ActionRow";
-import { WalletCard, type CardKind } from "../../ui/WalletCards";
+import type { CardKind } from "../../ui/WalletCards";
+import { Icon } from "../../ui/Icon";
+import { Sheet } from "../../ui/Sheet";
+import { VaultEditSheet } from "../../ui/VaultEditSheet";
 import { CoinMark } from "../../ui/CoinMark";
 import { LeadRow } from "../../ui/LeadRow";
 import type { LogoId } from "../../ui/logos";
-import { Button, ErrorText, Group, Note, Row, Screen } from "../../ui/controls";
+import { Button, ErrorText, Group, Note, Press, Row, Screen } from "../../ui/controls";
 import { LogoChips, VAULT_MARK } from "../../ui/LogoChips";
 import { IntroHero, Feature, Features } from "../../ui/Feature";
 import { SlideToPay } from "../../ui/SlideToPay";
@@ -77,7 +80,6 @@ export default function EthVault() {
     p.net && NETS.includes(p.net) ? p.net : NETS[0],
   );
   const all = useStore(vaults);
-  const { width } = useWindowDimensions();
   useEffect(() => {
     loadVaults();
   }, []);
@@ -89,6 +91,9 @@ export default function EthVault() {
   );
   const parts = useAsync<{ ready: boolean; missing: string[] } | null>(async () => (v ? null : partsStatus(net)), [net, !!v]);
   const [err, setErr] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [hist, setHist] = useState(false);
+  const [cancelAll, setCancelAll] = useState(false);
   const s = snap.data;
   const copy = async (text: string, what: string) => {
     await Clipboard.setStringAsync(text);
@@ -134,45 +139,71 @@ export default function EthVault() {
                   i.level === "warn" && !/item\(s\) are waiting/.test(i.text),
               )
               .map((i) => <Note key={i.text}>{i.text}</Note>)}
-          <WalletCard
-            c={{
-              kind: CARD[net].kind,
-              logo: CARD[net].logo,
-              title: `${CARD[net].name} vault`,
-              sub: !s ? "Checking…" : s.issues.some((i) => i.level === "danger") ? "Needs a look" : "Protected",
-              balance: s ? eth(s.eth, 18, 4) : "",
-              unit: NATIVE[net],
-              address: s?.expected.safe,
-            }}
-            width={width - 40}
-          />
+          {(() => {
+            const nowS = Math.floor(Date.now() / 1000);
+            const a = v.allowances.find((x) => x.token.toLowerCase() === ETH.toLowerCase());
+            const total = a ? BigInt(a.amount) : 0n;
+            const l = a && s ? s.today.find((t) => t.token.toLowerCase() === ETH.toLowerCase())?.left ?? total : total;
+            const used = total > 0n ? Math.max(0, Math.min(1, 1 - Number(l) / Number(total))) : 0;
+            const waitingN = s ? s.items.filter((i) => itemState(i, nowS, s.live.delay.txNonce) === 'waiting').length : 0;
+            const danger = !!s?.issues.some((i) => i.level === 'danger');
+            return (
+              <>
+                <View style={{ borderRadius: 30, padding: 20, gap: 12, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.14)', overflow: 'hidden' }}>
+                  <View style={{ position: 'absolute', right: -34, top: -34, opacity: 0.1 }}><VaultRing size={170} stroke={14} frac={1 - used} color={C.text} /></View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <CoinMark symbol={NATIVE[net]} seed={net} logo={VAULT_MARK[net].logo} size={30} />
+                    <T style={{ fontFamily: F.semibold, fontSize: 15 }}>{`${CARD[net].name} vault`}</T>
+                    <View style={{ marginLeft: 'auto', height: 26, paddingHorizontal: 11, borderRadius: 13, justifyContent: 'center', backgroundColor: danger ? 'rgba(255,92,92,0.14)' : 'rgba(255,255,255,0.09)' }}>
+                      <T style={{ fontFamily: F.medium, fontSize: 12.5, color: danger ? C.bad : C.soft }}>{!s ? 'Checking…' : danger ? 'Needs a look' : 'Protected'}</T>
+                    </View>
+                  </View>
+                  {a ? (
+                    <>
+                      <T v="sub" dim>Left to spend today</T>
+                      <T style={{ fontFamily: F.regular, fontSize: 40, letterSpacing: -1.4, fontVariant: ['tabular-nums'], marginTop: -6 }} numberOfLines={1} adjustsFontSizeToFit>{`${eth(l, a.decimals, 4)} ${NATIVE[net]}`}</T>
+                      <View style={{ height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.12)' }}>
+                        <View style={{ height: 4, borderRadius: 2, backgroundColor: C.text, opacity: 0.85, width: `${Math.round(used * 100)}%` }} />
+                      </View>
+                      <T v="caption" dim>{`of ${eth(total, a.decimals, 4)} ${NATIVE[net]} a day · ${s ? `${eth(s.eth, 18, 4)} ${NATIVE[net]} in the vault` : ''}`}</T>
+                    </>
+                  ) : (
+                    <>
+                      <T v="sub" dim>In the vault</T>
+                      <T style={{ fontFamily: F.regular, fontSize: 40, letterSpacing: -1.4, fontVariant: ['tabular-nums'], marginTop: -6 }} numberOfLines={1} adjustsFontSizeToFit>{s ? `${eth(s.eth, 18, 4)} ${NATIVE[net]}` : ''}</T>
+                      <T v="caption" dim>No daily limit on this coin: every send waits.</T>
+                    </>
+                  )}
+                </View>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  {([
+                    ['pen', 'Edit limit', () => (v.gated ? router.push(`/ethvault/settings?net=${net}`) : setEditing(true)), false],
+                    ['close', waitingN ? `Cancel ${waitingN}` : 'Cancel waiting', waitingN && s ? () => setCancelAll(true) : undefined, !waitingN],
+                    ['clock', 'History', () => setHist(true), false],
+                  ] as const).map(([icon, label, on, off]) => (
+                    <Press key={label} onPress={on} disabled={off} accessibilityLabel={label} style={{ flex: 1, height: 46, borderRadius: 23, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', opacity: off ? 0.4 : 1, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' }}>
+                      <Icon name={icon} size={16} color={C.soft} width={1.9} />
+                      <T style={{ fontFamily: F.medium, fontSize: 13.5 }}>{label}</T>
+                    </Press>
+                  ))}
+                </View>
+              </>
+            );
+          })()}
           <ActionRow
             items={[
               { icon: "send", label: "Send", onPress: () => router.push(`/ethvault/send?net=${net}`) },
               { icon: "receive", label: "Receive", onPress: s ? () => copy(s.expected.safe, "Vault address") : () => {} },
             ]}
           />
-          {(() => {
-            const a = v.allowances.find((x) => x.token.toLowerCase() === ETH.toLowerCase());
-            if (!a || !s) return null;
-            const total = Number(BigInt(a.amount)) || 1;
-            const l = s.today.find((t) => t.token.toLowerCase() === ETH.toLowerCase())?.left ?? BigInt(a.amount);
-            const used = Math.max(0, Math.min(1, 1 - Number(l) / total));
-            return (
-              <View style={{ borderRadius: 24, backgroundColor: C.fill, padding: 16, gap: 12 }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <T v="callout" style={{ fontSize: 16 }}>Allowance today</T>
-                  <T v="sub" dim>{`${eth(BigInt(a.amount) - l, 18, 4)} of ${eth(BigInt(a.amount), 18, 4)} ${NATIVE[net]}`}</T>
-                </View>
-                <View style={{ height: 6, borderRadius: 3, backgroundColor: C.fill2 }}>
-                  <View style={{ height: 6, borderRadius: 3, backgroundColor: C.blue, width: `${Math.round(used * 100)}%` }} />
-                </View>
-                <T v="caption" dim>Small sends go straight out. Anything bigger waits.</T>
-              </View>
-            );
-          })()}
+          <Group title="Rules">
+            <Row title="Daily limit" detail={(() => { const a = v.allowances.find((x) => x.token.toLowerCase() === ETH.toLowerCase()); return a ? `${eth(BigInt(a.amount), a.decimals, 4)} ${NATIVE[net]}` : 'None'; })()} onPress={() => (v.gated ? router.push(`/ethvault/settings?net=${net}`) : setEditing(true))} />
+            <Row title="Wait on bigger sends" detail={waitText(v.wait)} onPress={() => (v.gated ? router.push(`/ethvault/settings?net=${net}`) : setEditing(true))} />
+            <Row title="Bigger sends go to" sub="Your safe address" detail={shortAddr(v.sweepTo, 6, 4)} onPress={() => copy(v.sweepTo, "Safe address")} />
+          </Group>
           {s && s.items.length > 0 && (
             <View style={{ gap: 12 }}>
+              <T style={{ fontFamily: F.semibold, fontSize: 13, letterSpacing: 0.2, color: C.sub, paddingHorizontal: 8 }}>Waiting sends</T>
               {s.items.map((i) => {
                 const st = itemState(i, Math.floor(Date.now() / 1000), s.live.delay.txNonce);
                 if (st === "cancelled") return null;
@@ -206,25 +237,9 @@ export default function EthVault() {
                   </View>
                 );
               })}
-              {s.items.some((i) => itemState(i, Math.floor(Date.now() / 1000), s.live.delay.txNonce) === "waiting") && (
-                <SlideToPay
-                  label="Slide to cancel all waiting"
-                  onSlide={async () => {
-                    if (!(await confirmIt("Cancel everything waiting in your Ethereum vault"))) return false;
-                    try {
-                      await phoneCancel(v, s);
-                      done();
-                      return true;
-                    } catch (e) {
-                      setErr(plainError(e, VAULT_NETS[net].label));
-                      return false;
-                    }
-                  }}
-                />
-              )}
             </View>
           )}
-          <Group title="Coins in this vault">
+          <Group title="Protected coins">
             {(() => {
               const rows = [
                 { key: "ETH", symbol: NATIVE[net], token: ETH as string, decimals: 18, have: s?.eth ?? 0n },
@@ -238,7 +253,7 @@ export default function EthVault() {
                     key={r.key}
                     lead={<CoinMark symbol={r.symbol} seed={r.token} size={40} net={undefined} />}
                     title={r.symbol}
-                    sub={!a ? "No daily allowance: always waits" : l == null ? `Allowance ${eth(BigInt(a.amount), r.decimals, 4)} a day` : `${eth(l, r.decimals, 4)} left today of ${eth(BigInt(a.amount), r.decimals, 4)}`}
+                    sub={!a ? "Every send waits" : l == null ? `Limit ${eth(BigInt(a.amount), r.decimals, 4)} a day` : `${eth(l, r.decimals, 4)} left today of ${eth(BigInt(a.amount), r.decimals, 4)}`}
                     detail={eth(r.have, r.decimals, 4)}
                     onPress={() => router.push(`/ethvault/settings?net=${net}`)}
                     chevron
@@ -247,6 +262,44 @@ export default function EthVault() {
               });
             })()}
           </Group>
+          <VaultEditSheet open={editing} onClose={() => setEditing(false)} v={v} net={net} symbol={NATIVE[net]} onQueued={done} />
+          <Sheet open={hist} onClose={() => setHist(false)}>
+            <View style={{ padding: 20, gap: 12 }}>
+              <T v="headline">History</T>
+              {s && s.items.length ? s.items.slice().sort((x, y) => y.readyAt - x.readyAt).map((i) => {
+                const st = itemState(i, Math.floor(Date.now() / 1000), s.live.delay.txNonce);
+                const d = describeCall(i, tokensOn(net), { safe: s.expected.safe });
+                return (
+                  <View key={String(i.nonce)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44 }}>
+                    <View style={{ flex: 1 }}>
+                      <T style={{ fontFamily: F.medium, fontSize: 14.5 }} numberOfLines={2}>{d.line}</T>
+                      <T v="caption" dim>{st === 'waiting' ? `Runs in ${left(i.readyAt)}` : st === 'ready' ? 'Ready to run' : st === 'cancelled' ? 'Cancelled' : 'Expired or done'}</T>
+                    </View>
+                  </View>
+                );
+              }) : <T v="sub" dim>Nothing has waited in this vault yet.</T>}
+            </View>
+          </Sheet>
+          {s && s.items.some((i) => itemState(i, Math.floor(Date.now() / 1000), s.live.delay.txNonce) === 'waiting') && cancelAll ? (
+            <View style={{ gap: 10 }}>
+              <SlideToPay
+                label="Slide to cancel all waiting"
+                onSlide={async () => {
+                  if (!(await confirmIt('Cancel everything waiting in your vault'))) return false;
+                  try {
+                    await phoneCancel(v, s);
+                    setCancelAll(false);
+                    done();
+                    return true;
+                  } catch (e) {
+                    setErr(plainError(e, VAULT_NETS[net].label));
+                    return false;
+                  }
+                }}
+              />
+              <Button title="Keep them" kind="line" onPress={() => setCancelAll(false)} />
+            </View>
+          ) : null}
           <Group title="Settings">
             <Row
               title="Wait on bigger withdrawals"

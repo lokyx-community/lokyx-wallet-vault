@@ -24,7 +24,7 @@ export interface TxViewProps {
   mark: ReactNode;
   /** "Sent · Tron Nile" */
   label: string;
-  /** the transaction id, shown (and copied) at the foot of the receipt */
+  /** the transaction id, shown (and copied) in the details */
   hash: string;
   steps: TxStep[];
   rows: [string, string, boolean?][];
@@ -43,11 +43,32 @@ export interface TxViewProps {
 }
 
 const glass = { backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' } as const;
+const hair = { borderTopWidth: 0.5, borderTopColor: 'rgba(255,255,255,0.08)' } as const;
+
+/** A thin line with one segment per step: filled for done, half for the one in progress. Only shown while a payment is on its way. */
+function Progress({ steps }: { steps: TxStep[] }) {
+  return (
+    <View style={{ alignSelf: 'stretch', gap: 8, marginTop: 4 }}>
+      <View style={{ flexDirection: 'row', gap: 4 }}>
+        {steps.map((st) => (
+          <View key={st.title} style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+            <View style={{ width: st.state === 'done' ? '100%' : st.state === 'now' ? '50%' : '0%', height: 3, backgroundColor: st.state === 'failed' ? C.bad : C.text, opacity: 0.85 }} />
+          </View>
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', gap: 4 }}>
+        {steps.map((st) => (
+          <T key={st.title} style={{ flex: 1, fontFamily: F.medium, fontSize: 11.5, color: st.state === 'next' ? C.faint : C.sub, textAlign: 'center' }} numberOfLines={1}>{st.title}</T>
+        ))}
+      </View>
+    </View>
+  );
+}
 
 /**
- * One payment on any chain, in plain words. A finished payment says "Done" with the LOKYX sign and nothing else: the
- * Sent / In a block / Settled steps are only shown while it is still on its way. Below: the details, a private note and tag,
- * and Send again for money you sent.
+ * One payment on any chain, in one calm glass panel: the coin, who it went to, the amount, and a chip. A finished payment
+ * says "Done" with the LOKYX sign; while it is on its way the chip is a hollow ring and a thin line shows how far it got.
+ * Below the amount: what it was worth, the details, and a private note with tags. Share and Send again sit under the panel.
  */
 export function TxView(p: TxViewProps) {
   useEffect(() => { loadTxMeta(); }, []);
@@ -62,127 +83,128 @@ export function TxView(p: TxViewProps) {
     tick();
     Share.share({ message: p.shareText ?? `${p.sign}${p.amount} ${p.unit}\n${p.line}\nTransaction: ${p.hash}` }).catch(() => {});
   };
-  return (
-    <>
-      <View style={{ alignItems: 'center', paddingTop: 10, gap: 6 }}>
-        <View style={{ marginBottom: 6 }}>{p.mark}</View>
-        <T v="sub" dim>{p.label}</T>
-        <T style={{ fontFamily: F.regular, fontSize: 56, letterSpacing: -2.2, fontVariant: ['tabular-nums'], color: C.text }} numberOfLines={1} adjustsFontSizeToFit>
-          {`${p.sign}${p.amount}`}
-        </T>
-        <T style={{ fontFamily: F.medium, fontSize: 15, color: C.sub, marginTop: -6 }}>{p.unit} · {p.line}</T>
-        <View style={{ marginTop: 12, minHeight: 40 }}>
-          {p.state === 'settled' ? (
-            <DoneMark />
-          ) : p.state === 'failed' ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 36, paddingHorizontal: 16, borderRadius: 18, backgroundColor: 'rgba(255,92,92,0.12)' }}>
-              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: C.bad }} />
-              <T style={{ fontFamily: F.medium, fontSize: 14, color: C.bad }}>Didn't go through</T>
-            </View>
-          ) : (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 36, paddingHorizontal: 16, borderRadius: 18, ...glass }}>
-              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: C.wait }} />
-              <T style={{ fontFamily: F.medium, fontSize: 14, color: C.soft }}>{p.state === 'pending' ? 'On its way' : 'Almost done'}</T>
-            </View>
-          )}
-        </View>
-        {p.failMsg ? <T v="sub" color={C.bad} style={{ textAlign: 'center', marginTop: 8 }}>{p.failMsg}</T> : null}
-        {live ? (
-          <View style={{ alignSelf: 'stretch', marginTop: 14, paddingHorizontal: 6 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <View style={{ position: 'absolute', left: '16%', right: '16%', top: 6, height: 2, backgroundColor: 'rgba(255,255,255,0.12)' }} />
-              {p.steps.map((st) => (
-                <View key={st.title} style={{ flex: 1, alignItems: 'center' }}>
-                  <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: st.state === 'next' ? 'rgba(255,255,255,0.22)' : C.wait, backgroundColor: st.state === 'done' ? C.wait : C.bg }} />
-                  <T style={{ fontFamily: F.medium, fontSize: 12.5, color: st.state === 'next' ? C.faint : C.soft, marginTop: 6, textAlign: 'center' }}>{st.title}</T>
-                </View>
-              ))}
-            </View>
-            {now?.sub ? <T v="caption" dim style={{ textAlign: 'center', marginTop: 8 }}>{now.sub}</T> : null}
+  const wt = p.worth?.then;
+  const wn = p.worth?.now;
+  const sections: ReactNode[] = [];
+  if (wt || wn) {
+    sections.push(
+      <View key="worth" style={{ paddingVertical: 4 }}>
+        {wt ? (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 }}>
+            <T v="sub" dim style={{ fontSize: 14 }}>{p.sign === '−' ? 'When you sent it' : 'When it arrived'}</T>
+            <T style={{ fontFamily: F.medium, fontSize: 15, fontVariant: ['tabular-nums'] }}>{wt}</T>
           </View>
         ) : null}
-      </View>
-
-      {p.worth && (p.worth.then || p.worth.now) ? (
-        <View style={{ borderRadius: 26, paddingHorizontal: 18, paddingVertical: 6, ...glass }}>
-          {p.worth.then ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 46 }}>
-              <T v="sub" dim style={{ fontSize: 14 }}>{p.sign === '−' ? 'When you sent it' : 'When it arrived'}</T>
-              <T style={{ fontFamily: F.medium, fontSize: 15, fontVariant: ['tabular-nums'] }}>{p.worth.then}</T>
-            </View>
-          ) : null}
-          {p.worth.now ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 46, borderTopWidth: p.worth.then ? 0.5 : 0, borderTopColor: 'rgba(255,255,255,0.08)' }}>
-              <T v="sub" dim style={{ fontSize: 14 }}>Worth now</T>
-              <T style={{ fontFamily: F.medium, fontSize: 15, fontVariant: ['tabular-nums'] }}>
-                {p.worth.now}
-                {p.worth.pct !== undefined ? <T style={{ fontFamily: F.medium, fontSize: 13, color: p.worth.pct >= 0 ? '#9BE5BD' : C.sub }}>{`  ${p.worth.pct >= 0 ? '+' : '−'}${Math.abs(p.worth.pct).toFixed(1)}%`}</T> : null}
-              </T>
-            </View>
-          ) : null}
+        {wn ? (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 }}>
+            <T v="sub" dim style={{ fontSize: 14 }}>Worth now</T>
+            <T style={{ fontFamily: F.medium, fontSize: 15, fontVariant: ['tabular-nums'] }}>
+              {wn}
+              {p.worth?.pct !== undefined ? <T style={{ fontFamily: F.medium, fontSize: 13, color: p.worth.pct >= 0 ? '#9BE5BD' : C.sub }}>{`  ${p.worth.pct >= 0 ? '+' : '−'}${Math.abs(p.worth.pct).toFixed(1)}%`}</T> : null}
+            </T>
+          </View>
+        ) : null}
+      </View>,
+    );
+  }
+  sections.push(
+    <View key="rows" style={{ paddingVertical: 4 }}>
+      {p.rows.map(([l, v, mono], i) => (
+        <View key={l} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44, gap: 16, ...(i ? hair : null) }}>
+          <T v="sub" dim style={{ fontSize: 14 }}>{l}</T>
+          <T style={{ fontFamily: mono ? F.mono : F.medium, fontSize: mono ? 13 : 14, color: C.text, flexShrink: 1, textAlign: 'right' }} numberOfLines={1}>{v}</T>
+        </View>
+      ))}
+      <Press
+        onPress={() => {
+          p.onCopy();
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        }}
+        accessibilityLabel="Copy the transaction id"
+        style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44, gap: 16, ...(p.rows.length ? hair : null) }}
+      >
+        <T v="sub" dim style={{ fontSize: 14 }}>Hash</T>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
+          <T style={{ fontFamily: F.mono, fontSize: 13, color: C.text }} numberOfLines={1}>{copied ? 'Copied' : shortAddr(p.hash, 6, 4)}</T>
+          <Icon name={copied ? 'check' : 'copy'} size={15} color={C.faint} />
+        </View>
+      </Press>
+      {p.qrUrl ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, ...hair }}>
+          <View style={{ borderRadius: 10, overflow: 'hidden' }}><Qr value={p.qrUrl} size={52} /></View>
+          <T v="caption" dim style={{ flex: 1, lineHeight: 18 }}>Scan to open this payment on the block explorer.</T>
         </View>
       ) : null}
-
-      <View style={{ borderRadius: 26, paddingHorizontal: 18, paddingVertical: 6, ...glass }}>
-        {p.rows.map(([l, v, mono], i) => (
-          <View key={l} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 46, gap: 16, borderTopWidth: i ? 0.5 : 0, borderTopColor: 'rgba(255,255,255,0.08)' }}>
-            <T v="sub" dim style={{ fontSize: 14 }}>{l}</T>
-            <T style={{ fontFamily: mono ? F.mono : F.medium, fontSize: mono ? 13 : 14, color: C.text, flexShrink: 1, textAlign: 'right' }} numberOfLines={1}>{v}</T>
-          </View>
-        ))}
-        <Press
-          onPress={() => {
-            p.onCopy();
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-          }}
-          accessibilityLabel="Copy the transaction id"
-          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 46, gap: 16, borderTopWidth: 0.5, borderTopColor: 'rgba(255,255,255,0.08)' }}
-        >
-          <T v="sub" dim style={{ fontSize: 14 }}>Transaction</T>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
-            <T style={{ fontFamily: F.mono, fontSize: 13, color: C.text }} numberOfLines={1}>{copied ? 'Copied' : shortAddr(p.hash, 6, 4)}</T>
-            <Icon name={copied ? 'check' : 'copy'} size={15} color={C.faint} />
-          </View>
-        </Press>
-        {p.qrUrl ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: 0.5, borderTopColor: 'rgba(255,255,255,0.08)' }}>
-            <View style={{ borderRadius: 10, overflow: 'hidden' }}><Qr value={p.qrUrl} size={56} /></View>
-            <T v="caption" dim style={{ flex: 1, lineHeight: 18 }}>Scan to open this payment on the block explorer.</T>
-          </View>
-        ) : null}
+    </View>,
+  );
+  sections.push(
+    <View key="note" style={{ paddingTop: 14, paddingBottom: 6, gap: 10 }}>
+      <T v="caption" dim>Note · only you see it</T>
+      <TextInput
+        value={shown}
+        onChangeText={setNote}
+        onEndEditing={() => { if (note !== null) setTxNote(p.hash, note); }}
+        onBlur={() => { if (note !== null) setTxNote(p.hash, note); }}
+        placeholder="Add a note, like what it was for"
+        placeholderTextColor={C.faint}
+        selectionColor={C.text}
+        keyboardAppearance="dark"
+        maxLength={80}
+        returnKeyType="done"
+        style={{ height: 46, borderRadius: 16, paddingHorizontal: 14, fontFamily: F.regular, fontSize: 15, color: C.text, backgroundColor: 'rgba(255,255,255,0.06)' }}
+      />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {TAGS.map((t) => {
+          const on = meta?.tags?.includes(t);
+          return (
+            <Press key={t} onPress={() => toggleTxTag(p.hash, t)} accessibilityLabel={`Tag: ${t}`} style={{ height: 32, paddingHorizontal: 14, borderRadius: 16, justifyContent: 'center', backgroundColor: on ? C.ink : 'rgba(255,255,255,0.08)' }}>
+              <T style={{ fontFamily: F.medium, fontSize: 13, color: on ? C.inkText : C.soft }}>{t}</T>
+            </Press>
+          );
+        })}
       </View>
-
-      <View style={{ borderRadius: 26, padding: 16, gap: 12, ...glass }}>
-        <T v="caption" dim>Note · only you see it</T>
-        <TextInput
-          value={shown}
-          onChangeText={setNote}
-          onEndEditing={() => { if (note !== null) setTxNote(p.hash, note); }}
-          onBlur={() => { if (note !== null) setTxNote(p.hash, note); }}
-          placeholder="Add a note, like what it was for"
-          placeholderTextColor={C.faint}
-          selectionColor={C.text}
-          keyboardAppearance="dark"
-          maxLength={80}
-          returnKeyType="done"
-          style={{ height: 48, borderRadius: 16, paddingHorizontal: 14, fontFamily: F.regular, fontSize: 15, color: C.text, backgroundColor: 'rgba(255,255,255,0.06)' }}
-        />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {TAGS.map((t) => {
-            const on = meta?.tags?.includes(t);
-            return (
-              <Press key={t} onPress={() => toggleTxTag(p.hash, t)} accessibilityLabel={`Tag: ${t}`} style={{ height: 32, paddingHorizontal: 14, borderRadius: 16, justifyContent: 'center', backgroundColor: on ? C.ink : 'rgba(255,255,255,0.08)' }}>
-                <T style={{ fontFamily: F.medium, fontSize: 13, color: on ? C.inkText : C.soft }}>{t}</T>
-              </Press>
-            );
-          })}
+    </View>,
+  );
+  return (
+    <>
+      <View style={{ borderRadius: 32, paddingHorizontal: 20, paddingTop: 22, paddingBottom: 14, ...glass }}>
+        <View style={{ alignItems: 'center', gap: 6 }}>
+          <View style={{ marginBottom: 4 }}>{p.mark}</View>
+          <T v="sub" dim>{p.label}</T>
+          <T style={{ fontFamily: F.regular, fontSize: 52, letterSpacing: -2, fontVariant: ['tabular-nums'], color: C.text }} numberOfLines={1} adjustsFontSizeToFit>
+            {`${p.sign}${p.amount}`}
+          </T>
+          <T style={{ fontFamily: F.medium, fontSize: 15, color: C.sub, marginTop: -4, textAlign: 'center' }}>{p.unit} · {p.line}</T>
+          <View style={{ marginTop: 10, minHeight: 40, justifyContent: 'center' }}>
+            {p.state === 'settled' ? (
+              <DoneMark />
+            ) : p.state === 'failed' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 36, paddingHorizontal: 16, borderRadius: 18, backgroundColor: 'rgba(255,92,92,0.12)' }}>
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: C.bad }} />
+                <T style={{ fontFamily: F.medium, fontSize: 14, color: C.bad }}>Didn't go through</T>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 36, paddingLeft: 12, paddingRight: 16, borderRadius: 18, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.28)' }}>
+                <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.7)' }} />
+                <T style={{ fontFamily: F.medium, fontSize: 14, color: C.soft }}>{p.state === 'pending' ? 'On its way' : 'In a block'}</T>
+              </View>
+            )}
+          </View>
+          {p.failMsg ? <T v="sub" color={C.bad} style={{ textAlign: 'center' }}>{p.failMsg}</T> : null}
+          {live ? <Progress steps={p.steps} /> : null}
+          {live && now?.sub ? <T v="caption" dim style={{ textAlign: 'center' }}>{now.sub}</T> : null}
+        </View>
+        <View style={{ marginTop: 16 }}>
+          {sections.map((sec, i) => (
+            <View key={i} style={i ? hair : null}>{sec}</View>
+          ))}
         </View>
       </View>
 
       {p.extra}
       <View style={{ flexDirection: 'row', gap: 10, marginTop: 2 }}>
-        <Press onPress={share} style={{ width: p.onAgain ? 120 : undefined, flex: p.onAgain ? undefined : 1, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', ...glass }}>
+        <Press onPress={share} accessibilityLabel="Share this payment" style={{ width: p.onAgain ? 120 : undefined, flex: p.onAgain ? undefined : 1, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', ...glass }}>
           <T style={{ fontFamily: F.semibold, fontSize: 15.5 }}>Share</T>
         </Press>
         {p.onAgain ? (
