@@ -41,8 +41,9 @@ npx wrangler secret put GOPLUS_APP_SECRET
 ```
 
 Without them the relay still asks GoPlus without a key (lower limits). If a key is wrong it falls back to that, so a bad key never
-switches the check off. GoPlus's licence asks for attribution outside personal use, so the sheet shows "Security data: GoPlus"
-wherever its answer is used. Read their licence before launch.
+switches the check off. GoPlus's licence asks for a "Powered by Go+ Security" mention outside personal use, so the sheet shows exactly that
+wherever its answer is used. Their free plan is about 30 calls a minute, so the relay keeps each answer for 6 hours and
+refuses more than 12 new questions a minute from one phone (25 for everyone together). Read their licence before launch.
 
 Read each list's terms before launch: ScamSniffer says its public database is free for commercial use, ethereum-lists is MIT,
 and MetaMask's repository carries its own licence. This file does not replace reading them.

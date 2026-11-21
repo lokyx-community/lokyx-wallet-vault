@@ -341,7 +341,7 @@ export function SignRequest({ ask, chk, ass, unit, explorer, busy, onApprove, on
         <Animated.View entering={FadeInDown.duration(DUR.slow).easing(EASE_OUT)} key={headline}>
           <T style={{ fontFamily: F.semibold, fontSize: 26, letterSpacing: -0.8, lineHeight: 31, textAlign: 'center', marginTop: 6 }}>{headline}</T>
           {says ? <T v="sub" style={{ textAlign: 'center', color: C.soft, lineHeight: 21, marginTop: 8, paddingHorizontal: 6 }}>{says}</T> : null}
-          {api && api.level !== 'unknown' ? <T v="caption" dim style={{ textAlign: 'center', marginTop: 6 }}>Security data: GoPlus</T> : null}
+          {api && api.level !== 'unknown' ? <T v="caption" dim style={{ textAlign: 'center', marginTop: 6 }}>Powered by Go+ Security</T> : null}
         </Animated.View>
       ) : null}
 

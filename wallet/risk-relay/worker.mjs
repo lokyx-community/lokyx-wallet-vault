@@ -22,6 +22,19 @@ export const SOURCES = [
 const MAX_BYTES = 40_000_000;
 const GOPLUS = 'https://api.gopluslabs.io';
 const ANSWER_TTL = 6 * 3600;
+// GoPlus's free plan is about 30 calls a minute. Only questions that miss the cache cost a call, and they are counted here so a
+// script cannot burn the plan: a few per phone address per minute, and a ceiling for everyone together.
+const PER_PHONE_MIN = 12;
+const ALL_MIN = 25;
+
+/** Count one use of `name` this minute; false when it is over `max`. (Per data centre and not exact, which is enough for a guard.) */
+async function allow(cache, name, max, now) {
+  const key = new Request(`https://cache.invalid/rl/${name}/${Math.floor(now / 60_000)}`);
+  const seen = Number((await (await cache.match(key))?.text()) ?? 0);
+  if (seen >= max) return false;
+  await cache.put(key, new Response(String(seen + 1), { headers: { 'cache-control': 'max-age=90' } }));
+  return true;
+}
 const json = (body, status = 200, extra = {}) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...extra } });
 
 /**
@@ -104,13 +117,15 @@ async function goplus(path, env, fetchFn, now) {
 }
 
 /** Answer /risk/address and /risk/token, one contract at a time. Cached for hours so each contract costs one call. */
-async function risk(kind, url, env, fetchFn, ctx, cache) {
+async function risk(kind, url, env, fetchFn, ctx, cache, who) {
   const chain = Number(url.searchParams.get('chain'));
   const addr = normAddress(url.searchParams.get('address') ?? '');
   if (!API_CHAINS.has(chain) || !addr) return json({ error: 'bad question' }, 400);
   const key = new Request(`https://cache.invalid/risk/${kind}/${chain}/${addr}`);
   const hit = cache ? await cache.match(key) : null;
   if (hit) return new Response(hit.body, { headers: { 'content-type': 'application/json', 'x-lokyx-cache': 'hit' } });
+  const now = Date.now();
+  if (cache && !((await allow(cache, `ip-${who}`, PER_PHONE_MIN, now)) && (await allow(cache, 'all', ALL_MIN, now)))) return json({ error: 'too many questions, try again soon' }, 429);
   const raw = await goplus(kind === 'address' ? `/api/v1/address_security/${addr}?chain_id=${chain}` : `/api/v1/token_security/${chain}?contract_addresses=${addr}`, env, fetchFn, Date.now());
   if (raw === null) return json({ error: 'the security service did not answer' }, 502);
   const body = JSON.stringify(kind === 'address' ? normAddressResult(raw) : normTokenResult(raw, addr));
@@ -140,8 +155,8 @@ export async function handle(request, env, fetchFn = fetch, ctx = undefined, cac
     const body = await env.LISTS.get(p.slice('/lists/'.length), 'arrayBuffer');
     return body ? new Response(body, { headers: { 'content-type': 'application/octet-stream', 'cache-control': 'public, max-age=3600' } }) : json({ error: 'not built yet' }, 503);
   }
-  if (p === '/risk/address') return risk('address', url, env, fetchFn, ctx, cache);
-  if (p === '/risk/token') return risk('token', url, env, fetchFn, ctx, cache);
+  if (p === '/risk/address') return risk('address', url, env, fetchFn, ctx, cache, request.headers.get('cf-connecting-ip') ?? 'x');
+  if (p === '/risk/token') return risk('token', url, env, fetchFn, ctx, cache, request.headers.get('cf-connecting-ip') ?? 'x');
   return json({ error: 'not found' }, 404);
 }
 

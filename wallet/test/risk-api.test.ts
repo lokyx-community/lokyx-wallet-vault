@@ -94,3 +94,18 @@ test('bad questions are refused and a silent service is a 502, never a made-up a
   for (const q of ['/risk/address?chain=1&address=nope', `/risk/address?chain=11155111&address=${ADDR}`, '/risk/token?chain=1']) assert.equal((await handle(ask(q), { LISTS: kv() }, f, undefined, cache())).status, 400, q);
   assert.equal((await handle(ask(`/risk/address?chain=1&address=${ADDR}`), { LISTS: kv() }, f, undefined, cache())).status, 502);
 });
+
+test('a script cannot burn the free plan: per-phone and overall limits', async () => {
+  let calls = 0;
+  const f = async () => { calls++; return new Response(JSON.stringify({ code: 1, result: {} })); };
+  const c = cache();
+  const one = (i: number, ip: string) => handle(new Request(`https://r/risk/address?chain=1&address=0x${i.toString(16).padStart(40, '0')}`, { headers: { 'cf-connecting-ip': ip } }), { LISTS: kv() }, f, undefined, c);
+  for (let i = 1; i <= 12; i++) assert.equal((await one(i, '1.1.1.1')).status, 200);
+  assert.equal((await one(13, '1.1.1.1')).status, 429);
+  assert.equal(calls, 12);
+  const cached = await one(1, '1.1.1.1');
+  assert.equal(cached.status, 200, 'a cached answer is free, so it is never refused');
+  let ok = 0;
+  for (let i = 100; i < 140; i++) if ((await one(i, `9.9.9.${i}`)).status === 200) ok++;
+  assert.equal(ok, 25 - 12, 'everyone together stays under the ceiling');
+});
